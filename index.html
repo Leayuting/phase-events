@@ -247,7 +247,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 2;
+var APP_VERSION = 3;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -292,7 +292,9 @@ var K_DEV = 'phase_evt_device';
 var K_NAME = 'phase_evt_lastname';
 var K_SHORTPIN = 'phase_evt_shortpin';
 /* 每台裝置一組隨機代號，只用來計算登入錯誤次數（不鎖全場） */
-function isPin6(v) { return typeof v === 'string' && /^[0-9]{6}$/.test(v); }
+/* 管理員 PIN 4 位數、共用密碼 8 位數；用字串比對，0 開頭不會被吃掉 */
+function isAdminPin(v) { return typeof v === 'string' && /^[0-9]{4}$/.test(v); }
+function isSharedPw(v) { return typeof v === 'string' && /^[0-9]{8}$/.test(v); }
 function deviceId() {
   var d = LS.get(K_DEV);
   if (d) return d;
@@ -761,7 +763,7 @@ function vLogin() {
   var screen = S.ui.screen || 'partner';
   if (screen === 'partner') {
     h += '<p class="sub" style="margin-top:14px">輸入共用密碼和你的名字就可以開始使用。</p>' +
-      '<form data-form="partner"><div class="field"><label for="pw">共用密碼（6 位數字）</label><input type="password" id="pw" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></div>' +
+      '<form data-form="partner"><div class="field"><label for="pw">共用密碼（8 位數字）</label><input type="password" id="pw" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off"></div>' +
       '<div class="field" style="margin-top:12px"><label for="nm">你的名字</label><input type="text" id="nm" list="names" maxlength="30" autocomplete="off" value="' + esc(LS.get(K_NAME) || '') + '"></div>' + namesDatalist() +
       loginMsgHtml() + '<button class="btn" type="submit" style="width:100%;margin-top:16px">開始使用</button></form>' +
       '<div class="row" style="margin-top:20px;justify-content:space-between"><span class="hint">忘記共用密碼請問管理員。</span><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button></div>';
@@ -810,7 +812,7 @@ function vHeader() {
       : '<button class="btn ghost sm" data-act="screen" data-v="switch">換人</button><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button>') +
     '<button class="btn ghost sm" data-act="logout">登出</button></span></div></div>';
   if (S.offline) h += offlineBanner();
-  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 6 位數，請到「活動」分頁的「我的帳號」更改。</div>';
+  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「活動」分頁的「我的帳號」更改。</div>';
   h += '<nav class="tabs" role="tablist">' + TABS.map(function (t) {
     return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (S.ui.tab === t[0]) + '">' + t[1] + '</button>';
   }).join('') + '</nav></header>';
@@ -1630,8 +1632,8 @@ function vEvent() {
   if (isMgr()) {
     h += '<p class="sub">' + esc(S.me.name) + '（管理員登入）。這台裝置會記住登入，直到登出或你的 PIN 被更換。手機借給別人前，請先「切換為一般夥伴」或登出。</p>' +
       '<div class="grid2" style="align-items:end"><div class="field"><label for="pin-old">目前 PIN</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-old" autocomplete="current-password"></div>' +
-      '<div class="field"><label for="pin-new">新 PIN（6 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-new" autocomplete="new-password"></div>' +
-      '<div class="field"><label for="pin-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-new2" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="pin-new">新 PIN（4 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-new" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="pin-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-new2" autocomplete="new-password"></div>' +
       '<div class="field"><button class="btn ghost" data-act="changePin">更改 PIN</button></div></div>' +
       '<p class="hint" style="margin-top:8px">更改後，你在其他裝置上的管理員登入會立即失效；這台裝置維持登入。</p>' +
       '<div class="row" style="margin-top:14px"><button class="btn ghost" data-act="screen" data-v="switch">切換為一般夥伴</button><button class="btn ghost" data-act="logout">登出</button>';
@@ -1652,16 +1654,16 @@ function vPeople() {
   var sh = S.sharedStatus;
   var h = '<section class="blk"><h2>共用密碼</h2><p class="sub">一般夥伴用共用密碼登入，再輸入自己的名字。更換後，所有一般登入立即失效，大家需要用新密碼重新登入；管理員登入不受影響。</p>' +
     '<p class="small">' + (!sh ? '讀取中…' : (sh.is_set ? '目前狀態：<span class="tag ok">已設定</span> <span class="mut">' + tm(sh.updated_at) + (sh.updated_by ? '・' + esc(sh.updated_by) : '') + '</span>' : '目前狀態：<span class="tag warn">尚未設定</span> <span class="mut">設定前，一般夥伴無法登入</span>')) + '</p>' +
-    '<div class="grid2" style="align-items:end"><div class="field"><label for="sp-new">新的共用密碼（6 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="sp-new" autocomplete="new-password"></div>' +
-    '<div class="field"><label for="sp-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="sp-new2" autocomplete="new-password"></div>' +
+    '<div class="grid2" style="align-items:end"><div class="field"><label for="sp-new">新的共用密碼（8 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new" autocomplete="new-password"></div>' +
+    '<div class="field"><label for="sp-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new2" autocomplete="new-password"></div>' +
     '<div class="field"><button class="btn ghost" data-act="setShared">' + (sh && sh.is_set ? '更換共用密碼' : '設定共用密碼') + '</button></div></div></section>';
-  h += '<section class="blk"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯的名字可以在這裡停用。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 6 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th></tr></thead><tbody>';
+  h += '<section class="blk"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯的名字可以在這裡停用。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 4 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th></tr></thead><tbody>';
   S.G.people.forEach(function (p) {
     var s = st[p.id] || {};
     var pinTxt = '<span class="mut small">一般登入</span>', setTxt = '';
     if (p.is_manager) {
       pinTxt = !S.pinStatus ? '…' : (s.has_pin ? '<span class="tag ok">已設定</span>' : '<span class="tag warn">未設定，無法登入</span>');
-      setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" data-newpin="' + p.id + '" placeholder="6 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
+      setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-newpin="' + p.id + '" placeholder="4 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
     }
     h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 管理員"></td>' +
       '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td></tr>';
@@ -2001,13 +2003,13 @@ var A = {
   },
   setPin: function (e) {
     var id = e.getAttribute('data-id'), inp = document.querySelector('[data-newpin="' + id + '"]'), pin = inp.value;
-    if (!isPin6(pin)) { toast('PIN 必須是 6 位數字', true); return; }
+    if (!isAdminPin(pin)) { toast('管理員 PIN 必須是 4 位數字', true); return; }
     if (!confirm('把 ' + pname(id) + ' 的管理員 PIN 設為剛輸入的號碼？\n' + pname(id) + ' 在其他裝置上的管理員登入會立即失效。')) return;
     call('evt_set_pin', { p_person_id: id, p_pin: pin }, [], '已設定 ' + pname(id) + ' 的 PIN').then(function (r) { if (r.ok) { inp.value = ''; S.pinStatus = null; renderNow(); } });
   },
   setShared: function () {
     var n = val('#sp-new'), n2 = val('#sp-new2');
-    if (!isPin6(n)) { toast('共用密碼必須是 6 位數字', true); return; }
+    if (!isSharedPw(n)) { toast('共用密碼必須是 8 位數字', true); return; }
     if (n !== n2) { toast('兩次輸入的共用密碼不一樣', true); return; }
     if (S.sharedStatus && S.sharedStatus.is_set && !confirm('更換共用密碼？\n所有一般登入會立即失效，大家需要用新密碼重新登入。')) return;
     call('evt_set_shared_password', { p_new: n }, [], '已設定共用密碼').then(function (r) { if (r.ok) { S.pinStatus = null; S.sharedStatus = null; renderNow(); } });
@@ -2024,7 +2026,7 @@ var A = {
   },
   changePin: function () {
     var o = val('#pin-old'), n = val('#pin-new'), n2 = val('#pin-new2');
-    if (!isPin6(n)) { toast('新 PIN 必須是 6 位數字', true); return; }
+    if (!isAdminPin(n)) { toast('新 PIN 必須是 4 位數字', true); return; }
     if (n !== n2) { toast('兩次輸入的新 PIN 不一樣', true); return; }
     call('evt_change_my_pin', { p_old: o, p_new: n }, [], '已更改 PIN，你在其他裝置的管理員登入已失效').then(function (r) { if (r.ok) { LS.del(K_SHORTPIN); renderNow(); } });
   }
@@ -2058,7 +2060,7 @@ document.addEventListener('submit', function (ev) {
   ev.preventDefault();
   if (kind === 'partner') {
     var pw = val('#pw'), nm = val('#nm').trim();
-    if (!isPin6(pw)) { S.ui.loginMsg = '共用密碼是 6 位數字'; renderNow(); return; }
+    if (!isSharedPw(pw)) { S.ui.loginMsg = '共用密碼是 8 位數字'; renderNow(); return; }
     if (!nm) { S.ui.loginMsg = '請輸入你的名字'; renderNow(); return; }
     sb.rpc('evt_partner_login', { p_password: pw, p_name: nm, p_device: deviceId() }).then(function (r) {
       if (r.error) { handleErr(r.error); return; }
@@ -2072,7 +2074,7 @@ document.addEventListener('submit', function (ev) {
     sb.rpc('evt_admin_login', { p_person_id: S.ui.loginPid, p_pin: pin, p_device: deviceId() }).then(function (r) {
       if (r.error) { handleErr(r.error); return; }
       if (!r.data.ok) { loginFail(r.data); return; }
-      if (pin.length !== 6) LS.set(K_SHORTPIN, r.data.person.id); else LS.del(K_SHORTPIN);
+      if (pin.length !== 4) LS.set(K_SHORTPIN, r.data.person.id); else LS.del(K_SHORTPIN);
       loginOk(r.data, S.token);
     }, handleErr);
   } else if (kind === 'switch') {
