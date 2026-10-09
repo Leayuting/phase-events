@@ -247,7 +247,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 1;
+var APP_VERSION = 2;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -288,6 +288,20 @@ var LS = {
 };
 var K_TOKEN = 'phase_evt_token';
 var K_ME = 'phase_evt_me';
+var K_DEV = 'phase_evt_device';
+var K_NAME = 'phase_evt_lastname';
+var K_SHORTPIN = 'phase_evt_shortpin';
+/* 每台裝置一組隨機代號，只用來計算登入錯誤次數（不鎖全場） */
+function isPin6(v) { return typeof v === 'string' && /^[0-9]{6}$/.test(v); }
+function deviceId() {
+  var d = LS.get(K_DEV);
+  if (d) return d;
+  var a = new Uint8Array(16), c = window.crypto || window.msCrypto;
+  if (c && c.getRandomValues) c.getRandomValues(a); else for (var i = 0; i < 16; i++) a[i] = Math.floor(Math.random() * 256);
+  d = Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  LS.set(K_DEV, d);
+  return d;
+}
 
 var toastTimer = null;
 function toast(m, isErr) {
@@ -316,13 +330,13 @@ var S = {
   R: null,
   ev: null,
   loaded: false, offline: false, rt: '',
-  sig: {}, pinStatus: null, busy: false,
+  sig: {}, pinStatus: null, sharedStatus: null, busy: false,
   ui: {
     tab: 'count', st: '', ph: '全部', bt: '全部', lk: '全部', li: '', lw: '', ld: '',
     showDone: false, showArch: false, editId: null, pasteOpen: false,
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
-    loginPid: null, loginMsg: '', csv: null, tlEdit: false, buyEdit: null, itemArch: false,
+    loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
     showCalc: false, logMore: 0
   }
 };
@@ -390,7 +404,7 @@ var LOAD = {
   },
   items: function (ev) { return pageAll(function (a, b) { return sb.from('evt_items').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
   plan: function (ev) { return pageAll(function (a, b) { return sb.from('evt_plan').select('*').eq('event_id', ev).range(a, b); }); },
-  sheets: function (ev) { return pageAll(function (a, b) { return sb.from('evt_count_sheets').select('id,event_id,type,biz_date,counter_id,status,signed_at,note,created_at').eq('event_id', ev).order('created_at').range(a, b); }); },
+  sheets: function (ev) { return pageAll(function (a, b) { return sb.from('evt_count_sheets').select('id,event_id,type,biz_date,counter_id,status,signed_at,signer_mode,note,created_at').eq('event_id', ev).order('created_at').range(a, b); }); },
   lines: function (ev) {
     return pageAll(function (a, b) { return sb.from('evt_count_lines').select('sheet_id,item_id,warehouse_qty,counter_qty,brew_remaining_g,evt_count_sheets!inner(event_id)').eq('evt_count_sheets.event_id', ev).range(a, b); })
       .then(function (r) { return strip(r, 'evt_count_sheets'); });
@@ -398,13 +412,14 @@ var LOAD = {
   moves: function (ev) { return pageAll(function (a, b) { return sb.from('evt_movements').select('*').eq('event_id', ev).order('created_at').range(a, b); }); },
   ck: function (ev) { return pageAll(function (a, b) { return sb.from('evt_checklist_items').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
   cklog: function (ev) {
-    return pageAll(function (a, b) { return sb.from('evt_checklist_log').select('id,item_id,action,person_id,created_at,evt_checklist_items!inner(event_id)').eq('evt_checklist_items.event_id', ev).order('id').range(a, b); })
+    return pageAll(function (a, b) { return sb.from('evt_checklist_log').select('id,item_id,action,person_id,auth_mode,created_at,evt_checklist_items!inner(event_id)').eq('evt_checklist_items.event_id', ev).order('id').range(a, b); })
       .then(function (r) { return strip(r, 'evt_checklist_items'); });
   },
   buys: function (ev) { return pageAll(function (a, b) { return sb.from('evt_purchases').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
   tl: function (ev) { return pageAll(function (a, b) { return sb.from('evt_timeline').select('*').eq('event_id', ev).order('date').order('sort').range(a, b); }); },
   audit: function (ev) {
-    return sb.from('evt_audit_log').select('*').eq('event_id', ev).order('id', { ascending: false }).range(0, 999)
+    /* 這場活動的修改＋全系統設定（人員、PIN、共用密碼）的修改 */
+    return sb.from('evt_audit_log').select('*').or('event_id.eq.' + ev + ',event_id.is.null').order('id', { ascending: false }).range(0, 999)
       .then(function (r) { if (r.error) throw r.error; return r.data || []; });
   }
 };
@@ -469,7 +484,7 @@ function handleErr(e) {
 function logoutLocal() {
   S.token = null; S.me = null;
   LS.del(K_TOKEN); LS.del(K_ME);
-  S.ui.loginPid = null; S.ui.loginMsg = '';
+  S.ui.loginPid = null; S.ui.loginMsg = ''; S.ui.screen = null;
   renderNow();
 }
 
@@ -647,7 +662,7 @@ var CALC = {
     D.cklog.forEach(function (l) { lastLog[l.item_id] = l; });
     D.ck.forEach(function (c) {
       var l = lastLog[c.id];
-      R.ck[c.id] = (l && l.action === '完成') ? { by: l.person_id, at: l.created_at } : null;
+      R.ck[c.id] = (l && l.action === '完成') ? { by: l.person_id, at: l.created_at, mode: l.auth_mode } : null;
       if (!c.archived && stationLive(c.station_id)) { R.ckLive++; if (R.ck[c.id]) R.ckDone++; }
     });
 
@@ -667,6 +682,10 @@ var CALC = {
 function curEvent() { return byId(S.G.events, S.ev); }
 function person(id) { return byId(S.G.people, id); }
 function pname(id) { var p = person(id); return p ? p.name : '—'; }
+/* 登入方式標示：只讀紀錄當下保存的值；舊資料沒有這個值，一律標為「歷史紀錄」，不推算 */
+function modeLabel(m) { return m === 'admin' ? '管理員' : (m === 'partner' ? '一般登入' : '歷史紀錄'); }
+function modeTag(m) { return '<span class="tag' + (m === 'admin' ? ' ok' : '') + '">' + modeLabel(m) + '</span>'; }
+function whoHtml(id, m) { return '<span class="mut small nowrap">' + esc(pname(id)) + '</span> ' + modeTag(m); }
 function isMgr() { return !!(S.me && S.me.is_manager); }
 function station(id) { return byId(S.D.stations, id); }
 function stationLive(id) { var s = station(id); return !!(s && !s.archived); }
@@ -681,7 +700,7 @@ function canEditSt(stId) {
   return !!(S.me && s && !s.archived && ev && ev.status !== '已結束' && ownersOf(stId).indexOf(S.me.id) >= 0);
 }
 function roleText() {
-  if (isMgr()) return '主管';
+  if (isMgr()) return '管理員';
   var ev = curEvent();
   var o = (ev && ev.status !== '已結束') ? myStations().map(function (s) { return s.name; }) : [];
   return o.length ? '崗位負責人・' + o.join('、') : '夥伴';
@@ -717,7 +736,12 @@ function renderNow() {
   pendingRender = false;
   $('#ver').textContent = 'v' + APP_VERSION;
   var app = $('#app');
-  if (!S.me) { app.innerHTML = vLogin(); var pi = $('#pin'); if (pi) pi.focus(); return; }
+  if (!S.me || S.ui.screen) {
+    app.innerHTML = vLogin();
+    var fo = $('#pin') || $('#pw') || $('#nm');
+    if (fo) fo.focus();
+    return;
+  }
   var y = window.scrollY;
   app.innerHTML = vHeader() + '<main id="view">' + vBody() + '</main>';
   window.scrollTo(0, y);
@@ -725,26 +749,46 @@ function renderNow() {
   writeUrl();
 }
 
+function namesDatalist() {
+  return '<datalist id="names">' + S.G.people.filter(function (p) { return p.active; }).map(function (p) { return '<option value="' + esc(p.name) + '"></option>'; }).join('') + '</datalist>';
+}
+function loginMsgHtml() {
+  return S.ui.loginMsg ? '<p class="small" style="color:var(--warn);margin:10px 0 0">' + esc(S.ui.loginMsg) + '</p>' : '';
+}
 function vLogin() {
   var h = '<div class="login"><div class="brand">Phase Coffee Roasters</div><h1 style="margin-top:6px">活動系統</h1>';
   if (S.offline) h += offlineBanner();
-  var people = S.G.people.filter(function (p) { return p.active; });
-  if (!S.ui.loginPid) {
-    h += '<p class="sub" style="margin-top:14px">請選擇你的名字</p><div class="names">' +
-      people.map(function (p) { return '<button data-act="pickLogin" data-id="' + p.id + '">' + esc(p.name) + '</button>'; }).join('') + '</div>';
-    if (!people.length && S.loaded) h += '<div class="empty">讀不到人員名單</div>';
+  var screen = S.ui.screen || 'partner';
+  if (screen === 'partner') {
+    h += '<p class="sub" style="margin-top:14px">輸入共用密碼和你的名字就可以開始使用。</p>' +
+      '<form data-form="partner"><div class="field"><label for="pw">共用密碼（6 位數字）</label><input type="password" id="pw" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></div>' +
+      '<div class="field" style="margin-top:12px"><label for="nm">你的名字</label><input type="text" id="nm" list="names" maxlength="30" autocomplete="off" value="' + esc(LS.get(K_NAME) || '') + '"></div>' + namesDatalist() +
+      loginMsgHtml() + '<button class="btn" type="submit" style="width:100%;margin-top:16px">開始使用</button></form>' +
+      '<div class="row" style="margin-top:20px;justify-content:space-between"><span class="hint">忘記共用密碼請問管理員。</span><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button></div>';
+  } else if (screen === 'switch') {
+    var adm = S.me && S.me.is_manager;
+    h += '<p class="sub" style="margin-top:14px">' + (adm ? '切換為一般夥伴後，管理權限會立即取消；之後要再進入管理員模式需要輸入 PIN。' : '換人不用重新輸入共用密碼，輸入新的名字即可。') + '</p>' +
+      '<form data-form="switch"><div class="field"><label for="nm">' + (adm ? '以哪個名字繼續' : '新的名字') + '</label><input type="text" id="nm" list="names" maxlength="30" autocomplete="off" value="' + esc(adm ? S.me.name : '') + '"></div>' + namesDatalist() +
+      loginMsgHtml() + '<div class="row" style="margin-top:16px"><button class="btn" type="submit" style="flex:1">' + (adm ? '切換為一般夥伴' : '換人') + '</button><button class="btn ghost" type="button" data-act="screen" data-v="">取消</button></div></form>';
   } else {
-    var p = person(S.ui.loginPid);
-    h += '<p class="sub" style="margin-top:14px">' + esc(p ? p.name : '') + '，請輸入你的 PIN</p>' +
-      '<form data-form="login"><input type="password" id="pin" inputmode="numeric" autocomplete="current-password" pattern="[0-9]*" maxlength="8" aria-label="PIN">' +
-      (S.ui.loginMsg ? '<p class="small" style="color:var(--warn);margin:8px 0 0">' + esc(S.ui.loginMsg) + '</p>' : '') +
-      '<div class="row" style="margin-top:14px"><button class="btn" type="submit" style="flex:1">登入</button><button class="btn ghost" type="button" data-act="pickLogin" data-id="">換人</button></div></form>' +
-      '<p class="hint" style="margin-top:14px">忘記 PIN 或被鎖定，請找主管重設。</p>';
+    var admins = S.G.people.filter(function (p) { return p.active && p.is_manager; });
+    if (!S.ui.loginPid) {
+      h += '<p class="sub" style="margin-top:14px">管理員登入：請選擇你的名字</p><div class="names">' +
+        admins.map(function (p) { return '<button data-act="pickLogin" data-id="' + p.id + '">' + esc(p.name) + '</button>'; }).join('') + '</div>' +
+        (admins.length ? '' : '<div class="empty">讀不到管理員名單</div>');
+    } else {
+      var p = person(S.ui.loginPid);
+      h += '<p class="sub" style="margin-top:14px">' + esc(p ? p.name : '') + '，請輸入你的管理員 PIN</p>' +
+        '<form data-form="admin"><input type="password" id="pin" inputmode="numeric" autocomplete="current-password" pattern="[0-9]*" maxlength="6" aria-label="管理員 PIN">' +
+        loginMsgHtml() + '<div class="row" style="margin-top:14px"><button class="btn" type="submit" style="flex:1">登入</button><button class="btn ghost" type="button" data-act="pickLogin" data-id="">換一位</button></div></form>' +
+        '<p class="hint" style="margin-top:14px">忘記 PIN 請其他管理員幫你重設。</p>';
+    }
+    h += '<div style="margin-top:20px"><button class="btn ghost sm" data-act="screen" data-v="' + (S.me ? '' : 'partner') + '">' + (S.me ? '取消，回到系統' : '回到一般登入') + '</button></div>';
   }
   return h + '</div>';
 }
 function offlineBanner() {
-  return '<div class="banner warn">連不上資料庫。若網路正常，資料庫可能因為閒置 7 天被 Supabase 暫停：請主管登入 Supabase 後台（phase-events 專案）按「Restore project」，約 2–5 分鐘後重新整理本頁。</div>';
+  return '<div class="banner warn">連不上資料庫。若網路正常，資料庫可能因為閒置 7 天被 Supabase 暫停：請管理員登入 Supabase 後台（phase-events 專案）按「Restore project」，約 2–5 分鐘後重新整理本頁。</div>';
 }
 
 function vHeader() {
@@ -761,8 +805,12 @@ function vHeader() {
   }
   h += '</div><div class="who"><span class="small mut"><span id="rtdot" class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>目前操作人</span>' +
     '<span><span class="nm">' + esc(S.me.name) + '</span> <span class="tag">' + esc(roleText()) + '</span></span>' +
-    '<button class="btn ghost sm" data-act="logout">登出</button></div></div>';
+    '<span class="row" style="gap:6px">' + (isMgr()
+      ? '<button class="btn ghost sm" data-act="screen" data-v="switch">切換為一般夥伴</button>'
+      : '<button class="btn ghost sm" data-act="screen" data-v="switch">換人</button><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button>') +
+    '<button class="btn ghost sm" data-act="logout">登出</button></span></div></div>';
   if (S.offline) h += offlineBanner();
+  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 6 位數，請到「活動」分頁的「我的帳號」更改。</div>';
   h += '<nav class="tabs" role="tablist">' + TABS.map(function (t) {
     return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (S.ui.tab === t[0]) + '">' + t[1] + '</button>';
   }).join('') + '</nav></header>';
@@ -773,7 +821,7 @@ function vBody() {
   if (!S.loaded) return '<section class="blk"><div class="empty">載入中…</div></section>';
   var ev = curEvent();
   if (!ev && S.ui.tab !== 'event') {
-    return '<section class="blk"><div class="empty">' + (S.G.events.length ? '請選擇活動。' : (isMgr() ? '還沒有活動，請到「活動」分頁建立。' : '還沒有活動，請主管先建立。')) + '</div></section>';
+    return '<section class="blk"><div class="empty">' + (S.G.events.length ? '請選擇活動。' : (isMgr() ? '還沒有活動，請到「活動」分頁建立。' : '還沒有活動，請管理員先建立。')) + '</div></section>';
   }
   var m = { count: vCount, settle: vSettle, check: vCheck, buy: vBuy, timeline: vTimeline, items: vItems, log: vLog, event: vEvent }[S.ui.tab];
   return m();
@@ -894,9 +942,9 @@ function moveRow(m) {
   var rev = S.R.reversedBy[m.id];
   if (m.type === '沖銷') {
     var o = byId(S.D.moves, m.reverses_id);
-    return '<div class="log"><span class="tm">' + tm(m.created_at) + '</span><span class="tx"><span class="tag warn">沖銷</span> ' + (o ? '<span class="strike">' + moveText(o) + '</span>' : '') + (m.note ? ' ・ ' + esc(m.note) : '') + '</span><span class="mut small">' + esc(pname(m.created_by)) + '</span></div>';
+    return '<div class="log"><span class="tm">' + tm(m.created_at) + '</span><span class="tx"><span class="tag warn">沖銷</span> ' + (o ? '<span class="strike">' + moveText(o) + '</span>' : '') + (m.note ? ' ・ ' + esc(m.note) : '') + '</span>' + whoHtml(m.created_by, m.auth_mode) + '</div>';
   }
-  return '<div class="log' + (rev ? ' void' : '') + '"><span class="tm">' + tm(m.created_at) + '</span><span class="tx">' + moveText(m) + '</span><span class="mut small">' + esc(pname(m.created_by)) + '</span>' +
+  return '<div class="log' + (rev ? ' void' : '') + '"><span class="tm">' + tm(m.created_at) + '</span><span class="tx">' + moveText(m) + '</span>' + whoHtml(m.created_by, m.auth_mode) +
     (rev ? '<span class="tag warn">已沖銷・' + esc(pname(rev.created_by)) + '</span>' : '<button class="btn ghost sm" data-act="reverse" data-id="' + m.id + '">沖銷</button>') + '</div>';
 }
 function vItemCards() {
@@ -932,7 +980,7 @@ function itemHistory(itemId) {
   (S.R.signed || []).forEach(function (s) {
     var l = S.R.lineIdx[s.id] && S.R.lineIdx[s.id][itemId];
     if (!l) return;
-    rows.push({ t: s.signed_at, html: '<div class="log' + (S.R.superseded[s.id] ? ' void' : '') + '"><span class="tm">' + tm(s.signed_at) + '</span><span class="tx"><b>' + esc(s.type) + '</b> ' + md(s.biz_date) + '：倉庫 ' + I(l.warehouse_qty) + '・檯面 ' + I(l.counter_qty) + (l.brew_remaining_g != null ? '・沖煮豆 ' + I(l.brew_remaining_g) + ' g' : '') + '</span><span class="mut small">' + esc(pname(s.counter_id)) + '・已簽署</span>' + (S.R.superseded[s.id] ? '<span class="tag">已被較新的單取代</span>' : '') + '</div>' });
+    rows.push({ t: s.signed_at, html: '<div class="log' + (S.R.superseded[s.id] ? ' void' : '') + '"><span class="tm">' + tm(s.signed_at) + '</span><span class="tx"><b>' + esc(s.type) + '</b> ' + md(s.biz_date) + '：倉庫 ' + I(l.warehouse_qty) + '・檯面 ' + I(l.counter_qty) + (l.brew_remaining_g != null ? '・沖煮豆 ' + I(l.brew_remaining_g) + ' g' : '') + '</span>' + whoHtml(s.counter_id, s.signer_mode) + '<span class="mut small">已簽署</span>' + (S.R.superseded[s.id] ? '<span class="tag">已被較新的單取代</span>' : '') + '</div>' });
   });
   rows.sort(function (a, b) { return a.t < b.t ? 1 : -1; });
   return { n: rows.length, html: rows.length ? rows.map(function (r) { return r.html; }).join('') : '<div class="hint">沒有紀錄。</div>' };
@@ -947,7 +995,7 @@ function vSheets() {
       return '<tr><td>' + esc(it.name) + '</td><td class="n">' + I(l.warehouse_qty) + '</td><td class="n">' + I(l.counter_qty) + '</td><td class="n">' + I(num(l.warehouse_qty) + num(l.counter_qty)) + '</td>' + (s.type !== '帶出對點' ? '<td class="n">' + I(l.brew_remaining_g) + '</td>' : '') + '</tr>';
     }).join('');
     var sup = S.R.superseded[s.id];
-    return '<details data-sig="' + s.id + '"><summary><span class="row" style="display:inline-flex"><b>' + esc(s.type) + '</b><span class="mut">' + mdw(s.biz_date) + '</span><span>' + esc(pname(s.counter_id)) + '</span><span class="mut small">' + tm(s.signed_at) + '</span>' +
+    return '<details data-sig="' + s.id + '"><summary><span class="row" style="display:inline-flex"><b>' + esc(s.type) + '</b><span class="mut">' + mdw(s.biz_date) + '</span><span>' + esc(pname(s.counter_id)) + '</span>' + modeTag(s.signer_mode) + '<span class="mut small">' + tm(s.signed_at) + '</span>' +
       (sup ? '<span class="tag">已被 ' + tm(sup.signed_at) + ' 的單取代</span>' : '<span class="tag ok">已簽署・鎖定</span>') + '<span class="mut small">合計 ' + (tw + tt) + ' 包</span></span></summary>' +
       '<div style="padding:4px 0 16px"><div class="row" style="margin-bottom:10px"><span class="mut small">簽名</span>' + (S.sig[s.id] ? '<img class="sigimg" alt="' + esc(pname(s.counter_id)) + ' 的簽名" src="' + S.sig[s.id] + '">' : '<span class="hint">載入中…</span>') + '</div>' +
       '<div class="tw"><table><thead><tr><th>咖啡豆</th><th class="n">倉庫</th><th class="n">檯面</th><th class="n">合計</th>' + (s.type !== '帶出對點' ? '<th class="n">沖煮豆 g</th>' : '') + '</tr></thead><tbody>' + rows +
@@ -1111,7 +1159,7 @@ function ckRow(c, showSt) {
     (c.assignee_id ? ' <span class="tag ok">' + esc(pname(c.assignee_id)) + '</span>' : (as.length ? '' : ' <span class="tag warn">未分配</span>')) +
     (c.purpose ? '<div class="small mut">用途：' + esc(c.purpose) + '</div>' : '') +
     (c.note ? '<div class="small mut">' + esc(c.note) + '</div>' : '') +
-    (done ? '<div class="small mut">' + esc(pname(done.by)) + ' ・ ' + tm(done.at) + ' 完成</div>' : '') + '</div><div class="act">' +
+    (done ? '<div class="small mut">' + esc(pname(done.by)) + ' ' + modeTag(done.mode) + ' ・ ' + tm(done.at) + ' 完成</div>' : '') + '</div><div class="act">' +
     (c.link_page ? '<button class="btn ghost sm" data-act="go" data-v="' + c.link_page + '">' + esc(linkName(c.link_page)) + ' ›</button>' : '') +
     (can && !showSt ? '<button class="btn ghost sm" data-act="moveCk" data-id="' + c.id + '" data-v="-1" aria-label="上移">↑</button><button class="btn ghost sm" data-act="moveCk" data-id="' + c.id + '" data-v="1" aria-label="下移">↓</button>' : '') +
     (can ? '<button class="btn ghost sm" data-act="editCk" data-id="' + c.id + '">編輯</button><button class="btn ghost sm" data-act="archCk" data-id="' + c.id + '">刪除</button>' : '') + '</div></div>';
@@ -1185,7 +1233,7 @@ function vCheck() {
       if (S.ui.showArch) arch.forEach(function (c) {
         var done = S.R.ck[c.id];
         h += '<div class="ck"><span></span><div><span class="strike">' + esc(c.title) + '</span> <span class="mut small">' + esc(c.qty || '') + '</span><div class="hint">' + esc(pname(c.archived_by)) + ' 於 ' + tm(c.archived_at) + ' 刪除' + (done ? '・已有勾選紀錄（' + esc(pname(done.by)) + ' ' + tm(done.at) + '）' : '') + '</div></div><div class="act">' +
-          (mgr ? '<button class="btn ghost sm" data-act="restoreCk" data-id="' + c.id + '">還原</button>' : '<span class="hint">主管可還原</span>') + '</div></div>';
+          (mgr ? '<button class="btn ghost sm" data-act="restoreCk" data-id="' + c.id + '">還原</button>' : '<span class="hint">管理員可還原</span>') + '</div></div>';
       });
       h += '</section>';
     }
@@ -1202,7 +1250,7 @@ function vBuy() {
   var notArrived = live.filter(function (b) { return b.status !== '已到'; }).length;
   var short = live.filter(function (b) { return R.buy[b.id] && R.buy[b.id].short; }).length;
   var notReady = live.filter(function (b) { return b.status !== '已到' || (R.buy[b.id] && R.buy[b.id].short); }).length;
-  var h = '<section class="blk"><h2>備料採購</h2><p class="sub">尚未到貨 <b>' + notArrived + '</b> 項・實收不足 <b>' + short + '</b> 項・尚未備齊 <b>' + notReady + '</b> 項。主管新增品項與訂購數量；所有人都可以更新狀態與實收數量。</p>';
+  var h = '<section class="blk"><h2>備料採購</h2><p class="sub">尚未到貨 <b>' + notArrived + '</b> 項・實收不足 <b>' + short + '</b> 項・尚未備齊 <b>' + notReady + '</b> 項。管理員新增品項與訂購數量；所有人都可以更新狀態與實收數量。</p>';
   if (!live.length) h += '<div class="empty">還沒有備料項目。' + (m ? '可在下方新增。' : '') + '</div>';
   else {
     var A = live.slice().sort(function (a, b) {
@@ -1282,8 +1330,8 @@ function vTimeline() {
 function vItems() {
   var m = isMgr(), dis = m ? '' : ' disabled', R = S.R;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="blk"><h2>品項與預計量</h2><p class="sub">' + (m ? '主管可以直接修改，離開欄位即儲存，修改都會留在紀錄裡。' : '只有主管可以修改，你目前可以查看。') + '</p>';
-  if (flagged.length) h += '<div class="banner hold" style="margin:0 0 14px">有 ' + flagged.length + ' 個品項標示「待確認」，主管確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
+  var h = '<section class="blk"><h2>品項與預計量</h2><p class="sub">' + (m ? '管理員可以直接修改，離開欄位即儲存，修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。') + '</p>';
+  if (flagged.length) h += '<div class="banner hold" style="margin:0 0 14px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
   h += '<div class="tw"><table style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (m ? '<th></th>' : '') + '</tr></thead><tbody>';
   var tp1 = 0, tpT = 0;
   h += beansByBooth(function (it, booth) {
@@ -1396,14 +1444,14 @@ function vCsvPreview() {
    紀錄與匯出
    --------------------------------------------------------------------------- */
 var TABLE_LABEL = {
-  evt_events: '活動', evt_stations: '崗位', evt_station_owners: '崗位負責人', evt_items: '品項', evt_plan: '預計量', evt_people: '人員',
+  evt_shared_secret: '共用密碼', evt_events: '活動', evt_stations: '崗位', evt_station_owners: '崗位負責人', evt_items: '品項', evt_plan: '預計量', evt_people: '人員',
   evt_checklist_items: '清單項目', evt_checklist_templates: '範本', evt_checklist_template_items: '範本項目', evt_purchases: '備料', evt_timeline: '時程', evt_pins: 'PIN'
 };
 var FIELD_LABEL = {
   name: '名稱', booth: '展台', category: '分類', spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g', archived: '封存', note: '備註',
   needs_confirm: '待確認', title: '品項', qty: '數量', purpose: '用途', phase: '階段', assignee_id: '指派', link_page: '連結', sort: '排序', status: '狀態',
   order_qty: '訂購數量', received_qty: '實收數量', supplier: '供應商', eta: '預計到貨', total_need: '需求量', unit: '單位', item_name: '品項', buyer_id: '採購人',
-  start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '主管', active: '啟用', check_date: '對點日期',
+  start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
   content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調'
 };
 var SKIP_FIELDS = ['updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
@@ -1419,7 +1467,8 @@ function fmtVal(k, v) {
 function auditText(a) {
   var t = TABLE_LABEL[a.table_name] || a.table_name, o = a.old_data || {}, n = a.new_data || {}, r = a.new_data || a.old_data || {};
   var label = r.name || r.title || r.item_name || r.content || (r.item_id ? itemName(r.item_id) : '') || (r.station_id && r.person_id ? (station(r.station_id) || {}).name + '：' + pname(r.person_id) : '');
-  if (a.table_name === 'evt_pins') return '重設 ' + pname(a.row_id) + ' 的 PIN';
+  if (a.table_name === 'evt_pins') return (a.action === '更改自己的 PIN' ? '更改自己的管理員 PIN' : '重設 ' + esc(pname(a.row_id)) + ' 的管理員 PIN');
+  if (a.table_name === 'evt_shared_secret') return '更換共用密碼';
   if (a.action === 'INSERT') return '新增' + t + '：' + esc(label);
   if (a.action === 'DELETE') return '移除' + t + '：' + esc(label);
   var ch = [];
@@ -1434,21 +1483,21 @@ function auditText(a) {
 function logEntries() {
   var E = [];
   S.D.moves.forEach(function (m) {
-    E.push({ k: '異動', t: m.created_at, who: m.created_by, item: m.item_id, date: m.biz_date, html: m.type === '沖銷' ? '<span class="tag warn">沖銷</span> ' + (byId(S.D.moves, m.reverses_id) ? moveText(byId(S.D.moves, m.reverses_id)) : '') : moveText(m), void: !!S.R.reversedBy[m.id] });
+    E.push({ k: '異動', t: m.created_at, who: m.created_by, mode: m.auth_mode, item: m.item_id, date: m.biz_date, html: m.type === '沖銷' ? '<span class="tag warn">沖銷</span> ' + (byId(S.D.moves, m.reverses_id) ? moveText(byId(S.D.moves, m.reverses_id)) : '') : moveText(m), void: !!S.R.reversedBy[m.id] });
   });
   S.D.sheets.forEach(function (s) {
     if (s.status !== '已簽署') return;
-    E.push({ k: '盤點單', t: s.signed_at, who: s.counter_id, item: null, items: Object.keys(S.R.lineIdx[s.id] || {}), date: s.biz_date, html: '<b>簽署盤點單</b> ' + esc(s.type) + ' ' + md(s.biz_date) + (S.R.superseded[s.id] ? '（已被較新的單取代）' : '') });
+    E.push({ k: '盤點單', t: s.signed_at, who: s.counter_id, mode: s.signer_mode, item: null, items: Object.keys(S.R.lineIdx[s.id] || {}), date: s.biz_date, html: '<b>簽署盤點單</b> ' + esc(s.type) + ' ' + md(s.biz_date) + (S.R.superseded[s.id] ? '（已被較新的單取代）' : '') });
   });
   var ckBy = {};
   S.D.ck.forEach(function (c) { ckBy[c.id] = c; });
   S.D.cklog.forEach(function (l) {
     var c = ckBy[l.item_id];
-    E.push({ k: '勾選', t: l.created_at, who: l.person_id, item: null, date: l.created_at.slice(0, 10), html: (l.action === '完成' ? '完成' : '取消完成') + ' ' + esc(c ? (station(c.station_id) || {}).name + '：' + c.title : '') });
+    E.push({ k: '勾選', t: l.created_at, who: l.person_id, mode: l.auth_mode, item: null, date: l.created_at.slice(0, 10), html: (l.action === '完成' ? '完成' : '取消完成') + ' ' + esc(c ? (station(c.station_id) || {}).name + '：' + c.title : '') });
   });
   S.D.audit.forEach(function (a) {
     var r = a.new_data || a.old_data || {};
-    E.push({ k: '設定變更', t: a.created_at, who: a.person_id, item: r.item_id || (a.table_name === 'evt_items' ? r.id : null), date: a.created_at.slice(0, 10), html: auditText(a) });
+    E.push({ k: '設定變更', t: a.created_at, who: a.person_id, mode: a.auth_mode, item: r.item_id || (a.table_name === 'evt_items' ? r.id : null), date: a.created_at.slice(0, 10), html: auditText(a) });
   });
   E.forEach(function (e) { e.day = e.t ? ymd(new Date(e.t)) : ''; });
   E.sort(function (a, b) { return a.t < b.t ? 1 : -1; });
@@ -1474,7 +1523,7 @@ function vLog() {
     '<div class="field"><label>日期</label><select data-f="ld"><option value="">全部</option>' + days.map(function (d) { return '<option value="' + d + '"' + (f.ld === d ? ' selected' : '') + '>' + mdw(d) + '</option>'; }).join('') + '</select></div></div>';
   var limit = 200 + S.ui.logMore;
   h += '<p class="hint">共 ' + list.length + ' 筆</p>' + (list.length ? list.slice(0, limit).map(function (e) {
-    return '<div class="log' + (e.void ? ' void' : '') + '"><span class="tm">' + tm(e.t) + '</span><span class="tag">' + e.k + '</span><span class="tx">' + e.html + '</span><span class="mut small">' + esc(pname(e.who)) + '</span></div>';
+    return '<div class="log' + (e.void ? ' void' : '') + '"><span class="tm">' + tm(e.t) + '</span><span class="tag">' + e.k + '</span><span class="tx">' + e.html + '</span>' + whoHtml(e.who, e.mode) + '</div>';
   }).join('') : '<div class="empty">沒有符合的紀錄。</div>');
   if (list.length > limit) h += '<div style="margin-top:12px"><button class="btn ghost sm" data-act="logMore">顯示更多</button></div>';
   h += '</section><section class="blk"><h2>匯出</h2><p class="sub">活動結束後建議全部匯出存檔。CSV 可用 Excel 或 Google 試算表開啟。資料庫為免費方案、沒有自動備份，建議每天收店盤點簽署後匯出一次「整場資料」。</p><div class="row">' +
@@ -1505,27 +1554,27 @@ function exportData(kind) {
     R.beans.forEach(function (it) { R.item[it.id].daily.forEach(function (d) { r2.push([it.name, d.date, d.open, d.rep, d.close, d.sold]); }); });
     csvDownload(base + '_每日銷售.csv', r2);
   } else if (kind === 'moves') {
-    var r3 = [['時間', '營業日', '類型', '品項', '數量', '單位', '來源', '去處', '沖銷對象時間', '已被沖銷', '備註', '操作人']];
+    var r3 = [['時間', '營業日', '類型', '品項', '數量', '單位', '來源', '去處', '沖銷對象時間', '已被沖銷', '備註', '操作人', '登入方式']];
     S.D.moves.forEach(function (m) {
       var o = byId(S.D.moves, m.reverses_id);
-      r3.push([tm(m.created_at), m.biz_date, m.type, itemName(m.item_id), m.qty, m.type === '出杯用豆' ? 'g' : '包', m.from_loc, m.to_loc, o ? tm(o.created_at) : '', R.reversedBy[m.id] ? '是' : '', m.note, pname(m.created_by)]);
+      r3.push([tm(m.created_at), m.biz_date, m.type, itemName(m.item_id), m.qty, m.type === '出杯用豆' ? 'g' : '包', m.from_loc, m.to_loc, o ? tm(o.created_at) : '', R.reversedBy[m.id] ? '是' : '', m.note, pname(m.created_by), modeLabel(m.auth_mode)]);
     });
     csvDownload(base + '_異動紀錄.csv', r3);
   } else if (kind === 'sheets') {
-    var r4 = [['盤點單', '日期', '盤點人', '簽署時間', '狀態', '咖啡豆', '倉庫', '檯面', '合計', '沖煮豆剩餘g']];
+    var r4 = [['盤點單', '日期', '盤點人', '簽署時登入方式', '簽署時間', '狀態', '咖啡豆', '倉庫', '檯面', '合計', '沖煮豆剩餘g']];
     S.D.sheets.forEach(function (s) {
       var L = R.lineIdx[s.id] || {};
-      Object.keys(L).forEach(function (id) { var l = L[id]; r4.push([s.type, s.biz_date, pname(s.counter_id), tm(s.signed_at), s.status + (R.superseded[s.id] ? '（已被取代）' : ''), itemName(id), l.warehouse_qty, l.counter_qty, num(l.warehouse_qty) + num(l.counter_qty), l.brew_remaining_g]); });
+      Object.keys(L).forEach(function (id) { var l = L[id]; r4.push([s.type, s.biz_date, pname(s.counter_id), s.status === '已簽署' ? modeLabel(s.signer_mode) : '', tm(s.signed_at), s.status + (R.superseded[s.id] ? '（已被取代）' : ''), itemName(id), l.warehouse_qty, l.counter_qty, num(l.warehouse_qty) + num(l.counter_qty), l.brew_remaining_g]); });
     });
     csvDownload(base + '_盤點單明細.csv', r4);
   } else if (kind === 'check') {
     var ckBy = {}; S.D.ck.forEach(function (c) { ckBy[c.id] = c; });
-    var r5 = [['時間', '崗位', '項目', '動作', '操作人']];
-    S.D.cklog.forEach(function (l) { var c = ckBy[l.item_id]; r5.push([tm(l.created_at), c ? (station(c.station_id) || {}).name : '', c ? c.title : '', l.action, pname(l.person_id)]); });
+    var r5 = [['時間', '崗位', '項目', '動作', '操作人', '登入方式']];
+    S.D.cklog.forEach(function (l) { var c = ckBy[l.item_id]; r5.push([tm(l.created_at), c ? (station(c.station_id) || {}).name : '', c ? c.title : '', l.action, pname(l.person_id), modeLabel(l.auth_mode)]); });
     csvDownload(base + '_勾選紀錄.csv', r5);
   } else if (kind === 'audit') {
-    var r6 = [['時間', '對象', '動作', '內容', '操作人']];
-    S.D.audit.forEach(function (a) { var div = document.createElement('div'); div.innerHTML = auditText(a); r6.push([tm(a.created_at), TABLE_LABEL[a.table_name] || a.table_name, a.action, div.textContent, pname(a.person_id)]); });
+    var r6 = [['時間', '對象', '動作', '內容', '操作人', '登入方式']];
+    S.D.audit.forEach(function (a) { var div = document.createElement('div'); div.innerHTML = auditText(a); r6.push([tm(a.created_at), TABLE_LABEL[a.table_name] || a.table_name, a.action, div.textContent, pname(a.person_id), modeLabel(a.auth_mode)]); });
     csvDownload(base + '_設定變更.csv', r6);
   } else if (kind === 'json') {
     toast('匯出中，正在讀取簽名…');
@@ -1546,7 +1595,7 @@ function vEvent() {
   var ev = curEvent(), m = isMgr();
   var h = '';
   if (ev) {
-    h += '<section class="blk"><h2>活動設定</h2>' + (m ? '' : '<p class="sub">只有主管可以修改。</p>') + '<div class="grid2" style="align-items:end" id="evform">' +
+    h += '<section class="blk"><h2>活動設定</h2>' + (m ? '' : '<p class="sub">只有管理員可以修改。</p>') + '<div class="grid2" style="align-items:end" id="evform">' +
       evField('name', '名稱', 'text', ev.name, m) + evField('start_date', '開始', 'date', ev.start_date, m) + evField('end_date', '結束', 'date', ev.end_date, m) +
       evField('setup_date', '佈場', 'date', ev.setup_date, m) + evField('count_date', '帶出對點日', 'date', ev.count_date, m) + evField('venue', '場地', 'text', ev.venue, m) + evField('booth', '攤位', 'text', ev.booth, m) +
       '<div class="field"><label>狀態</label><select data-ef="status"' + (m ? '' : ' disabled') + '>' + ['籌備中', '進行中', '已結束'].map(function (s) { return '<option' + (ev.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +
@@ -1577,10 +1626,20 @@ function vEvent() {
       '<div class="field"><button class="btn" data-act="createEvent">建立</button></div></div></section>';
     h += vPeople();
   }
-  h += '<section class="blk"><h2>我的帳號</h2><p class="sub">' + esc(S.me.name) + '（' + esc(roleText()) + '）。登入 14 天內不用重新輸入 PIN；手機借給別人前請先登出。</p>' +
-    '<div class="grid2" style="align-items:end"><div class="field"><label>目前 PIN</label><input type="password" inputmode="numeric" id="pin-old" autocomplete="current-password"></div><div class="field"><label>新 PIN（4–8 位數字）</label><input type="password" inputmode="numeric" id="pin-new" autocomplete="new-password"></div>' +
-    '<div class="field"><label>再輸入一次</label><input type="password" inputmode="numeric" id="pin-new2" autocomplete="new-password"></div><div class="field"><button class="btn ghost" data-act="changePin">更改 PIN</button></div></div>' +
-    '<div class="row" style="margin-top:14px"><button class="btn ghost" data-act="logout">登出</button><span class="hint">系統版本 v' + APP_VERSION + ' ・ 即時同步 <span class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>' + (S.rt === 'SUBSCRIBED' ? '連線中' : '未連線') + '</span></div></section>';
+  h += '<section class="blk"><h2>我的帳號</h2>';
+  if (isMgr()) {
+    h += '<p class="sub">' + esc(S.me.name) + '（管理員登入）。這台裝置會記住登入，直到登出或你的 PIN 被更換。手機借給別人前，請先「切換為一般夥伴」或登出。</p>' +
+      '<div class="grid2" style="align-items:end"><div class="field"><label for="pin-old">目前 PIN</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-old" autocomplete="current-password"></div>' +
+      '<div class="field"><label for="pin-new">新 PIN（6 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-new" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="pin-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-new2" autocomplete="new-password"></div>' +
+      '<div class="field"><button class="btn ghost" data-act="changePin">更改 PIN</button></div></div>' +
+      '<p class="hint" style="margin-top:8px">更改後，你在其他裝置上的管理員登入會立即失效；這台裝置維持登入。</p>' +
+      '<div class="row" style="margin-top:14px"><button class="btn ghost" data-act="screen" data-v="switch">切換為一般夥伴</button><button class="btn ghost" data-act="logout">登出</button>';
+  } else {
+    h += '<p class="sub">' + esc(S.me.name) + '（一般登入）。這台裝置會記住登入，直到登出或共用密碼被更換。換人不用重新輸入共用密碼。</p>' +
+      '<div class="row" style="margin-top:4px"><button class="btn ghost" data-act="screen" data-v="switch">換人</button><button class="btn ghost" data-act="screen" data-v="admin">管理員登入</button><button class="btn ghost" data-act="logout">登出</button>';
+  }
+  h += '<span class="hint">系統版本 v' + APP_VERSION + ' ・ 即時同步 <span class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>' + (S.rt === 'SUBSCRIBED' ? '連線中' : '未連線') + '</span></div></section>';
   return h;
 }
 function evField(k, label, type, v, m) {
@@ -1590,27 +1649,41 @@ function vPeople() {
   var st = {};
   (S.pinStatus || []).forEach(function (x) { st[x.person_id] = x; });
   if (!S.pinStatus) loadPinStatus();
-  var h = '<section class="blk"><h2>人員</h2><p class="sub">操作人只能從名單選擇。主管可以設定或重設每個人的 PIN（同時解除鎖定，並登出那個人所有裝置）。</p><div class="tw"><table><thead><tr><th>姓名</th><th>主管</th><th>啟用</th><th>PIN</th><th>設定新 PIN</th></tr></thead><tbody>';
+  var sh = S.sharedStatus;
+  var h = '<section class="blk"><h2>共用密碼</h2><p class="sub">一般夥伴用共用密碼登入，再輸入自己的名字。更換後，所有一般登入立即失效，大家需要用新密碼重新登入；管理員登入不受影響。</p>' +
+    '<p class="small">' + (!sh ? '讀取中…' : (sh.is_set ? '目前狀態：<span class="tag ok">已設定</span> <span class="mut">' + tm(sh.updated_at) + (sh.updated_by ? '・' + esc(sh.updated_by) : '') + '</span>' : '目前狀態：<span class="tag warn">尚未設定</span> <span class="mut">設定前，一般夥伴無法登入</span>')) + '</p>' +
+    '<div class="grid2" style="align-items:end"><div class="field"><label for="sp-new">新的共用密碼（6 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="sp-new" autocomplete="new-password"></div>' +
+    '<div class="field"><label for="sp-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="sp-new2" autocomplete="new-password"></div>' +
+    '<div class="field"><button class="btn ghost" data-act="setShared">' + (sh && sh.is_set ? '更換共用密碼' : '設定共用密碼') + '</button></div></div></section>';
+  h += '<section class="blk"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯的名字可以在這裡停用。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 6 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th></tr></thead><tbody>';
   S.G.people.forEach(function (p) {
     var s = st[p.id] || {};
-    var pinTxt = !S.pinStatus ? '…' : (s.has_pin ? (s.locked_until ? '<span class="tag warn">鎖定至 ' + tm(s.locked_until) + '</span>' : '<span class="tag ok">已設定</span>') : '<span class="tag hold">未設定</span>');
-    h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 主管"></td>' +
-      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td>' +
-      '<td class="nowrap"><input type="password" inputmode="numeric" data-newpin="' + p.id + '" placeholder="4–8 位數字" style="width:130px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button></td></tr>';
+    var pinTxt = '<span class="mut small">一般登入</span>', setTxt = '';
+    if (p.is_manager) {
+      pinTxt = !S.pinStatus ? '…' : (s.has_pin ? '<span class="tag ok">已設定</span>' : '<span class="tag warn">未設定，無法登入</span>');
+      setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" data-newpin="' + p.id + '" placeholder="6 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
+    }
+    h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 管理員"></td>' +
+      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td></tr>';
   });
-  h += '</tbody></table></div><div class="row" style="margin-top:12px"><input type="text" id="newperson" placeholder="新增人員姓名" style="max-width:200px"><button class="btn ghost" data-act="addPerson">新增人員</button></div></section>';
+  h += '</tbody></table></div><div class="row" style="margin-top:12px"><input type="text" id="newperson" placeholder="新增人員姓名" maxlength="30" style="max-width:200px"><button class="btn ghost" data-act="addPerson">新增人員</button></div></section>';
   return h;
 }
 var pinLoading = false;
 function loadPinStatus() {
   if (pinLoading || !isMgr()) return;
   pinLoading = true;
-  sb.rpc('evt_people_pin_status', { p_token: S.token }).then(function (r) {
+  Promise.all([
+    sb.rpc('evt_people_pin_status', { p_token: S.token }),
+    sb.rpc('evt_shared_password_status', { p_token: S.token })
+  ]).then(function (rs) {
     pinLoading = false;
-    if (r.error) { handleErr(r.error); S.pinStatus = []; return; }
-    S.pinStatus = r.data || [];
+    var err = rs[0].error || rs[1].error;
+    if (err) { handleErr(err); S.pinStatus = []; S.sharedStatus = { is_set: false }; return; }
+    S.pinStatus = rs[0].data || [];
+    S.sharedStatus = rs[1].data || { is_set: false };
     if (S.ui.tab === 'event') render();
-  });
+  }, function (e) { pinLoading = false; handleErr(e); });
 }
 
 /* ============================================================================
@@ -1669,10 +1742,13 @@ function startDraft(id) {
 
 var A = {
   pickLogin: function (e) { S.ui.loginPid = e.getAttribute('data-id') || null; S.ui.loginMsg = ''; renderNow(); },
+  screen: function (e) { S.ui.screen = e.getAttribute('data-v') || null; S.ui.loginPid = null; S.ui.loginMsg = ''; renderNow(); window.scrollTo(0, 0); },
   logout: function () {
     if (!confirm('確定要登出？')) return;
-    sb.rpc('evt_logout', { p_token: S.token });
+    var tok = S.token;
     logoutLocal();
+    /* supabase-js 的呼叫要接上 then 才會真正送出 */
+    sb.rpc('evt_logout', { p_token: tok }).then(function () {}, function () {});
   },
   tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
   go: function (e) { S.ui.tab = e.getAttribute('data-v'); renderNow(); window.scrollTo(0, 0); },
@@ -1759,7 +1835,7 @@ var A = {
   },
   archCk: function (e) {
     var c = byId(S.D.ck, e.getAttribute('data-id'));
-    if (!c || !confirm('刪除「' + c.title + '」？\n項目會從清單隱藏，勾選紀錄保留，主管可以還原。')) return;
+    if (!c || !confirm('刪除「' + c.title + '」？\n項目會從清單隱藏，勾選紀錄保留，管理員可以還原。')) return;
     call('evt_checklist_archive', { p_item_id: c.id }, ['ck'], '已刪除，可在下方還原');
   },
   restoreCk: function (e) { call('evt_checklist_restore', { p_item_id: e.getAttribute('data-id') }, ['ck'], '已還原'); },
@@ -1925,14 +2001,21 @@ var A = {
   },
   setPin: function (e) {
     var id = e.getAttribute('data-id'), inp = document.querySelector('[data-newpin="' + id + '"]'), pin = inp.value;
-    if (!/^[0-9]{4,8}$/.test(pin)) { toast('PIN 必須是 4 到 8 位數字', true); return; }
-    if (!confirm('把 ' + pname(id) + ' 的 PIN 設為剛輸入的號碼？\n會解除鎖定，並登出這個人所有的裝置。')) return;
+    if (!isPin6(pin)) { toast('PIN 必須是 6 位數字', true); return; }
+    if (!confirm('把 ' + pname(id) + ' 的管理員 PIN 設為剛輸入的號碼？\n' + pname(id) + ' 在其他裝置上的管理員登入會立即失效。')) return;
     call('evt_set_pin', { p_person_id: id, p_pin: pin }, [], '已設定 ' + pname(id) + ' 的 PIN').then(function (r) { if (r.ok) { inp.value = ''; S.pinStatus = null; renderNow(); } });
+  },
+  setShared: function () {
+    var n = val('#sp-new'), n2 = val('#sp-new2');
+    if (!isPin6(n)) { toast('共用密碼必須是 6 位數字', true); return; }
+    if (n !== n2) { toast('兩次輸入的共用密碼不一樣', true); return; }
+    if (S.sharedStatus && S.sharedStatus.is_set && !confirm('更換共用密碼？\n所有一般登入會立即失效，大家需要用新密碼重新登入。')) return;
+    call('evt_set_shared_password', { p_new: n }, [], '已設定共用密碼').then(function (r) { if (r.ok) { S.pinStatus = null; S.sharedStatus = null; renderNow(); } });
   },
   addPerson: function () {
     var n = val('#newperson').trim();
     if (!n) { toast('請輸入姓名', true); return; }
-    call('evt_person_save', { p: { name: n } }, ['people'], '已新增：' + n + '，請設定 PIN').then(function (r) { if (r.ok) { S.pinStatus = null; renderNow(); } });
+    call('evt_person_save', { p: { name: n } }, ['people'], '已新增：' + n).then(function (r) { if (r.ok) { S.pinStatus = null; renderNow(); } });
   },
   pMgr: function (e) { call('evt_person_save', { p: { id: e.getAttribute('data-id'), is_manager: e.checked } }, ['people'], '已更新').then(function (r) { if (!r.ok) renderNow(); }); },
   pActive: function (e) {
@@ -1941,9 +2024,9 @@ var A = {
   },
   changePin: function () {
     var o = val('#pin-old'), n = val('#pin-new'), n2 = val('#pin-new2');
-    if (!/^[0-9]{4,8}$/.test(n)) { toast('新 PIN 必須是 4 到 8 位數字', true); return; }
+    if (!isPin6(n)) { toast('新 PIN 必須是 6 位數字', true); return; }
     if (n !== n2) { toast('兩次輸入的新 PIN 不一樣', true); return; }
-    call('evt_change_my_pin', { p_old: o, p_new: n }, [], '已更改 PIN，其他裝置已登出').then(function (r) { if (r.ok) renderNow(); });
+    call('evt_change_my_pin', { p_old: o, p_new: n }, [], '已更改 PIN，你在其他裝置的管理員登入已失效').then(function (r) { if (r.ok) { LS.del(K_SHORTPIN); renderNow(); } });
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
@@ -1958,26 +2041,57 @@ document.addEventListener('click', function (ev) {
   if (t.tagName === 'BUTTON') ev.preventDefault();
   if (A[a]) A[a](t);
 });
+function loginFail(d) {
+  S.ui.loginMsg = (d.error || '登入失敗') + (d.retry_at ? '，請於 ' + tm(d.retry_at).slice(6) + ' 後再試' : '');
+  renderNow();
+}
+function loginOk(d, oldToken) {
+  if (oldToken && oldToken !== d.token) sb.rpc('evt_logout', { p_token: oldToken }).then(function () {}, function () {});
+  S.token = d.token; S.me = d.person;
+  LS.set(K_TOKEN, d.token); LS.set(K_ME, JSON.stringify(d.person));
+  S.ui.loginPid = null; S.ui.loginMsg = ''; S.ui.screen = null;
+  afterLogin();
+}
 document.addEventListener('submit', function (ev) {
-  var f = ev.target;
-  if (f.getAttribute('data-form') !== 'login') return;
+  var kind = ev.target.getAttribute('data-form');
+  if (!kind) return;
   ev.preventDefault();
-  var pin = val('#pin');
-  if (!pin) return;
-  var pid = S.ui.loginPid;
-  sb.rpc('evt_login', { p_person_id: pid, p_pin: pin, p_device: (navigator.userAgent || '').slice(0, 180) }).then(function (r) {
-    if (r.error) { handleErr(r.error); return; }
-    var d = r.data || {};
-    if (!d.ok) {
-      S.ui.loginMsg = d.error + (d.remaining != null ? '（再錯 ' + d.remaining + ' 次會暫時鎖定）' : '') + (d.locked_until ? '，可於 ' + tm(d.locked_until) + ' 後再試，或請主管重設' : '');
-      renderNow();
-      return;
+  if (kind === 'partner') {
+    var pw = val('#pw'), nm = val('#nm').trim();
+    if (!isPin6(pw)) { S.ui.loginMsg = '共用密碼是 6 位數字'; renderNow(); return; }
+    if (!nm) { S.ui.loginMsg = '請輸入你的名字'; renderNow(); return; }
+    sb.rpc('evt_partner_login', { p_password: pw, p_name: nm, p_device: deviceId() }).then(function (r) {
+      if (r.error) { handleErr(r.error); return; }
+      if (!r.data.ok) { loginFail(r.data); return; }
+      LS.set(K_NAME, r.data.person.name);
+      loginOk(r.data, S.token);
+    }, handleErr);
+  } else if (kind === 'admin') {
+    var pin = val('#pin');
+    if (!pin) return;
+    sb.rpc('evt_admin_login', { p_person_id: S.ui.loginPid, p_pin: pin, p_device: deviceId() }).then(function (r) {
+      if (r.error) { handleErr(r.error); return; }
+      if (!r.data.ok) { loginFail(r.data); return; }
+      if (pin.length !== 6) LS.set(K_SHORTPIN, r.data.person.id); else LS.del(K_SHORTPIN);
+      loginOk(r.data, S.token);
+    }, handleErr);
+  } else if (kind === 'switch') {
+    var name = val('#nm').trim();
+    if (!name) { S.ui.loginMsg = '請輸入名字'; renderNow(); return; }
+    if (S.me && S.me.is_manager) {
+      sb.rpc('evt_admin_to_partner', { p_token: S.token, p_name: name }).then(function (r) {
+        if (r.error) { handleErr(r.error); return; }
+        loginOk(r.data, null);
+      }, handleErr);
+    } else {
+      sb.rpc('evt_partner_switch', { p_token: S.token, p_name: name }).then(function (r) {
+        if (r.error) { S.ui.loginMsg = r.error.message; if (r.error.hint === 'EVT_AUTH') handleErr(r.error); else renderNow(); return; }
+        S.me = r.data; LS.set(K_ME, JSON.stringify(r.data)); LS.set(K_NAME, r.data.name);
+        S.ui.screen = null; S.ui.loginMsg = '';
+        reload(['people']); toast('已換成 ' + r.data.name);
+      }, handleErr);
     }
-    S.token = d.token; S.me = d.person;
-    LS.set(K_TOKEN, d.token); LS.set(K_ME, JSON.stringify(d.person));
-    S.ui.loginPid = null; S.ui.loginMsg = '';
-    afterLogin();
-  }, handleErr);
+  }
 });
 document.addEventListener('change', function (ev) {
   var t = ev.target, a = t.getAttribute('data-act');
