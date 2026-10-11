@@ -332,7 +332,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 9;
+var APP_VERSION = 10;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1553,22 +1553,26 @@ function csvToItems(text) {
   if (rows.length < 2) return { rows: [], errors: ['沒有資料列'] };
   var head = rows[0].map(function (x) { return CSV_COLS[String(x).replace(/\s/g, '')] || ''; });
   if (head.indexOf('name') < 0) return { rows: [], errors: ['找不到「名稱」欄'] };
-  var out = [], errors = [], names = {};
-  S.D.items.forEach(function (it) { if (!it.archived) names[it.kind + '|' + it.name] = 1; });
+  var out = [], errors = [], existing = {}, seen = {};
+  S.D.items.forEach(function (it) { if (!it.archived) existing[it.kind + '|' + it.name] = 1; });
   rows.slice(1).forEach(function (r, i) {
     var o = {}, err = [];
     head.forEach(function (k, j) { if (k) o[k] = String(r[j] == null ? '' : r[j]).trim(); });
     o.kind = /濾掛|drip/i.test(o.kind || '') ? 'drip' : 'bean';
     if (!o.name) err.push('缺名稱');
     if (o.booth && BOOTHS.indexOf(o.booth) < 0) err.push('展台只能是 ' + BOOTHS.join('、'));
-    if (o.kind === 'bean' && !(num(o.spec_g) > 0)) err.push('咖啡豆需要規格 g');
+    if (o.kind === 'bean' && !existing['bean|' + o.name] && !(num(o.spec_g) > 0)) err.push('新增的咖啡豆需要規格 g');
+    if (o.spec_g && !(num(o.spec_g) > 0)) err.push('規格 g 要大於 0');
     ['spec_g', 'plan_batch1', 'plan_total', 'tasting_g'].forEach(function (k) { if (o[k] && !isFinite(o[k])) err.push(k + ' 不是數字'); });
-    if (names[o.kind + '|' + o.name]) err.push('名稱重複');
-    names[o.kind + '|' + o.name] = 1;
+    var key = o.kind + '|' + o.name, row = { data: o, line: i + 2, err: err, over: !!existing[key], by: null };
+    if (o.name && seen[key]) seen[key].by = row.line;
+    if (o.name) seen[key] = row;
     if (o.kind === 'bean') delete o.parent_name;
-    out.push({ data: o, line: i + 2, err: err });
+    out.push(row);
   });
-  return { rows: out, errors: errors };
+  var add = 0, over = 0;
+  Object.keys(seen).forEach(function (k) { if (existing[k]) over++; else add++; });
+  return { rows: out, errors: errors, add: add, over: over };
 }
 function vCsvPreview() {
   var c = S.ui.csv;
@@ -1579,9 +1583,10 @@ function vCsvPreview() {
     h += '<div class="tw"><table><thead><tr><th>列</th><th>類型</th><th>名稱</th><th>展台</th><th class="n">規格</th><th class="n">第一批</th><th class="n">總預計</th><th>所屬豆款</th><th>檢查</th></tr></thead><tbody>' + c.rows.map(function (r) {
       var o = r.data;
       return '<tr><td class="mut">' + r.line + '</td><td>' + (o.kind === 'drip' ? '濾掛' : '咖啡豆') + '</td><td>' + esc(o.name) + '</td><td>' + esc(o.booth || '') + '</td><td class="n">' + esc(o.spec_g || '') + '</td><td class="n">' + esc(o.plan_batch1 || '') + '</td><td class="n">' + esc(o.plan_total || '') + '</td><td>' + esc(o.parent_name || '') + '</td><td>' +
-        (r.err.length ? '<span class="tag warn">' + esc(r.err.join('、')) + '</span>' : '<span class="tag ok">可匯入</span>') + '</td></tr>';
+        (r.err.length ? '<span class="tag warn">' + esc(r.err.join('、')) + '</span>' : (r.by ? '<span class="tag">由第 ' + r.by + ' 列取代</span>' : (r.over ? '<span class="tag hold">覆蓋既有品項</span>' : '<span class="tag ok">新增</span>'))) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
-    h += '<div class="row btns" style="margin-top:8px"><button class="btn" data-act="csvImport"' + (bad || !c.rows.length ? ' disabled' : '') + '>匯入 ' + c.rows.length + ' 個品項</button>' + (bad ? '<span class="small" style="color:var(--warn)">有 ' + bad + ' 列需要修正</span>' : '') + '</div>';
+    if (c.over) h += '<p class="hint" style="margin-top:16px">「覆蓋既有品項」：CSV 有填的欄位會取代目前的值，空白欄位保留原值；修改會留在「紀錄」。同一份 CSV 裡名稱重複時，以後面那一列為準。</p>';
+    h += '<div class="row btns" style="margin-top:16px"><button class="btn" data-act="csvImport"' + (bad || !c.rows.length ? ' disabled' : '') + '>匯入（新增 ' + c.add + '、覆蓋 ' + c.over + '）</button>' + (bad ? '<span class="small" style="color:var(--warn)">有 ' + bad + ' 列需要修正</span>' : '') + '</div>';
   }
   return h + '</div>';
 }
@@ -2130,8 +2135,9 @@ var A = {
     else toast('請選擇檔案或貼上內容', true);
   },
   csvImport: function () {
-    var rows = S.ui.csv.rows.map(function (r) { return r.data; });
-    call('evt_items_import', { p_event_id: S.ev, p_rows: rows }, ['items', 'plan']).then(function (r) { if (r.ok) { S.ui.csv = null; toast('已匯入 ' + r.data + ' 個品項'); renderNow(); } });
+    var c = S.ui.csv, rows = c.rows.map(function (r) { return r.data; });
+    if (c.over && !confirm('有 ' + c.over + ' 個品項名稱和目前的重複，會用 CSV 的內容覆蓋（空白欄位保留原值）。確定匯入？')) return;
+    call('evt_items_import', { p_event_id: S.ev, p_rows: rows }, ['items', 'plan']).then(function (r) { if (r.ok) { S.ui.csv = null; toast('已匯入：新增 ' + c.add + '、覆蓋 ' + c.over + ' 個品項'); renderNow(); } });
   },
 
   /* 紀錄 */
