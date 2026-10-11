@@ -101,6 +101,7 @@ table.top tr.grp td{line-height:1.5}
 tr.grp td{background:var(--soft);padding-top:8px;padding-bottom:8px;font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.06em}
 tr.tot td{font-weight:600;border-top:2px solid var(--gold)}
 td input[type=number]{width:84px;text-align:right;min-height:40px}
+td .sect input[type=number]{width:100%;text-align:left}
 td input[type=text],td input[type=date],td select{min-height:40px}
 .empty{padding:24px;text-align:center;color:var(--mut);border:1px dashed var(--gold);border-radius:4px;font-size:14px}
 .log{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
@@ -334,7 +335,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 14;
+var APP_VERSION = 15;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1604,13 +1605,36 @@ function vNewItem(beanOpts) {
 function itemOps(it) {
   return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除</button></span>';
 }
+function beanLinkField(it) {
+  var B = S.beanDb;
+  loadBeanDb();
+  var cur = it.bean_ref_id != null ? String(it.bean_ref_id) : '';
+  var taken = {};
+  S.D.items.forEach(function (x) { if (!x.archived && x.kind === 'bean' && x.id !== it.id && x.bean_ref_id != null) taken[x.bean_ref_id] = x.name; });
+  var groups = {}, order = [], inList = false;
+  B.list.forEach(function (b) { if (String(b.id) === cur) inList = true; if (!groups[b.cat]) { groups[b.cat] = []; order.push(b.cat); } groups[b.cat].push(b); });
+  var opts = '<option value="">不連結（手動輸入的豆款）</option>' +
+    (cur && !inList ? '<option value="' + cur + '" selected>' + esc(it.bean_ref_name || '') + '（#' + cur + '，資料庫已下架或刪除）</option>' : '') +
+    order.map(function (g) {
+      return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (b) {
+        return '<option value="' + b.id + '"' + (String(b.id) === cur ? ' selected' : '') + (taken[b.id] ? ' disabled' : '') + '>' + esc(b.label) + (taken[b.id] ? '（已連結：' + esc(taken[b.id]) + '）' : '') + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+  var st = B.state === 'error' ? '<span class="hint" style="color:var(--warn)">讀取咖啡豆資料庫失敗：' + esc(B.error) + '</span> <button class="btn ghost sm" data-act="beanDbRetry" style="width:auto">重試</button>'
+    : (B.state !== 'ok' ? '<span class="hint">正在讀取咖啡豆資料庫…</span>' : '<span class="hint">只記錄連結，不會改到咖啡豆資料庫；本場的名稱與數量照下方設定。</span>');
+  if (!cur && B.state === 'ok') {
+    var same = find(B.list, function (b) { return b.name === it.name && !taken[b.id]; });
+    if (same) st = '<span class="hint">咖啡豆資料庫有同名豆款「' + esc(same.label) + '」，可以直接選它連結。</span>';
+  }
+  return '<div class="field" style="grid-column:1 / -1;max-width:560px"><label for="ie-bean">連結咖啡豆資料庫</label><select id="ie-bean" data-ie="bean_ref_id"' + (B.state === 'ok' || cur ? '' : ' disabled') + '>' + opts + '</select>' + st + '</div>';
+}
 function itemForm(it) {
   var R = S.R, bean = it.kind === 'bean', x = bean ? R.item[it.id] : R.drip[it.id];
   function f(k, label, v, type, extra) {
     return '<div class="field"><label>' + label + '</label><input type="' + (type || 'text') + '" data-ie="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '></div>';
   }
   var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3>' +
-    (bean && it.bean_ref_id != null ? '<p class="hint" style="margin:0 0 16px">連結咖啡豆資料庫：' + esc(it.bean_ref_name || '') + '（#' + it.bean_ref_id + '）。這裡的修改只影響本次活動，不會改到咖啡豆資料庫。</p>' : (bean ? '<p class="hint" style="margin:0 0 16px">手動輸入的豆款，沒有連結咖啡豆資料庫。</p>' : '')) + '<div class="grid2 form">' +
+    '<div class="grid2 form">' + (bean ? beanLinkField(it) : '') +
     f('name', '名稱', it.name) +
     (bean ? '<div class="field"><label>展台</label><select data-ie="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option' + (it.booth === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
       f('category', '分類', it.category) + f('spec_g', '規格 g', it.spec_g, 'number', ' min="1"')
@@ -2208,6 +2232,10 @@ var A = {
     if (!p.name) { toast('名稱不能空白', true); return; }
     if (it.kind === 'bean' && !(num(p.spec_g) > 0)) { toast('咖啡豆需要規格 g', true); return; }
     if (p.plan_batch1 === '') p.plan_batch1 = '0';
+    if ('bean_ref_id' in p) {
+      if (p.bean_ref_id === (it.bean_ref_id != null ? String(it.bean_ref_id) : '')) delete p.bean_ref_id;
+      else if (p.bean_ref_id) { var b = find(S.beanDb.list, function (x) { return String(x.id) === p.bean_ref_id; }); if (!b) { toast('找不到這個豆款，請重新選擇', true); return; } p.bean_ref_name = b.name; }
+    }
     call('evt_item_save', { p: p }, ['items', 'plan'], '已儲存：' + p.name).then(function (r) { if (r.ok) { S.ui.itemEdit = null; renderNow(); } });
   },
   archItem: function (e) {
