@@ -70,6 +70,7 @@ section.blk:last-child{border-bottom:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:0 16px;min-height:40px;cursor:pointer;font-size:14px;color:var(--fg)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--onink);border-color:var(--ink)}
+.chip[aria-pressed="true"] .mut{color:inherit;opacity:.75}
 .tag{display:inline-block;font-size:12px;padding:2px 8px;border:1px solid var(--mist);border-radius:999px;color:var(--mut);white-space:nowrap;line-height:1.5;vertical-align:middle}
 .tag.ok{border-color:var(--ok);color:var(--ok)}
 .tag.warn{border-color:var(--warn);color:var(--warn)}
@@ -304,7 +305,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 7;
+var APP_VERSION = 8;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -396,7 +397,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, newEv: '', picker: ''
+    showCalc: false, logMore: 0, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -457,6 +458,11 @@ var LOAD = {
   people: function () { return pageAll(function (a, b) { return sb.from('evt_people').select('id,name,is_manager,active,sort').order('sort').order('name').range(a, b); }); },
   events: function () { return pageAll(function (a, b) { return sb.from('evt_events').select('*').order('start_date', { ascending: false }).range(a, b); }); },
   templates: function () { return pageAll(function (a, b) { return sb.from('evt_checklist_templates').select('id,name,station_names,note,updated_at').order('name').range(a, b); }); },
+  /* 參加夥伴：資料庫還沒執行 v3 更新時回傳 null，視為所有人都可看到 */
+  members: function () {
+    return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id').range(a, b); })
+      .then(function (r) { return r; }, function (e) { if (isNetErr(e)) throw e; return null; });
+  },
   tplItems: function () { return pageAll(function (a, b) { return sb.from('evt_checklist_template_items').select('id,template_id,station_name,phase,title').range(a, b); }); },
   stations: function (ev) { return pageAll(function (a, b) { return sb.from('evt_stations').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
   owners: function (ev) {
@@ -484,10 +490,10 @@ var LOAD = {
       .then(function (r) { if (r.error) throw r.error; return r.data || []; });
   }
 };
-var GLOBAL_KEYS = ['people', 'events', 'templates', 'tplItems'];
+var GLOBAL_KEYS = ['people', 'events', 'members', 'templates', 'tplItems'];
 var EVENT_KEYS = ['stations', 'owners', 'items', 'plan', 'sheets', 'lines', 'moves', 'ck', 'cklog', 'buys', 'tl', 'audit'];
 var TABLE_KEY = {
-  evt_people: 'people', evt_events: 'events', evt_checklist_templates: 'templates', evt_checklist_template_items: 'tplItems',
+  evt_people: 'people', evt_events: 'events', evt_event_members: 'members', evt_checklist_templates: 'templates', evt_checklist_template_items: 'tplItems',
   evt_stations: 'stations', evt_station_owners: 'owners', evt_items: 'items', evt_plan: 'plan',
   evt_count_sheets: 'sheets', evt_count_lines: 'lines', evt_movements: 'moves',
   evt_checklist_items: 'ck', evt_checklist_log: 'cklog', evt_purchases: 'buys', evt_timeline: 'tl'
@@ -740,7 +746,17 @@ var CALC = {
 /* ============================================================================
    身分與權限（畫面上的判斷；真正的權限由伺服器端函式把關）
    ============================================================================ */
-function curEvent() { return byId(S.G.events, S.ev); }
+function membersOf(evId) {
+  if (!S.G.members) return S.G.people.filter(function (p) { return p.active; }).map(function (p) { return p.id; });
+  return S.G.members.filter(function (m) { return m.event_id === evId; }).map(function (m) { return m.person_id; });
+}
+function canSeeEvent(e) {
+  if (!e) return false;
+  if (!S.me || isMgr() || !S.G.members) return true;
+  return membersOf(e.id).indexOf(S.me.id) >= 0;
+}
+function visibleEvents() { return (S.G.events || []).filter(canSeeEvent); }
+function curEvent() { var e = byId(S.G.events, S.ev); return canSeeEvent(e) ? e : null; }
 function person(id) { return byId(S.G.people, id); }
 function pname(id) { var p = person(id); return p ? p.name : '—'; }
 /* 登入方式標示：只讀紀錄當下保存的值；舊資料沒有這個值，一律標為「歷史紀錄」，不推算 */
@@ -868,8 +884,8 @@ function vListPage() {
   h += '</header><main id="view">';
   if (!S.loaded) return h + '<section class="blk"><div class="empty">載入中…</div></section></main>';
   if (isMgr()) h += '<div class="row btns" style="margin-top:24px"><button class="btn" data-act="openNewEv">＋建立活動</button></div>';
-  var evs = S.G.events.slice();
-  if (!evs.length) h += '<div class="empty" style="margin-top:24px">' + (isMgr() ? '還沒有活動，請按「＋建立活動」。可以先建立之後的活動，到時候再進來選。' : '還沒有活動，請管理員先建立。') + '</div>';
+  var evs = visibleEvents();
+  if (!evs.length) h += '<div class="empty" style="margin-top:24px">' + (isMgr() ? '還沒有活動，請按「＋建立活動」。可以先建立之後的活動，到時候再進來選。' : (S.G.events.length ? '你目前沒有被加入任何活動。請管理員在活動的「本次活動參加夥伴」把你加入。' : '還沒有活動，請管理員先建立。')) + '</div>';
   var groups = [['進行中', function (a, b) { return a.start_date < b.start_date ? -1 : 1; }],
     ['籌備中', function (a, b) { return a.start_date < b.start_date ? -1 : 1; }],
     ['已結束', function (a, b) { return a.start_date < b.start_date ? 1 : -1; }]];
@@ -1222,7 +1238,8 @@ function assignees(c) { if (c.assignee_id) return [c.assignee_id]; return owners
 function isMine(c) { return !!S.me && assignees(c).indexOf(S.me.id) >= 0; }
 function selOpts(arr, cur) { return arr.map(function (a) { return '<option value="' + esc(a[0]) + '"' + (a[0] === cur ? ' selected' : '') + '>' + esc(a[1]) + '</option>'; }).join(''); }
 function whoOpts(cur) {
-  return '<option value="">依崗位負責人</option>' + S.G.people.filter(function (p) { return p.active || p.id === cur; }).map(function (p) {
+  var mem = membersOf(S.ev);
+  return '<option value="">依崗位負責人</option>' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || p.id === cur; }).map(function (p) {
     return '<option value="' + p.id + '"' + (p.id === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>';
   }).join('');
 }
@@ -1285,7 +1302,8 @@ function vCheck() {
     h += '<div style="margin-top:24px" class="row"><h2 style="margin:0">' + esc(st.name) + '</h2><span class="mut small">負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span>' +
       '<span class="mut small">對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span>' + (can ? '' : '<span class="tag">僅可勾選</span>') + '<span class="mut small">已完成 ' + d2 + ' / ' + a2.length + '</span></div>';
     if (mgr) {
-      h += '<div style="margin-top:16px"><div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換）</div><div class="chips">' + S.G.people.filter(function (p) { return p.active; }).map(function (p) {
+      var mem = membersOf(S.ev);
+      h += '<div style="margin-top:16px"><div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
         return '<button class="chip" data-act="owner" data-v="' + p.id + '" aria-pressed="' + (owners.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>';
       }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div>';
     }
@@ -1533,7 +1551,7 @@ function vCsvPreview() {
    紀錄與匯出
    --------------------------------------------------------------------------- */
 var TABLE_LABEL = {
-  evt_shared_secret: '共用密碼', evt_events: '活動', evt_stations: '崗位', evt_station_owners: '崗位負責人', evt_items: '品項', evt_plan: '預計量', evt_people: '人員',
+  evt_shared_secret: '共用密碼', evt_events: '活動', evt_event_members: '參加夥伴', evt_stations: '崗位', evt_station_owners: '崗位負責人', evt_items: '品項', evt_plan: '預計量', evt_people: '人員',
   evt_checklist_items: '清單項目', evt_checklist_templates: '範本', evt_checklist_template_items: '範本項目', evt_purchases: '備料', evt_timeline: '時程', evt_pins: 'PIN'
 };
 var FIELD_LABEL = {
@@ -1691,6 +1709,7 @@ function vEvent() {
       evField('note', '備註', 'text', ev.note, m) + '</div>' +
       '<p class="hint" style="margin-top:16px">狀態改為「已結束」後，崗位負責人的編輯權限自動失效。</p>' +
       (m ? '<div class="foot"><button class="btn" data-act="saveEvent">儲存活動設定</button></div>' : '') + '</section>';
+    if (m) h += vMembersCard(ev);
     if (m) {
       h += '<section class="panel"><h2>本次活動崗位</h2><p class="sub">設定此活動的工作崗位與分工</p>' +
         S.D.stations.map(function (s) {
@@ -1732,7 +1751,32 @@ function vAccount() {
   h += '<p class="hint" style="margin-top:16px">系統版本 v' + APP_VERSION + ' ・ 即時同步 <span class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>' + (S.rt === 'SUBSCRIBED' ? '連線中' : '未連線') + '</p></section>';
   return h;
 }
+function memChips(sel, act) {
+  return '<div class="chips">' + S.G.people.filter(function (p) { return p.active || sel[p.id]; }).map(function (p) {
+    return '<button class="chip" data-act="' + act + '" data-v="' + p.id + '" aria-pressed="' + !!sel[p.id] + '">' + esc(p.name) + (p.is_manager ? '<span class="mut small">・管理員</span>' : '') + '</button>';
+  }).join('') + '</div>';
+}
+function selCount(sel) { return Object.keys(sel).filter(function (k) { return sel[k]; }).length; }
+function vMembersCard(ev) {
+  if (!S.G.members) return '<section class="panel"><h2>本次活動參加夥伴</h2><p class="sub">選擇這場活動有哪些夥伴參加</p><div class="banner hold" style="margin:0">需要先執行資料庫更新（v3 參加夥伴）才能使用。</div></section>';
+  if (!S.ui.mem || S.ui.memEv !== ev.id) {
+    S.ui.mem = {}; S.ui.memEv = ev.id;
+    membersOf(ev.id).forEach(function (id) { S.ui.mem[id] = true; });
+  }
+  var saved = membersOf(ev.id), sel = S.ui.mem, n = selCount(sel);
+  var dirty = n !== saved.length || saved.some(function (id) { return !sel[id]; });
+  return '<section class="panel"><h2>本次活動參加夥伴</h2><p class="sub">選擇這場活動有哪些夥伴參加。沒有參加的夥伴看不到這場活動，也不能修改；管理員登入不受限制。</p>' +
+    '<div class="row" style="margin-bottom:16px"><span class="small">已選 <b>' + n + '</b> 人' + (dirty ? '<span class="tag hold" style="margin-left:8px">尚未儲存</span>' : '') + '</span>' +
+    '<span class="row btns"><button class="btn ghost sm" data-act="memAll">全選</button><button class="btn ghost sm" data-act="memNone">全部取消</button></span></div>' +
+    memChips(sel, 'memToggle') +
+    '<p class="hint" style="margin-top:16px">新夥伴第一次登入後才會出現在名單裡；之後新建立的活動會預設加入所有啟用中的人。</p>' +
+    '<div class="foot"><button class="btn" data-act="saveMembers">儲存參加夥伴</button>' + (dirty ? '<button class="btn ghost" data-act="memReset">還原</button>' : '') + '</div></section>';
+}
+var nevKeep = null;
+function keepNev() { nevKeep = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-nev]'), function (x) { nevKeep[x.getAttribute('data-nev')] = x.value; }); }
+function restoreNev() { if (!nevKeep) return; Array.prototype.forEach.call(document.querySelectorAll('[data-nev]'), function (x) { var k = x.getAttribute('data-nev'); if (nevKeep[k] != null) x.value = nevKeep[k]; }); nevKeep = null; }
 function vNewEvent() {
+  if (!S.ui.nevMem && S.G.people.length) { S.ui.nevMem = {}; S.G.people.forEach(function (p) { if (p.active) S.ui.nevMem[p.id] = true; }); }
   var hasData = !!find(S.G.events, function (e) { return e.name === DATA.event.name && e.start_date === DATA.event.start_date; });
   var h = '<div class="modal-bg" data-act="closeNewEv"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="nev-title" data-act="modalStay">' +
     '<h2 id="nev-title">建立活動</h2><p class="sub">建立新的活動，可以套用清單範本或沿用其他活動的崗位</p>';
@@ -1741,7 +1785,8 @@ function vNewEvent() {
     '<div class="field"><label for="nev-start">開始</label><input type="date" id="nev-start" data-nev="start_date"></div><div class="field"><label for="nev-end">結束</label><input type="date" id="nev-end" data-nev="end_date"></div>' +
     '<div class="field wide"><label for="nev-venue">場地</label><input type="text" id="nev-venue" data-nev="venue"></div>' +
     '<div class="field"><label for="nev-tpl">套用範本</label><select id="nev-tpl" data-nev="tpl"><option value="">不套用</option>' + S.G.templates.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="field"><label for="nev-from">沿用崗位</label><select id="nev-from" data-nev="from"><option value="">不沿用</option>' + S.G.events.map(function (e) { return '<option value="' + e.id + '">' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select></div></div>' +
+    '<div class="field"><label for="nev-from">沿用崗位</label><select id="nev-from" data-nev="from"><option value="">不沿用</option>' + S.G.events.map(function (e) { return '<option value="' + e.id + '">' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select></div>' +
+    '<div class="field wide"><label>參加夥伴（已選 ' + selCount(S.ui.nevMem || {}) + ' 人）</label>' + memChips(S.ui.nevMem || {}, 'nevMem') + '</div></div>' +
     '<div class="foot"><button class="btn ghost" data-act="closeNewEv">取消</button><button class="btn" data-act="createEvent">建立活動</button></div></div></div>';
   return h;
 }
@@ -2056,7 +2101,17 @@ var A = {
   /* 活動 */
   openList: function () { S.pinStatus = null; S.ui.picker = '1'; S.ui.newEv = ''; renderNow(); window.scrollTo(0, 0); },
   enterEvent: function (e) { var id = e.getAttribute('data-id'); S.ui.picker = ''; if (id === S.ev) { renderNow(); } else { S.ui.tab = 'count'; switchEvent(id); } window.scrollTo(0, 0); },
-  openNewEv: function () { S.ui.newEv = '1'; renderNow(); var f = $('#nev-name'); if (f) f.focus(); },
+  memToggle: function (e) { var id = e.getAttribute('data-v'); S.ui.mem[id] = !S.ui.mem[id]; renderNow(); },
+  memAll: function () { S.G.people.forEach(function (p) { if (p.active) S.ui.mem[p.id] = true; }); renderNow(); },
+  memNone: function () { S.ui.mem = {}; renderNow(); },
+  memReset: function () { S.ui.mem = null; renderNow(); },
+  saveMembers: function () {
+    var ids = Object.keys(S.ui.mem).filter(function (k) { return S.ui.mem[k]; });
+    if (!ids.length && !confirm('沒有選任何夥伴：只有管理員登入可以操作這場活動。確定儲存？')) return;
+    call('evt_event_set_members', { p_event_id: S.ev, p_person_ids: ids }, ['members'], '已更新參加夥伴：' + ids.length + ' 人').then(function (r) { if (r.ok) { S.ui.mem = null; renderNow(); } });
+  },
+  nevMem: function (e) { var id = e.getAttribute('data-v'); S.ui.nevMem[id] = !S.ui.nevMem[id]; keepNev(); renderNow(); restoreNev(); },
+  openNewEv: function () { S.ui.nevMem = {}; S.G.people.forEach(function (p) { if (p.active) S.ui.nevMem[p.id] = true; }); S.ui.newEv = '1'; renderNow(); var f = $('#nev-name'); if (f) f.focus(); },
   closeNewEv: function () { S.ui.newEv = ''; renderNow(); },
   saveEvent: function () {
     var p = { id: S.ev };
@@ -2103,6 +2158,9 @@ var A = {
       var chain = Promise.resolve({ ok: true });
       if (from) chain = chain.then(function () { return call('evt_stations_copy', { p_from: from, p_to: id }); });
       if (tpl) chain = chain.then(function () { return call('evt_template_apply', { p_template_id: tpl, p_event_id: id, p_station_id: null }); });
+      var mem = Object.keys(S.ui.nevMem || {}).filter(function (k) { return S.ui.nevMem[k]; });
+      var allActive = S.G.people.filter(function (x) { return x.active; }).length;
+      if (S.G.members && mem.length !== allActive) chain = chain.then(function () { return call('evt_event_set_members', { p_event_id: id, p_person_ids: mem }, ['members']); });
       chain.then(function () { toast('已建立：' + p.name + '。請到「清單」指定各崗位負責人。'); switchEvent(id); });
     });
   },
@@ -2255,7 +2313,7 @@ function afterLogin() {
   S.loaded = false;
   renderNow();
   return reload(GLOBAL_KEYS).then(function () {
-    var evs = S.G.events;
+    var evs = visibleEvents();
     if (!S.ev || !byId(evs, S.ev)) {
       var last = LS.get('phase_evt_last_event');
       var pick = (last && byId(evs, last)) || find(evs, function (e) { return e.status === '進行中'; }) || find(evs, function (e) { return e.status === '籌備中'; }) || evs[0];
