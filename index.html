@@ -332,7 +332,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 10;
+var APP_VERSION = 11;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -424,7 +424,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1475,7 +1475,7 @@ function vTimeline() {
 function vItems() {
   var m = isMgr(), dis = m ? '' : ' disabled', R = S.R;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? '管理員可以直接修改，離開欄位即儲存，修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。', '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
+  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? '數字欄位可以直接修改，離開欄位即儲存；名稱、展台、分類、備註請按「編輯」。沒有要帶的品項按「刪除」，可以再還原。修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。', '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
   if (flagged.length) h += '<div class="banner hold" style="margin:0 0 16px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
   h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
   var tp1 = 0, tpT = 0;
@@ -1483,23 +1483,25 @@ function vItems() {
     if (!it) return '<tr class="grp"><td colspan="' + (m ? 8 : 7) + '">' + esc(booth) + '</td></tr>';
     var x = R.item[it.id];
     tp1 += num(x.plan1); tpT += num(x.planT);
+    if (m && S.ui.itemEdit === it.id) return '<tr><td colspan="8">' + itemForm(it) + '</td></tr>';
     var drip = find(R.drips, function (d) { return d.parent_item_id === it.id; });
-    return '<tr><td>' + (m ? '<input type="text" data-it="' + it.id + '|name" value="' + esc(it.name) + '" style="min-width:150px">' : esc(it.name)) + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
-      '<td class="small mut" style="min-width:140px">' + (m ? '<input type="text" data-it="' + it.id + '|category" value="' + esc(it.category || '') + '">' : esc(it.category || '')) + '</td>' +
+    return '<tr><td style="min-width:150px"><b style="font-weight:600">' + esc(it.name) + '</b>' + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
+      '<td class="small mut" style="min-width:140px">' + esc(it.category || '—') + '</td>' +
       '<td class="n"><input type="number" min="1" data-it="' + it.id + '|spec_g" value="' + I(it.spec_g) + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(x.plan1) ? x.plan1 : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(x.planT) ? x.planT : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|tasting_g" value="' + (isNum(x.tasting) ? x.tasting : '') + '"' + dis + '></td>' +
-      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td>' + (m ? '<td class="ops"><button class="btn ghost sm" data-act="archItem" data-id="' + it.id + '">封存</button></td>' : '') + '</tr>';
+      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td>' + (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
-  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」；要改所屬豆款請按「編輯」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
-      return '<tr><td>' + (m ? '<input type="text" data-it="' + it.id + '|name" value="' + esc(it.name) + '" style="min-width:130px">' : esc(it.name)) + flagHtml(it, m) + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
+      if (m && S.ui.itemEdit === it.id) return '<tr><td colspan="5">' + itemForm(it) + '</td></tr>';
+      return '<tr><td style="min-width:130px"><b style="font-weight:600">' + esc(it.name) + '</b>' + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
-        (m ? '<td class="ops"><button class="btn ghost sm" data-act="archItem" data-id="' + it.id + '">封存</button></td>' : '') + '</tr>';
+        (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
 
   if (m) {
@@ -1520,11 +1522,30 @@ function vItems() {
       '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext"></textarea></div>' + vCsvPreview() +
       '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button></div></section>';
     if (R.archived.length) {
-      h += '<section class="panel">' + pHead('已封存的品項（' + R.archived.length + '）', '封存的品項不會出現在盤點與結算，可以隨時還原。', '<button class="btn ghost sm" data-act="toggleItemArch">' + (S.ui.itemArch ? '收起' : '展開') + '</button>');
+      h += '<section class="panel">' + pHead('已刪除的品項（' + R.archived.length + '）', '刪除的品項不會出現在盤點、結算與快速紀錄；已有的盤點與異動紀錄保留，可以隨時還原。', '<button class="btn ghost sm" data-act="toggleItemArch">' + (S.ui.itemArch ? '收起' : '展開') + '</button>');
       if (S.ui.itemArch) h += R.archived.map(function (it) { return '<div class="log"><span class="tx strike">' + esc(itemName(it.id)) + '</span><button class="btn ghost sm" data-act="restoreItem" data-id="' + it.id + '">還原</button></div>'; }).join('');
       h += '</section>';
     }
   }
+  return h;
+}
+function itemOps(it) {
+  return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除</button></span>';
+}
+function itemForm(it) {
+  var R = S.R, bean = it.kind === 'bean', x = bean ? R.item[it.id] : R.drip[it.id];
+  function f(k, label, v, type, extra) {
+    return '<div class="field"><label>' + label + '</label><input type="' + (type || 'text') + '" data-ie="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '></div>';
+  }
+  var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3><div class="grid2 form">' +
+    f('name', '名稱', it.name) +
+    (bean ? '<div class="field"><label>展台</label><select data-ie="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option' + (it.booth === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
+      f('category', '分類', it.category) + f('spec_g', '規格 g', it.spec_g, 'number', ' min="1"')
+      : '<div class="field"><label>所屬豆款</label><select data-ie="parent_item_id"><option value="">只帶濾掛</option>' + R.beans.map(function (b) { return '<option value="' + b.id + '"' + (it.parent_item_id === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select></div>') +
+    f('plan_batch1', '第一批', x && isNum(x.plan1) ? x.plan1 : '', 'number', ' min="0"') + f('plan_total', '總預計', x && isNum(x.planT) ? x.planT : '', 'number', ' min="0"') +
+    (bean ? f('tasting_g', '試喝量 g', x && isNum(x.tasting) ? x.tasting : '', 'number', ' min="0"') : '') +
+    '<div class="field" style="grid-column:span 2">' + '<label>備註</label><input type="text" data-ie="note" value="' + esc(it.note || '') + '"></div></div>' +
+    '<div class="row btns" style="margin-top:16px"><button class="btn sm" data-act="saveItemEdit" data-id="' + it.id + '">儲存</button><button class="btn ghost sm" data-act="cancelItemEdit">取消</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除這個品項</button></div></div>';
   return h;
 }
 function flagHtml(it, m) {
@@ -1943,7 +1964,7 @@ var A = {
     /* supabase-js 的呼叫要接上 then 才會真正送出 */
     sb.rpc('evt_logout', { p_token: tok }).then(function () {}, function () {});
   },
-  tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
+  tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; S.ui.itemEdit = null; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
   go: function (e) { S.ui.tab = e.getAttribute('data-v'); renderNow(); window.scrollTo(0, 0); },
 
   /* 盤點單 */
@@ -2105,10 +2126,22 @@ var A = {
       sb.rpc('evt_item_confirm', { p_token: S.token, p_item_id: list[i++].id }).then(function (r) { if (r.error) { handleErr(r.error); reload(['items']); return; } next(); });
     })();
   },
+  editItem: function (e) { S.ui.itemEdit = e.getAttribute('data-id'); renderNow(); },
+  cancelItemEdit: function () { S.ui.itemEdit = null; renderNow(); },
+  saveItemEdit: function (e) {
+    var id = e.getAttribute('data-id'), it = item(id), p = { id: id };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ie]'), function (x) { p[x.getAttribute('data-ie')] = x.value.trim(); });
+    if (!p.name) { toast('名稱不能空白', true); return; }
+    if (it.kind === 'bean' && !(num(p.spec_g) > 0)) { toast('咖啡豆需要規格 g', true); return; }
+    if (p.plan_batch1 === '') p.plan_batch1 = '0';
+    call('evt_item_save', { p: p }, ['items', 'plan'], '已儲存：' + p.name).then(function (r) { if (r.ok) { S.ui.itemEdit = null; renderNow(); } });
+  },
   archItem: function (e) {
     var it = item(e.getAttribute('data-id'));
-    if (!it || !confirm('封存「' + itemName(it.id) + '」？\n品項會從盤點與結算中隱藏，已有的紀錄保留，可以還原。')) return;
-    call('evt_item_save', { p: { id: it.id, archived: true } }, ['items'], '已封存');
+    if (!it) return;
+    var kids = it.kind === 'bean' ? S.D.items.filter(function (d) { return !d.archived && d.parent_item_id === it.id; }) : [];
+    if (!confirm('刪除「' + itemName(it.id) + '」？\n刪除後不會出現在盤點、結算與快速紀錄；已有的盤點與異動紀錄會保留，可以在「已刪除的品項」還原。' + (kids.length ? '\n這款咖啡豆的濾掛不會一起刪除，需要的話請另外刪除。' : ''))) return;
+    call('evt_item_save', { p: { id: it.id, archived: true } }, ['items'], '已刪除：' + itemName(it.id)).then(function (r) { if (r.ok && S.ui.itemEdit === it.id) { S.ui.itemEdit = null; renderNow(); } });
   },
   restoreItem: function (e) { call('evt_item_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['items'], '已還原'); },
   toggleItemArch: function () { S.ui.itemArch = !S.ui.itemArch; renderNow(); },
