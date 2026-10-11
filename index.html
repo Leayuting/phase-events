@@ -139,7 +139,15 @@ details[open]>summary::before{transform:rotate(90deg)}
 .inline-add{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .inline-add input{flex:1 1 200px;max-width:320px}
 .evlist{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
-.evlist select{width:auto;max-width:320px}
+.evgrp{margin-top:32px}
+.evgrp>h2{margin:0 0 16px}
+.evcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:stretch}
+.evcard{display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:24px;box-shadow:var(--shadow);cursor:pointer;color:var(--fg);font:inherit;width:100%}
+.evcard:hover{border-color:var(--ink)}
+.evcard.cur{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink),var(--shadow)}
+.evcard .nm{font-size:18px;font-weight:600;line-height:1.4;color:var(--ink)}
+.evcard .row{gap:8px}
+.evcard .go{margin-top:auto;padding-top:8px;font-size:13px;font-weight:600;color:var(--ink)}
 .modal-bg{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(54,29,11,.32);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow-y:auto}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:24px;width:100%;max-width:640px;box-shadow:0 8px 32px rgba(54,29,11,.18)}
 .modal>h2{margin:0 0 8px}
@@ -296,7 +304,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 6;
+var APP_VERSION = 7;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -388,13 +396,13 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, newEv: ''
+    showCalc: false, logMore: 0, newEv: '', picker: ''
   }
 };
 function emptyD() {
   return { stations: [], owners: [], items: [], plan: [], sheets: [], lines: [], moves: [], ck: [], cklog: [], buys: [], tl: [], audit: [] };
 }
-var URL_KEYS = { tab: 'tab', ev: 'ev', st: 'st', ph: 'ph', bt: 'bt', lk: 'lk', li: 'li', lw: 'lw', ld: 'ld', newEv: 'new' };
+var URL_KEYS = { tab: 'tab', ev: 'ev', st: 'st', ph: 'ph', bt: 'bt', lk: 'lk', li: 'li', lw: 'lw', ld: 'ld', newEv: 'new', picker: 'list' };
 function readUrl() {
   var q = new URLSearchParams(location.search);
   Object.keys(URL_KEYS).forEach(function (k) {
@@ -417,6 +425,7 @@ function writeUrl() {
     if (S.ui.ld) q.set('ld', S.ui.ld);
   }
   if (S.ui.newEv) q.set('new', '1');
+  if (S.ui.picker) q.set('list', '1');
   var s = '?' + q.toString();
   if (s !== location.search) history.replaceState(null, '', location.pathname + s + location.hash);
 }
@@ -795,7 +804,7 @@ function renderNow() {
     return;
   }
   var y = window.scrollY;
-  app.innerHTML = vHeader() + '<main id="view">' + vBody() + '</main>' + (S.ui.newEv && isMgr() ? vNewEvent() : '');
+  app.innerHTML = (S.ui.picker || (S.loaded && !curEvent()) ? vListPage() : vHeader() + '<main id="view">' + vBody() + '</main>') + (S.ui.newEv && isMgr() ? vNewEvent() : '');
   window.scrollTo(0, y);
   if (S.ui.tab === 'count' && S.ui.signing) initPad();
   writeUrl();
@@ -843,6 +852,42 @@ function offlineBanner() {
   return '<div class="banner warn">連不上資料庫。若網路正常，資料庫可能因為閒置 7 天被 Supabase 暫停：請管理員登入 Supabase 後台（phase-events 專案）按「Restore project」，約 2–5 分鐘後重新整理本頁。</div>';
 }
 
+function vWho() {
+  return '<div class="who"><span class="small mut"><span id="rtdot" class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>目前操作人</span>' +
+    '<span><span class="nm">' + esc(S.me.name) + '</span> <span class="tag">' + esc(roleText()) + '</span></span>' +
+    '<span class="row btns">' + (isMgr()
+      ? '<button class="btn ghost sm" data-act="screen" data-v="switch">切換為一般夥伴</button>'
+      : '<button class="btn ghost sm" data-act="screen" data-v="switch">換人</button><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button>') +
+    '<button class="btn ghost sm" data-act="logout">登出</button></span></div>';
+}
+function vListPage() {
+  var h = '<header class="top"><div class="brand">Phase Coffee Roasters ・ 活動系統</div><div class="hrow"><div style="min-width:0"><h1>選擇活動</h1>' +
+    '<div class="meta">選擇要查看的活動。之後可以隨時從頁首「切換活動」回到這裡。</div></div>' + vWho() + '</div>';
+  if (S.offline) h += offlineBanner();
+  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「我的帳號」更改。</div>';
+  h += '</header><main id="view">';
+  if (!S.loaded) return h + '<section class="blk"><div class="empty">載入中…</div></section></main>';
+  if (isMgr()) h += '<div class="row btns" style="margin-top:24px"><button class="btn" data-act="openNewEv">＋建立活動</button></div>';
+  var evs = S.G.events.slice();
+  if (!evs.length) h += '<div class="empty" style="margin-top:24px">' + (isMgr() ? '還沒有活動，請按「＋建立活動」。可以先建立之後的活動，到時候再進來選。' : '還沒有活動，請管理員先建立。') + '</div>';
+  var groups = [['進行中', function (a, b) { return a.start_date < b.start_date ? -1 : 1; }],
+    ['籌備中', function (a, b) { return a.start_date < b.start_date ? -1 : 1; }],
+    ['已結束', function (a, b) { return a.start_date < b.start_date ? 1 : -1; }]];
+  groups.forEach(function (g) {
+    var L = evs.filter(function (e) { return e.status === g[0]; }).sort(g[1]);
+    if (!L.length) return;
+    h += '<section class="evgrp"><h2>' + g[0] + '<span class="mut small" style="font-weight:400;margin-left:8px">' + L.length + ' 場</span></h2><div class="evcards">' + L.map(function (e) {
+      var cur = e.id === S.ev;
+      return '<button class="evcard' + (cur ? ' cur' : '') + '" data-act="enterEvent" data-id="' + e.id + '">' +
+        '<span class="row"><span class="nm">' + esc(e.name) + '</span><span class="tag' + (e.status === '進行中' ? ' ok' : '') + '">' + esc(e.status) + '</span>' + (cur ? '<span class="tag ink">目前檢視</span>' : '') + '</span>' +
+        '<span class="mut small">' + md(e.start_date) + ' – ' + md(e.end_date) + (e.setup_date ? ' ・ 佈場 ' + md(e.setup_date) : '') + '</span>' +
+        (e.venue || e.booth ? '<span class="small">' + esc([e.venue, e.booth].filter(Boolean).join(' ')) + '</span>' : '') +
+        '<span class="go">進入活動 →</span></button>';
+    }).join('') + '</div></section>';
+  });
+  h += '<section class="evgrp"><h2>帳號與權限</h2><div class="panels" style="padding-top:0">' + (isMgr() ? vPeople() : '') + vAccount() + '</div></section>';
+  return h + '</main>';
+}
 function vHeader() {
   var ev = curEvent();
   var h = '<header class="top"><div class="brand">Phase Coffee Roasters ・ 活動系統</div><div class="hrow"><div style="min-width:0">';
@@ -851,19 +896,10 @@ function vHeader() {
       '<div class="meta">' + md(ev.start_date) + ' – ' + md(ev.end_date) + (ev.venue ? ' ・ ' + esc(ev.venue) : '') + (ev.booth ? ' ' + esc(ev.booth) : '') +
       (ev.setup_date ? ' ・ 佈場 ' + md(ev.setup_date) : '') + '</div>';
   } else h += '<h1>尚未選擇活動</h1>';
-  if (S.G.events.length > 1 || isMgr()) {
-    h += '<div class="evlist">' + (S.G.events.length > 1 ? '<select data-act="pickEvent" aria-label="切換活動">' +
-      S.G.events.map(function (e) { return '<option value="' + e.id + '"' + (e.id === S.ev ? ' selected' : '') + '>' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select>' : '') +
-      (isMgr() ? '<button class="btn ghost sm" data-act="openNewEv">＋建立活動</button>' : '') + '</div>';
-  }
-  h += '</div><div class="who"><span class="small mut"><span id="rtdot" class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>目前操作人</span>' +
-    '<span><span class="nm">' + esc(S.me.name) + '</span> <span class="tag">' + esc(roleText()) + '</span></span>' +
-    '<span class="row" style="gap:8px">' + (isMgr()
-      ? '<button class="btn ghost sm" data-act="screen" data-v="switch">切換為一般夥伴</button>'
-      : '<button class="btn ghost sm" data-act="screen" data-v="switch">換人</button><button class="btn ghost sm" data-act="screen" data-v="admin">管理員登入</button>') +
-    '<button class="btn ghost sm" data-act="logout">登出</button></span></div></div>';
+  h += '<div class="evlist"><button class="btn ghost sm" data-act="openList">切換活動</button></div>';
+  h += '</div>' + vWho() + '</div>';
   if (S.offline) h += offlineBanner();
-  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「活動」分頁的「我的帳號」更改。</div>';
+  if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「活動」分頁或「切換活動」頁的「我的帳號」更改。</div>';
   h += '<nav class="tabs" role="tablist">' + TABS.map(function (t) {
     return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (S.ui.tab === t[0]) + '">' + t[1] + '</button>';
   }).join('') + '</nav></header>';
@@ -1677,7 +1713,11 @@ function vEvent() {
     }
   }
   if (m) h += vPeople();
-  h += '<section class="panel"><h2>我的帳號</h2>';
+  h += vAccount();
+  return h + '</div>';
+}
+function vAccount() {
+  var h = '<section class="panel"><h2>我的帳號</h2>';
   if (isMgr()) {
     h += '<p class="sub">' + esc(S.me.name) + '（管理員登入）。這台裝置會記住登入，直到登出或你的 PIN 被更換。手機借給別人前，請先「切換為一般夥伴」或登出。</p>' +
       '<div class="grid2 form"><div class="field"><label for="pin-old">目前 PIN</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-old" autocomplete="current-password"></div>' +
@@ -1690,7 +1730,7 @@ function vEvent() {
       '<div class="foot"><button class="btn ghost" data-act="screen" data-v="switch">換人</button><button class="btn ghost" data-act="screen" data-v="admin">管理員登入</button><button class="btn ghost" data-act="logout">登出</button></div>';
   }
   h += '<p class="hint" style="margin-top:16px">系統版本 v' + APP_VERSION + ' ・ 即時同步 <span class="dot ' + (S.rt === 'SUBSCRIBED' ? 'on' : 'off') + '"></span>' + (S.rt === 'SUBSCRIBED' ? '連線中' : '未連線') + '</p></section>';
-  return h + '</div>';
+  return h;
 }
 function vNewEvent() {
   var hasData = !!find(S.G.events, function (e) { return e.name === DATA.event.name && e.start_date === DATA.event.start_date; });
@@ -1745,7 +1785,7 @@ function loadPinStatus() {
     if (err) { handleErr(err); S.pinStatus = []; S.sharedStatus = { is_set: false }; return; }
     S.pinStatus = rs[0].data || [];
     S.sharedStatus = rs[1].data || { is_set: false };
-    if (S.ui.tab === 'event') render();
+    if (S.ui.tab === 'event' || S.ui.picker || !curEvent()) render();
   }, function (e) { pinLoading = false; handleErr(e); });
 }
 
@@ -1783,7 +1823,7 @@ function switchEvent(id) {
   S.ev = id || null;
   LS.set('phase_evt_last_event', S.ev || '');
   S.D = emptyD(); S.R = CALC.build();
-  S.ui.newEv = ''; S.ui.draftId = null; S.ui.signing = false; S.ui.st = ''; S.ui.editId = null; S.ui.cdate = ''; S.ui.q.item = ''; S.ui.q.date = '';
+  S.ui.newEv = ''; S.ui.picker = ''; S.ui.draftId = null; S.ui.signing = false; S.ui.st = ''; S.ui.editId = null; S.ui.cdate = ''; S.ui.q.item = ''; S.ui.q.date = '';
   S.sig = {};
   renderNow();
   return reload(EVENT_KEYS);
@@ -2014,6 +2054,8 @@ var A = {
   exp: function (e) { exportData(e.getAttribute('data-v')); },
 
   /* 活動 */
+  openList: function () { S.pinStatus = null; S.ui.picker = '1'; S.ui.newEv = ''; renderNow(); window.scrollTo(0, 0); },
+  enterEvent: function (e) { var id = e.getAttribute('data-id'); S.ui.picker = ''; if (id === S.ev) { renderNow(); } else { S.ui.tab = 'count'; switchEvent(id); } window.scrollTo(0, 0); },
   openNewEv: function () { S.ui.newEv = '1'; renderNow(); var f = $('#nev-name'); if (f) f.focus(); },
   closeNewEv: function () { S.ui.newEv = ''; renderNow(); },
   saveEvent: function () {
@@ -2115,6 +2157,7 @@ function loginFail(d) {
 }
 function loginOk(d, oldToken) {
   if (oldToken && oldToken !== d.token) sb.rpc('evt_logout', { p_token: oldToken }).then(function () {}, function () {});
+  if (!S.me) S.ui.picker = '1';
   S.token = d.token; S.me = d.person;
   LS.set(K_TOKEN, d.token); LS.set(K_ME, JSON.stringify(d.person));
   S.ui.loginPid = null; S.ui.loginMsg = ''; S.ui.screen = null;
@@ -2222,7 +2265,6 @@ function afterLogin() {
     return S.ev ? reload(EVENT_KEYS) : null;
   }).then(function () {
     S.loaded = true;
-    if (!S.ev && isMgr()) S.ui.tab = 'event';
     subscribe();
     renderNow();
   });
