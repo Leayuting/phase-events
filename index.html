@@ -186,21 +186,35 @@ details[open]>summary::before{transform:rotate(90deg)}
 .modal .grid2 .wide{grid-column:1 / -1}
 #printarea{display:none}
 @media print{
-  @page{size:A4;margin:12mm}
-  body.printing{background:#fff;padding:0;font-size:11pt;color:#000}
+  @page{size:A4;margin:12mm 10mm 14mm}
+  body.printing{background:#fff;padding:0;color:#361D0B;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body.printing>*:not(#printarea){display:none!important}
   body.printing #printarea{display:block}
-  #printarea h1{font-size:16pt;color:#000;margin:0}
-  #printarea .pm{font-size:9pt;color:#444;margin:2mm 0 4mm}
-  #printarea h2{font-size:12pt;color:#000;margin:6mm 0 2mm}
-  #printarea table{width:100%;border-collapse:collapse;font-size:9.5pt}
-  #printarea th,#printarea td{border:0.5pt solid #999;padding:1.2mm 2mm;text-align:left;vertical-align:top}
-  #printarea th{background:#eee;font-weight:600;color:#000}
-  #printarea td.n,#printarea th.n{text-align:right}
-  #printarea tr.grp td{background:#f4f4f4;font-weight:600}
-  #printarea tr.tot td{font-weight:700;border-top:1pt solid #000}
-  #printarea tr{page-break-inside:avoid}
 }
+#printarea{--p-ink:#184652;--p-ink-bg:#E4EDEF;--p-drip:#AB5628;--p-drip-tx:#7A3A16;--p-drip-bg:#F6E8DE;--p-other:#8B9EA6;--p-other-tx:#41545C;--p-other-bg:#E9EEF0;--p-zebra:#F5F5F2;--p-line:#D9D4C7;--p-tot:#D7E7EA}
+#printarea .ph{border-bottom:2pt solid var(--p-ink);padding-bottom:3mm;margin-bottom:5mm}
+#printarea .ph .br{font-size:7.5pt;letter-spacing:.2em;color:#6E5A4A}
+#printarea h1{font-size:17pt;color:var(--p-ink);margin:1mm 0 0;font-weight:700}
+#printarea .pm{font-size:8.5pt;color:#6E5A4A;margin-top:1.5mm}
+#printarea .legend{display:flex;gap:4mm;font-size:8pt;color:#6E5A4A;margin-top:2mm;align-items:center}
+#printarea .sec{margin-top:6mm}
+#printarea h2{font-size:12pt;margin:0 0 2mm;padding-left:2.5mm;border-left:3pt solid var(--p-ink);color:var(--p-ink);break-after:avoid;page-break-after:avoid}
+#printarea h2.drip{border-left-color:var(--p-drip);color:var(--p-drip-tx)}
+#printarea h2 small{font-size:9pt;font-weight:400;color:#6E5A4A;margin-left:2mm}
+#printarea table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed}
+#printarea thead{display:table-header-group}
+#printarea th{background:var(--p-ink-bg);color:var(--p-ink);font-weight:700;text-align:left;padding:1.6mm 2mm;border-bottom:1.2pt solid var(--p-ink);font-size:8.5pt}
+#printarea td{padding:1.5mm 2mm;border-bottom:.5pt solid var(--p-line);vertical-align:top;word-break:break-word;overflow-wrap:anywhere;line-height:1.35}
+#printarea .n{text-align:right;font-variant-numeric:tabular-nums}
+#printarea tr{break-inside:avoid;page-break-inside:avoid}
+#printarea tr.z td{background:var(--p-zebra)}
+#printarea tr.grp td{background:#FBF8F1;font-weight:700;color:var(--p-ink);border-left:3pt solid var(--p-ink);padding-top:2mm;break-after:avoid;page-break-after:avoid}
+#printarea tr.tot td{background:var(--p-tot);font-weight:700;border-top:1.2pt solid var(--p-ink);border-bottom:0;color:#1d2b2f}
+#printarea .tg{display:inline-block;font-size:7.5pt;font-weight:700;padding:.3mm 1.6mm;border-radius:1mm;border:.6pt solid;white-space:nowrap}
+#printarea .tg.bean{background:var(--p-ink-bg);color:var(--p-ink);border-color:var(--p-ink)}
+#printarea .tg.drip{background:var(--p-drip-bg);color:var(--p-drip-tx);border-color:var(--p-drip)}
+#printarea .tg.other{background:var(--p-other-bg);color:var(--p-other-tx);border-color:var(--p-other)}
+#printarea .ft{margin-top:5mm;font-size:7.5pt;color:#8a7a6c}
 #ver{position:fixed;right:10px;bottom:8px;font-size:11px;color:var(--mist);z-index:40;pointer-events:none}
 .login{max-width:420px;margin:12vh auto 0}
 .login .names{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:16px}
@@ -353,7 +367,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 16;
+var APP_VERSION = 17;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1532,7 +1546,7 @@ function vItems() {
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
-  var shareCard = '<section class="panel">' + pHead('複製與列印', '把目前的咖啡豆與濾掛清單複製下來，可以直接貼到 LINE、Excel 或 Google 試算表；也可以列印或存成 PDF（列印視窗的目的地選「另存為 PDF」）。已刪除的品項不包含在內。') +
+  var shareCard = '<section class="panel">' + pHead('複製與列印', '把目前的咖啡豆與濾掛清單複製下來，可以直接貼到 LINE、Excel 或 Google 試算表；也可以列印或存成 PDF（列印視窗的目的地選「另存為 PDF」）。PDF 以顏色區分類型：咖啡豆深藍綠、濾掛暖橘棕、其他商品灰藍。已刪除的品項不包含在內。') +
     '<div class="foot" style="margin-top:0;padding-top:0;border-top:0"><button class="btn" data-act="printItems">列印／存成 PDF</button><button class="btn ghost" data-act="copyItems" data-v="text">複製文字（LINE）</button><button class="btn ghost" data-act="copyItems" data-v="tsv">複製表格（Excel）</button></div></section>';
   h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」；要改所屬豆款請按「編輯」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
@@ -1678,19 +1692,26 @@ function copyText(t) {
   if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(null, fallback);
   return fallback();
 }
+var KIND_TAG = { bean: ['bean', '咖啡豆'], drip: ['drip', '濾掛'] };
+function kindTag(k) { var t = KIND_TAG[k] || ['other', '其他商品']; return '<span class="tg ' + t[0] + '">' + t[1] + '</span>'; }
 function itemsPrintHtml() {
-  var ev = curEvent(), r = itemRows(), s1 = 0, sT = 0, d1 = 0, dT = 0, g = null;
-  var h = '<h1>' + esc(ev.name) + '　品項與預計量</h1><div class="pm">' + md(ev.start_date) + ' – ' + md(ev.end_date) + (ev.venue ? '・' + esc(ev.venue) : '') + (ev.booth ? ' ' + esc(ev.booth) : '') + (ev.setup_date ? '・佈場 ' + md(ev.setup_date) : '') + '・列印時間 ' + tm(new Date().toISOString()) + '・' + esc(S.me.name) + '</div>';
-  h += '<h2>咖啡豆（' + r.beans.length + ' 款）</h2><table><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th><th>備註</th></tr></thead><tbody>';
+  var ev = curEvent(), r = itemRows(), s1 = 0, sT = 0, d1 = 0, dT = 0, g = null, z = 0;
+  var h = '<div class="ph"><div class="br">PHASE COFFEE ROASTERS ・ 活動系統</div><h1>' + esc(ev.name) + '　品項與預計量</h1><div class="pm">' + md(ev.start_date) + ' – ' + md(ev.end_date) + (ev.venue ? '・' + esc(ev.venue) : '') + (ev.booth ? ' ' + esc(ev.booth) : '') + (ev.setup_date ? '・佈場 ' + md(ev.setup_date) : '') + '・列印時間 ' + tm(new Date().toISOString()) + '・' + esc(S.me.name) + '</div>' +
+    '<div class="legend">類型：' + kindTag('bean') + kindTag('drip') + kindTag('other') + '</div></div>';
+  h += '<div class="sec"><h2>咖啡豆<small>' + r.beans.length + ' 款</small></h2><table><colgroup><col style="width:10%"><col style="width:19%"><col style="width:19%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:5%"><col></colgroup>' +
+    '<thead><tr><th>類型</th><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th><th>備註</th></tr></thead><tbody>';
   r.beans.forEach(function (b) {
-    if (b.booth !== g) { g = b.booth; h += '<tr class="grp"><td colspan="8">' + esc(g) + '</td></tr>'; }
+    if (b.booth !== g) { g = b.booth; z = 0; h += '<tr class="grp"><td colspan="9">展台：' + esc(g) + '</td></tr>'; }
     s1 += num(b.p1); sT += num(b.pt);
-    h += '<tr><td>' + esc(b.name) + '</td><td>' + esc(b.cat) + '</td><td class="n">' + esc(nv(b.spec)) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td class="n">' + esc(nv(b.tg)) + '</td><td>' + b.drip + '</td><td>' + esc(b.note) + '</td></tr>';
+    h += '<tr' + (z++ % 2 ? ' class="z"' : '') + '><td>' + kindTag('bean') + '</td><td>' + esc(b.name) + '</td><td>' + esc(b.cat) + '</td><td class="n">' + esc(nv(b.spec)) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td class="n">' + esc(nv(b.tg)) + '</td><td>' + b.drip + '</td><td>' + esc(b.note) + '</td></tr>';
   });
-  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + s1 + '</td><td class="n">' + sT + '</td><td></td><td></td><td></td></tr></tbody></table>';
-  h += '<h2>濾掛（' + r.drips.length + ' 款）</h2><table><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th><th>備註</th></tr></thead><tbody>';
-  r.drips.forEach(function (b) { d1 += num(b.p1); dT += num(b.pt); h += '<tr><td>' + esc(b.name) + '</td><td>' + esc(b.parent) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td>' + esc(b.note) + '</td></tr>'; });
-  h += '<tr class="tot"><td>合計</td><td></td><td class="n">' + d1 + '</td><td class="n">' + dT + '</td><td></td></tr></tbody></table>';
+  h += '<tr class="tot"><td colspan="4">咖啡豆合計 ' + r.beans.length + ' 款</td><td class="n">' + s1 + '</td><td class="n">' + sT + '</td><td></td><td></td><td></td></tr></tbody></table></div>';
+  h += '<div class="sec"><h2 class="drip">濾掛<small>' + r.drips.length + ' 款</small></h2><table><colgroup><col style="width:10%"><col style="width:26%"><col style="width:26%"><col style="width:9%"><col style="width:9%"><col></colgroup>' +
+    '<thead><tr><th>類型</th><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th><th>備註</th></tr></thead><tbody>';
+  z = 0;
+  r.drips.forEach(function (b) { d1 += num(b.p1); dT += num(b.pt); h += '<tr' + (z++ % 2 ? ' class="z"' : '') + '><td>' + kindTag('drip') + '</td><td>' + esc(b.name) + '</td><td>' + esc(b.parent) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td>' + esc(b.note) + '</td></tr>'; });
+  h += '<tr class="tot"><td colspan="3">濾掛合計 ' + r.drips.length + ' 款</td><td class="n">' + d1 + '</td><td class="n">' + dT + '</td><td></td></tr></tbody></table></div>';
+  h += '<div class="ft">已刪除的品項不列入。數字為本次活動的預計量；顏色僅輔助辨識，類型與分類以文字為準。</div>';
   return h;
 }
 function itemOps(it) {
