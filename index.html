@@ -64,7 +64,7 @@ section.blk:last-child{border-bottom:0}
 .btn.ghost[disabled]:hover{border-color:var(--ghostline)}
 .btn.warn[disabled]:hover{border-color:var(--warn)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex-wrap:wrap}
-.seg button{background:var(--surface);border:0;border-right:1px solid var(--line);padding:0 16px;min-height:44px;cursor:pointer}
+.seg button{background:var(--surface);border:0;border-right:1px solid var(--line);padding:0 16px;min-height:42px;cursor:pointer}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--onink)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -135,7 +135,31 @@ details[open]>summary::before{transform:rotate(90deg)}
 .panel>.sub{margin:0 0 24px}
 .panel h3{margin:24px 0 8px}
 .panel .foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
-.panel .tw{margin:0;padding:0}
+.panel .tw{margin:0 -8px;padding:0 8px}
+.panel tbody tr:last-child td{border-bottom:0}
+.phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px}
+.phead .ptitle{flex:1 1 320px;min-width:0}
+.phead h2{margin:0}
+.phead .sub{margin:8px 0 0}
+.paside{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pmeta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--mut);margin:8px 0 0}
+.panel h3:first-child{margin-top:0}
+.panel .card{background:var(--bg);box-shadow:none}
+.flt{display:grid;grid-template-columns:56px 1fr;gap:8px 16px;align-items:start;margin-top:16px}
+.flt>.lbl{font-size:12px;color:var(--mut);line-height:40px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;margin-bottom:24px}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:16px}
+.stat span{display:block;font-size:12px;color:var(--mut)}
+.stat b{display:block;font-size:24px;font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums;color:var(--ink)}
+.stat.warn b{color:var(--warn)}
+.sect{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
+.sect>h3{margin:0 0 8px}
+.ownerbox{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 16px;margin-bottom:24px}
+.ownerbox[open]{padding-bottom:16px}
+.pagebar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;padding-top:32px}
+.pagebar h2{margin:0}
+.pagebar .sub{margin:8px 0 0}
+.pagebar+.panels{padding-top:24px}
 .panel .log:last-of-type{border-bottom:0}
 .inline-add{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .inline-add input{flex:1 1 200px;max-width:320px}
@@ -178,6 +202,9 @@ details[open]>summary::before{transform:rotate(90deg)}
   .ck .act{grid-column:2;justify-content:flex-start}
   h2{font-size:17px}
   .panels{gap:24px;padding:24px 0}
+  .flt{grid-template-columns:1fr;gap:8px}
+  .flt>.lbl{line-height:1.5}
+  .pagebar{padding-top:24px}
   .panel .grid2,.modal .grid2{grid-template-columns:1fr}
   .modal-bg{padding:16px}
   .modal .foot{justify-content:stretch}
@@ -305,7 +332,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 8;
+var APP_VERSION = 9;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -882,7 +909,7 @@ function vListPage() {
   if (S.offline) h += offlineBanner();
   if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「我的帳號」更改。</div>';
   h += '</header><main id="view">';
-  if (!S.loaded) return h + '<section class="blk"><div class="empty">載入中…</div></section></main>';
+  if (!S.loaded) return h + '<div class="panels"><section class="panel"><div class="empty">載入中…</div></section></div></main>';
   if (isMgr()) h += '<div class="row btns" style="margin-top:24px"><button class="btn" data-act="openNewEv">＋建立活動</button></div>';
   var evs = visibleEvents();
   if (!evs.length) h += '<div class="empty" style="margin-top:24px">' + (isMgr() ? '還沒有活動，請按「＋建立活動」。可以先建立之後的活動，到時候再進來選。' : (S.G.events.length ? '你目前沒有被加入任何活動。請管理員在活動的「本次活動參加夥伴」把你加入。' : '還沒有活動，請管理員先建立。')) + '</div>';
@@ -922,14 +949,19 @@ function vHeader() {
   return h;
 }
 
+function pHead(title, sub, aside, meta) {
+  return '<div class="phead"><div class="ptitle"><h2>' + title + '</h2>' + (sub ? '<p class="sub">' + sub + '</p>' : '') + (meta ? '<div class="pmeta">' + meta + '</div>' : '') + '</div>' +
+    (aside ? '<div class="paside">' + aside + '</div>' : '') + '</div>';
+}
 function vBody() {
-  if (!S.loaded) return '<section class="blk"><div class="empty">載入中…</div></section>';
+  if (!S.loaded) return '<div class="panels"><section class="panel"><div class="empty">載入中…</div></section></div>';
   var ev = curEvent();
   if (!ev && S.ui.tab !== 'event') {
-    return '<section class="blk"><div class="empty">' + (S.G.events.length ? '請選擇活動。' : (isMgr() ? '還沒有活動，請按上方「＋建立活動」。' : '還沒有活動，請管理員先建立。')) + '</div></section>';
+    return '<div class="panels"><section class="panel"><div class="empty">' + (S.G.events.length ? '請選擇活動。' : (isMgr() ? '還沒有活動，請按上方「＋建立活動」。' : '還沒有活動，請管理員先建立。')) + '</div></section></div>';
   }
   var m = { count: vCount, settle: vSettle, check: vCheck, buy: vBuy, timeline: vTimeline, items: vItems, log: vLog, event: vEvent }[S.ui.tab];
-  return m();
+  var out = m();
+  return out.indexOf('<div class="panels">') === 0 || out.indexOf('<div class="pagebar">') === 0 ? out : '<div class="panels">' + out + '</div>';
 }
 
 /* ---------------------------------------------------------------------------
@@ -953,33 +985,37 @@ function defaultSheetDate(type) {
   return t;
 }
 function vCount() {
-  var h = '<section class="blk"><h2>盤點單</h2><p class="sub">帶出對點、收店盤點、帶回都以一張盤點單為單位，只盤咖啡豆。填完後由盤點人本人手寫簽名，簽署後鎖定不能修改；有誤時開一張新的，系統以最後簽署的為準。</p>';
+  var h = '<section class="panel">' + pHead('盤點單', '帶出對點、收店盤點、帶回都以一張盤點單為單位，只盤咖啡豆。填完後由盤點人本人手寫簽名，簽署後鎖定不能修改；有誤時開一張新的，系統以最後簽署的為準。');
   var draft = S.ui.draftId ? byId(S.D.sheets, S.ui.draftId) : null;
   if (draft && draft.status !== '草稿') { draft = null; S.ui.draftId = null; S.ui.signing = false; }
   if (draft) h += vDraft(draft);
   else {
     if (!S.ui.cdate) S.ui.cdate = defaultSheetDate(S.ui.ctype);
-    h += '<div class="row" style="margin-bottom:16px"><div class="seg" role="group" aria-label="盤點類型">' + SHEET_TYPES.map(function (t) {
+    h += '<div class="row" style="align-items:flex-end;gap:16px"><div class="field"><label>盤點類型</label><div class="seg" role="group" aria-label="盤點類型">' + SHEET_TYPES.map(function (t) {
       return '<button data-act="ctype" data-v="' + t + '" aria-pressed="' + (S.ui.ctype === t) + '">' + t + '</button>';
-    }).join('') + '</div><input type="date" data-k="cdate" value="' + esc(S.ui.cdate) + '" aria-label="盤點日期" style="width:170px"><button class="btn" data-act="startSheet">開始盤點</button></div>';
+    }).join('') + '</div></div><div class="field" style="width:200px"><label for="cdate">盤點日期</label><input type="date" id="cdate" data-k="cdate" value="' + esc(S.ui.cdate) + '"></div></div>';
     var mine = S.D.sheets.filter(function (s) { return s.status === '草稿' && s.counter_id === S.me.id; });
     var others = S.D.sheets.filter(function (s) { return s.status === '草稿' && s.counter_id !== S.me.id; });
-    if (mine.length) h += '<div class="row small" style="margin-top:8px"><span class="mut">我未完成的草稿：</span>' + mine.map(function (s) {
+    if (mine.length) h += '<div class="sect"><h3>我未完成的草稿</h3><div class="row btns">' + mine.map(function (s) {
       return '<button class="btn ghost sm" data-act="openDraft" data-id="' + s.id + '">' + esc(s.type) + ' ' + md(s.biz_date) + ' 繼續</button>';
-    }).join('') + '</div>';
-    if (others.length) h += '<p class="hint" style="margin-top:8px">盤點中：' + others.map(function (s) { return esc(pname(s.counter_id)) + '（' + esc(s.type) + ' ' + md(s.biz_date) + '）'; }).join('、') + '</p>';
+    }).join('') + '</div></div>';
+    if (others.length) h += '<p class="hint" style="margin-top:16px">其他人盤點中：' + others.map(function (s) { return esc(pname(s.counter_id)) + '（' + esc(s.type) + ' ' + md(s.biz_date) + '）'; }).join('、') + '</p>';
+    h += '<div class="foot"><button class="btn" data-act="startSheet">開始盤點</button></div>';
   }
   h += '</section>';
-  h += '<section class="blk"><h2>現場快速紀錄</h2><p class="sub">咖啡豆或濾掛不夠賣時記「補貨」；從倉庫拿到檯面記「上架」（不影響總量）；試喝沖煮記「出杯用豆」（g）。只記操作人與時間，不需要簽名。填錯時按「沖銷」，原紀錄會保留。</p>' + vQuick() + '</section>';
-  h += '<section class="blk"><div class="row" style="justify-content:space-between"><h2 style="margin:0">品項現況</h2><div class="chips" role="group" aria-label="展台">' +
-    ['全部'].concat(BOOTHS).concat(['濾掛']).map(function (b) { return '<button class="chip" data-act="bt" data-v="' + b + '" aria-pressed="' + (S.ui.bt === b) + '">' + b + '</button>'; }).join('') +
-    '</div></div><div style="margin-top:16px">' + vItemCards() + '</div></section>';
-  h += '<section class="blk"><h2>已簽署的盤點單</h2>' + vSheets() + '</section>';
+  h += '<section class="panel">' + pHead('現場快速紀錄', '咖啡豆或濾掛不夠賣時記「補貨」；從倉庫拿到檯面記「上架」（不影響總量）；試喝沖煮記「出杯用豆」（g）。只記操作人與時間，不需要簽名。') + vQuick() + '</section>';
+  var recent = S.D.moves.slice().reverse().slice(0, 10);
+  h += '<section class="panel">' + pHead('最近紀錄', '最近 10 筆補貨、上架與出杯紀錄。填錯時按「沖銷」，原紀錄會保留；完整紀錄在「紀錄」分頁。') +
+    (recent.length ? recent.map(moveRow).join('') : '<div class="empty">還沒有快速紀錄。</div>') + '</section>';
+  h += '<section class="panel">' + pHead('品項現況', '各品項的帶出、補貨、最新盤點與帶回數量。', '<div class="chips" role="group" aria-label="展台">' +
+    ['全部'].concat(BOOTHS).concat(['濾掛']).map(function (b) { return '<button class="chip" data-act="bt" data-v="' + b + '" aria-pressed="' + (S.ui.bt === b) + '">' + b + '</button>'; }).join('') + '</div>') +
+    vItemCards() + '</section>';
+  h += '<section class="panel">' + pHead('已簽署的盤點單', '簽署後鎖定不能修改；點開可以看明細與簽名。同一天同類型有多張時，以最後簽署的為準。') + vSheets() + '</section>';
   return h;
 }
 function vDraft(d) {
   var withBrew = d.type !== '帶出對點';
-  var h = '<div class="row" style="margin-bottom:8px"><b>' + esc(d.type) + '</b><span class="mut">' + mdw(d.biz_date) + ' ・ 盤點人 ' + esc(pname(d.counter_id)) + '</span><span class="tag hold">草稿，尚未簽署</span><span class="saving" id="saving"></span></div>';
+  var h = '<div class="row" style="margin-bottom:16px"><b>' + esc(d.type) + '</b><span class="mut">' + mdw(d.biz_date) + ' ・ 盤點人 ' + esc(pname(d.counter_id)) + '</span><span class="tag hold">草稿，尚未簽署</span><span class="saving" id="saving"></span></div>';
   if (!S.ui.signing) {
     h += '<div class="tw"><table><thead><tr><th>咖啡豆</th><th class="n">預計</th><th class="n">倉庫</th><th class="n">檯面</th><th class="n">合計</th>' + (withBrew ? '<th class="n">沖煮豆剩餘 g</th>' : '') + '</tr></thead><tbody>';
     h += beansByBooth(function (it, booth) {
@@ -993,14 +1029,14 @@ function vDraft(d) {
         (withBrew ? '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-line="' + it.id + '|brew" value="' + (isNum(v.brew) ? v.brew : '') + '" aria-label="' + esc(it.name) + ' 沖煮豆剩餘"></td>' : '') + '</tr>';
     });
     h += '</tbody></table></div><p class="hint" style="margin-top:8px">每支咖啡豆的倉庫與檯面都要填，沒有就填 0。輸入後會自動儲存草稿，換手機或重新整理都可以接著填。</p>';
-    h += '<div class="row btns" style="margin-top:16px"><button class="btn" data-act="toSign">檢視並簽名</button><button class="btn ghost" data-act="closeDraft">先離開</button><button class="btn warn" data-act="discardDraft">放棄這張草稿</button></div>';
+    h += '<div class="foot"><button class="btn" data-act="toSign">檢視並簽名</button><button class="btn ghost" data-act="closeDraft">先離開</button><button class="btn warn" data-act="discardDraft">放棄這張草稿</button></div>';
   } else {
     var tw = 0, tt = 0, n = 0;
     S.R.beans.forEach(function (it) { var v = S.ui.dv[it.id]; if (v && isNum(v.wh) && isNum(v.tb)) { tw += v.wh; tt += v.tb; n++; } });
     h += '<div class="tw"><table><thead><tr><th>摘要</th><th class="n">款數</th><th class="n">倉庫</th><th class="n">檯面</th><th class="n">合計</th></tr></thead><tbody><tr><td>咖啡豆</td><td class="n">' + n + '</td><td class="n">' + tw + '</td><td class="n">' + tt + '</td><td class="n"><b>' + (tw + tt) + '</b></td></tr></tbody></table></div>';
-    h += '<h3 style="margin-top:24px">簽名確認</h3><p class="sub">簽名後，這張盤點單由 <b>' + esc(pname(d.counter_id)) + '</b> 負責，且不能再修改。簽名只能由盤點人本人在自己登入的裝置上完成。</p>' +
+    h += '<div class="sect"><h3>簽名確認</h3><p class="sub">簽名後，這張盤點單由 <b>' + esc(pname(d.counter_id)) + '</b> 負責，且不能再修改。簽名只能由盤點人本人在自己登入的裝置上完成。</p>' +
       '<canvas id="pad" class="pad" aria-label="簽名區"></canvas>' +
-      '<div class="row btns" style="margin-top:8px"><button class="btn" data-act="submitSheet">簽署並送出</button><button class="btn ghost" data-act="clearPad">重簽</button><button class="btn ghost" data-act="backEdit">回到填寫</button></div>';
+      '</div><div class="foot"><button class="btn" data-act="submitSheet">簽署並送出</button><button class="btn ghost" data-act="clearPad">重簽</button><button class="btn ghost" data-act="backEdit">回到填寫</button></div>';
   }
   return h;
 }
@@ -1017,19 +1053,17 @@ function vQuick() {
     dripOpts = '<optgroup label="濾掛">' + S.R.drips.map(function (it) { return '<option value="' + it.id + '"' + (q.item === it.id ? ' selected' : '') + '>' + esc(it.name) + '（濾掛）</option>'; }).join('') + '</optgroup>';
   }
   var closedToday = !!find(S.R.signed || [], function (s) { return (s.type === '收店盤點' || s.type === '帶回') && s.biz_date === todayStr(); });
-  var h = '<div class="seg" role="group" aria-label="紀錄類型" style="margin-bottom:16px">' + ['補貨', '上架', '出杯用豆'].map(function (k) {
+  var h = '<div class="field" style="margin-bottom:16px"><label>紀錄類型</label><div><div class="seg" role="group" aria-label="紀錄類型">' + ['補貨', '上架', '出杯用豆'].map(function (k) {
     return '<button data-act="qkind" data-v="' + k + '" aria-pressed="' + (q.kind === k) + '">' + k + '</button>';
-  }).join('') + '</div>';
+  }).join('') + '</div></div></div>';
   h += '<div class="grid2 form">' +
     '<div class="field" style="grid-column:span 2"><label for="q-item">品項</label><select id="q-item" data-q="item"><option value="">請選擇</option>' + beanOpts + dripOpts + '</select></div>' +
     '<div class="field"><label for="q-qty">數量（' + (q.kind === '出杯用豆' ? 'g' : '包') + '）</label><input type="number" inputmode="numeric" min="1" step="1" id="q-qty" data-q="qty" value="' + esc(q.qty) + '"></div>' +
     (q.kind === '上架' ? '<div class="field"><label for="q-dir">方向</label><select id="q-dir" data-q="dir"><option value="倉庫→檯面"' + (q.from === '倉庫' ? ' selected' : '') + '>倉庫 → 檯面</option><option value="檯面→倉庫"' + (q.from === '檯面' ? ' selected' : '') + '>檯面 → 倉庫</option></select></div>' : '') +
     '<div class="field"><label for="q-date">營業日</label><input type="date" id="q-date" data-q="date" value="' + esc(q.date) + '"></div>' +
-    '<div class="field"><label for="q-note">備註</label><input type="text" id="q-note" data-q="note" value="' + esc(q.note) + '"></div>' +
-    '<div class="field"><button class="btn" data-act="addMove">記錄' + esc(q.kind) + '</button></div></div>';
-  if (closedToday && q.kind === '補貨') h += '<p class="hint" style="margin-top:8px">今天已經收店盤點，補貨預設記到明天的營業日；如果是收店前的補貨，請把營業日改回今天。</p>';
-  var L = S.D.moves.slice().reverse().slice(0, 10);
-  h += '<h3 style="margin-top:24px">最近紀錄</h3>' + (L.length ? L.map(moveRow).join('') : '<div class="empty">還沒有快速紀錄。</div>');
+    '<div class="field"><label for="q-note">備註</label><input type="text" id="q-note" data-q="note" value="' + esc(q.note) + '"></div></div>';
+  if (closedToday && q.kind === '補貨') h += '<p class="hint" style="margin-top:16px">今天已經收店盤點，補貨預設記到明天的營業日；如果是收店前的補貨，請把營業日改回今天。</p>';
+  h += '<div class="foot"><button class="btn" data-act="addMove">記錄' + esc(q.kind) + '</button></div>';
   return h;
 }
 function defaultMoveDate() {
@@ -1070,12 +1104,12 @@ function vItemCards() {
     } else h += '<div class="empty">沒有符合的咖啡豆。</div>';
   }
   if ((bt === '全部' || bt === '濾掛') && S.R.drips.length) {
-    h += '<h3 style="margin-top:24px">濾掛</h3><p class="hint" style="margin-top:0">濾掛不做盤點，只記補貨。</p><div class="tw"><table><thead><tr><th>濾掛</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">補貨累計</th><th>紀錄</th></tr></thead><tbody>' +
+    h += '<div class="' + (bt === '濾掛' ? '' : 'sect') + '"><h3>濾掛</h3><p class="hint" style="margin:0 0 8px">濾掛不做盤點，只記補貨。</p><div class="tw"><table><thead><tr><th>濾掛</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">補貨累計</th><th>紀錄</th></tr></thead><tbody>' +
       S.R.drips.map(function (it) {
         var y = S.R.drip[it.id], hist = itemHistory(it.id);
         return '<tr><td>' + esc(it.name) + (it.parent_item_id ? '' : ' <span class="tag">只帶濾掛</span>') + '</td><td class="n">' + I(y.plan1) + '</td><td class="n">' + I(y.planT) + '</td><td class="n"><b>' + I(y.rep) + '</b></td><td>' +
           (hist.n ? '<details><summary class="small">' + hist.n + ' 筆</summary>' + hist.html + '</details>' : '<span class="mut small">—</span>') + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+      }).join('') + '</tbody></table></div></div>';
   }
   return h;
 }
@@ -1187,8 +1221,9 @@ function loadDraftValues(sheetId) {
    --------------------------------------------------------------------------- */
 function vSettle() {
   var R = S.R, T = R.tot, ev = curEvent();
-  var h = '<section class="blk"><h2>銷售結算</h2><p class="sub">不需要現場逐筆記銷售。全場銷售 ＝ 帶出 ＋ 補貨 − 帶回；還沒帶回時，算到最近一次收店盤點為止。出杯用豆另計，不併入銷售量。</p>' +
-    '<div class="row small mut" style="margin-bottom:16px"><span>帶出：' + (R.outSheet ? md(R.outSheet.biz_date) + '（' + esc(pname(R.outSheet.counter_id)) + '）' : '尚無帶出對點') + '</span><span>帶回：' + (R.backSheet ? md(R.backSheet.biz_date) + '（' + esc(pname(R.backSheet.counter_id)) + '）' : '尚未帶回') + '</span></div>';
+  var h = '<section class="panel">' + pHead('銷售結算', '不需要現場逐筆記銷售。全場銷售 ＝ 帶出 ＋ 補貨 − 帶回；還沒帶回時，算到最近一次收店盤點為止。出杯用豆另計，不併入銷售量。', '',
+    '<span>帶出：' + (R.outSheet ? md(R.outSheet.biz_date) + '（' + esc(pname(R.outSheet.counter_id)) + '）' : '尚無帶出對點') + '</span><span>帶回：' + (R.backSheet ? md(R.backSheet.biz_date) + '（' + esc(pname(R.backSheet.counter_id)) + '）' : '尚未帶回') + '</span>');
+  h += '<div class="stats"><div class="stat"><span>帶出</span><b>' + I(T.out) + '</b></div><div class="stat"><span>補貨</span><b>' + I(T.rep) + '</b></div><div class="stat"><span>帶回</span><b>' + I(T.back) + '</b></div><div class="stat"><span>全場銷售</span><b>' + I(T.sold) + '</b></div><div class="stat"><span>售出比例</span><b>' + (T.ratio != null ? Math.round(T.ratio * 100) + '%' : '—') + '</b></div></div>';
   h += '<div class="tw"><table><thead><tr><th>咖啡豆</th><th class="n">帶出</th><th class="n">補貨</th><th class="n">帶回</th><th class="n">銷售</th><th class="n">售出比例</th><th class="n">試喝用 g</th></tr></thead><tbody>';
   h += beansByBooth(function (it, booth) {
     if (!it) return '<tr class="grp"><td colspan="7">' + esc(booth) + '</td></tr>';
@@ -1198,15 +1233,15 @@ function vSettle() {
       '<td class="n">' + I(x.used) + ' <span class="mut">／' + I(x.tasting) + '</span></td></tr>';
   });
   h += '<tr class="tot"><td>合計</td><td class="n">' + I(T.out) + '</td><td class="n">' + I(T.rep) + '</td><td class="n">' + I(T.back) + '</td><td class="n">' + I(T.sold) + '</td><td class="n">' + (T.ratio != null ? Math.round(T.ratio * 100) + '%' : '—') + '</td><td class="n">' + I(T.used) + ' <span class="mut">／' + I(T.tasting) + '</span></td></tr></tbody></table></div>';
-  if (T.outMissing) h += '<p class="hint" style="margin-top:8px">有 ' + T.outMissing + ' 款咖啡豆沒有帶出數字（尚未帶出對點，或在帶出後才新增），這些品項的銷售顯示「—」。</p>';
-  h += '</section>';
+  if (T.outMissing) h += '<p class="hint" style="margin-top:16px">有 ' + T.outMissing + ' 款咖啡豆沒有帶出數字（尚未帶出對點，或在帶出後才新增），這些品項的銷售顯示「—」。</p>';
+  h += '<div class="foot"><button class="btn ghost" data-act="exp" data-v="settle">匯出結算 CSV</button></div></section>';
 
-  h += '<section class="blk"><div class="row" style="justify-content:space-between"><h2 style="margin:0">每日銷售</h2><label class="small mut row" style="gap:8px;cursor:pointer"><input type="checkbox" data-act="showCalc"' + (S.ui.showCalc ? ' checked' : '') + '> 顯示計算過程</label></div>' +
-    '<p class="sub" style="margin-top:8px">當日銷售 ＝ 期初（第一天為帶出，之後為前一日收店）＋ 當日補貨 − 當日收店。最後一天以「帶回」作為收店。缺少盤點的日子顯示「—」。</p>' +
-    '<div class="row small mut" style="margin-bottom:8px">' + R.days.map(function (d) {
+  h += '<section class="panel">' + pHead('每日銷售', '當日銷售 ＝ 期初（第一天為帶出，之後為前一日收店）＋ 當日補貨 − 當日收店。最後一天以「帶回」作為收店。缺少盤點的日子顯示「—」。',
+    '<label class="small row" style="gap:8px;cursor:pointer;min-height:40px"><input type="checkbox" data-act="showCalc"' + (S.ui.showCalc ? ' checked' : '') + '> 顯示計算過程</label>',
+    R.days.map(function (d) {
       var s = R.closeSheet[d];
       return '<span>' + md(d) + ' 收店：' + (s ? esc(s.type) + '（' + esc(pname(s.counter_id)) + '）' : '尚未盤點') + '</span>';
-    }).join('') + '</div>';
+    }).join(''));
   h += '<div class="tw"><table><thead><tr><th>咖啡豆</th>' + R.days.map(function (d) { return '<th class="n">' + mdw(d) + '</th>'; }).join('') + '<th class="n">合計</th></tr></thead><tbody>';
   h += beansByBooth(function (it, booth) {
     if (!it) return '<tr class="grp"><td colspan="' + (R.days.length + 2) + '">' + esc(booth) + '</td></tr>';
@@ -1217,9 +1252,9 @@ function vSettle() {
       return '<td class="n">' + c + '</td>';
     }).join('') + '<td class="n"><b>' + I(x.sold) + '</b></td></tr>';
   });
-  h += '<tr class="tot"><td>合計</td>' + R.days.map(function (d) { return '<td class="n">' + I(T.day[d]) + (T.dayMissing[d] ? '<div class="hint">缺 ' + T.dayMissing[d] + ' 款</div>' : '') + '</td>'; }).join('') + '<td class="n">' + I(T.sold) + '</td></tr></tbody></table></div></section>';
+  h += '<tr class="tot"><td>合計</td>' + R.days.map(function (d) { return '<td class="n">' + I(T.day[d]) + (T.dayMissing[d] ? '<div class="hint">缺 ' + T.dayMissing[d] + ' 款</div>' : '') + '</td>'; }).join('') + '<td class="n">' + I(T.sold) + '</td></tr></tbody></table></div><div class="foot"><button class="btn ghost" data-act="exp" data-v="daily">匯出每日銷售 CSV</button></div></section>';
 
-  h += '<section class="blk"><h2>濾掛</h2><p class="sub">濾掛不做盤點，只列預計帶出量與現場補貨累計，不計算銷售量。</p>';
+  h += '<section class="panel">' + pHead('濾掛', '濾掛不做盤點，只列預計帶出量與現場補貨累計，不計算銷售量。');
   if (!R.drips.length) h += '<div class="empty">沒有濾掛品項。</div>';
   else {
     h += '<div class="tw"><table><thead><tr><th>濾掛</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">補貨累計</th><th class="n">第一批＋補貨</th></tr></thead><tbody>' +
@@ -1286,42 +1321,44 @@ function vCheck() {
   var open = list.filter(function (c) { return !R.ck[c.id]; }), dn = list.filter(function (c) { return R.ck[c.id]; });
   var pct = R.ckLive ? Math.round(R.ckDone / R.ckLive * 100) : 0;
 
-  var h = '<section class="blk"><div class="row small"><b>全場進度</b><span class="mut">' + R.ckDone + ' / ' + R.ckLive + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + pct + '%"></i></div>';
-  h += '<div class="chips" style="margin-top:16px" role="group" aria-label="崗位">' + stations.map(function (s) {
+  var h = '<section class="panel">' + pHead('全場進度', '已完成 <b>' + R.ckDone + '</b> / ' + R.ckLive + ' 項（' + pct + '%）。選擇崗位與階段，下方只顯示符合的項目。') +
+    '<div class="bar" aria-hidden="true" style="margin-top:0"><i style="width:' + pct + '%"></i></div>';
+  h += '<div class="flt"><span class="lbl">崗位</span><div class="chips" role="group" aria-label="崗位">' + stations.map(function (s) {
     var a = live.filter(function (c) { return c.station_id === s.id; }), d = a.filter(function (c) { return R.ck[c.id]; }).length;
     return '<button class="chip" data-act="station" data-v="' + s.id + '" aria-pressed="' + (v === s.id) + '">' + esc(s.name) + ' <span style="opacity:.7">' + d + '/' + a.length + '</span></button>';
   }).join('') +
     '<button class="chip" data-act="station" data-v="me" aria-pressed="' + (v === 'me') + '">我的待辦 <span style="opacity:.7">' + mine.filter(function (c) { return !R.ck[c.id]; }).length + '</span></button>' +
     '<button class="chip" data-act="station" data-v="none" aria-pressed="' + (v === 'none') + '">未分配 <span style="opacity:.7">' + none.length + '</span></button></div>';
-  h += '<div class="chips" style="margin-top:8px" role="group" aria-label="階段">' + ['全部'].concat(PHASES).map(function (p) {
+  h += '<span class="lbl">階段</span><div class="chips" role="group" aria-label="階段">' + ['全部'].concat(PHASES).map(function (p) {
     return '<button class="chip" data-act="phase" data-v="' + p + '" aria-pressed="' + (S.ui.ph === p) + '">' + p + '</button>';
-  }).join('') + '</div>';
+  }).join('') + '</div></div></section>';
 
   if (real && st) {
     var owners = ownersOf(st.id), a2 = live.filter(function (c) { return c.station_id === st.id; }), d2 = a2.filter(function (c) { return R.ck[c.id]; }).length;
-    h += '<div style="margin-top:24px" class="row"><h2 style="margin:0">' + esc(st.name) + '</h2><span class="mut small">負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span>' +
-      '<span class="mut small">對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span>' + (can ? '' : '<span class="tag">僅可勾選</span>') + '<span class="mut small">已完成 ' + d2 + ' / ' + a2.length + '</span></div>';
+    h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '你可以勾選；新增與編輯由崗位負責人或管理員處理。'),
+      can ? '' : '<span class="tag">僅可勾選</span>',
+      '<span>負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span>對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span>已完成 ' + d2 + ' / ' + a2.length + '</span>');
     if (mgr) {
       var mem = membersOf(S.ev);
-      h += '<div style="margin-top:16px"><div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
+      h += '<details class="ownerbox"' + (owners.length ? '' : ' open') + '><summary class="small"><b>負責人與對點日期</b><span class="mut">（管理員設定）</span></summary><div style="padding:8px 0 0"><div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
         return '<button class="chip" data-act="owner" data-v="' + p.id + '" aria-pressed="' + (owners.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>';
-      }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div>';
+      }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div></details>';
     }
   } else {
-    h += '<div style="margin-top:24px" class="row"><h2 style="margin:0">' + (v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配') + '</h2><span class="mut small">' + (v === 'me' ? '指派給我，或我是該崗位負責人的項目' : '沒有指派人，且崗位沒有負責人') + '</span></div>';
+    h += '<section class="panel">' + pHead(v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配', v === 'me' ? '指派給我，或我是該崗位負責人的項目。' : '沒有指派人，而且崗位也沒有負責人的項目。');
   }
-  h += '</section><section class="blk">';
+  h += '<h3>待完成（' + open.length + '）</h3>';
   if (!open.length) h += '<div class="empty">' + (list.length ? '這一組都完成了。' : (can ? '這個崗位在這個階段還沒有項目，可以在下方新增或套用範本。' : '沒有符合的項目。')) + '</div>';
   open.forEach(function (c) { h += ckRow(c, !real); });
-  h += '</section>';
   if (dn.length) {
-    h += '<section class="blk"><button class="btn ghost sm" data-act="toggleDone">已完成（' + dn.length + '）' + (S.ui.showDone ? ' 收起' : ' 展開') + '</button>';
+    h += '<div class="sect"><div class="row" style="justify-content:space-between"><h3 style="margin:0">已完成（' + dn.length + '）</h3><button class="btn ghost sm" data-act="toggleDone">' + (S.ui.showDone ? '收起' : '展開') + '</button></div>';
     if (S.ui.showDone) dn.forEach(function (c) { h += ckRow(c, !real); });
-    h += '</section>';
+    h += '</div>';
   }
+  h += '</section>';
   if (can) {
     var tpls = S.G.templates.filter(function (t) { return find(S.G.tplItems, function (ti) { return ti.template_id === t.id && ti.station_name === st.name; }); });
-    h += '<section class="blk"><h2>新增項目</h2><div class="grid2 form">' +
+    h += '<section class="panel">' + pHead('新增項目', '加到「' + esc(st.name) + '」。可以一次貼上多行，或把這個崗位的清單存成範本、從範本套用。') + '<div class="grid2 form">' +
       '<div class="field"><label for="a-title">品項</label><input type="text" id="a-title"></div>' +
       '<div class="field"><label for="a-qty">數量</label><input type="text" id="a-qty"></div>' +
       '<div class="field"><label for="a-purpose">用途</label><input type="text" id="a-purpose"></div>' +
@@ -1329,14 +1366,14 @@ function vCheck() {
       '<div class="field"><label for="a-phase">階段</label><select id="a-phase">' + selOpts(PHASES.map(function (p) { return [p, p]; }), S.ui.ph === '全部' ? '事前' : S.ui.ph) + '</select></div>' +
       '<div class="field"><label for="a-who">指派給</label><select id="a-who">' + whoOpts('') + '</select></div>' +
       '<div class="field"><label for="a-link">連結頁面</label><select id="a-link">' + selOpts(LINKS, '') + '</select></div>' +
-      '<div class="field"><button class="btn" data-act="addCk">新增</button></div></div>' +
-      '<div class="row btns" style="margin-top:16px"><button class="btn ghost sm" data-act="togglePaste">' + (S.ui.pasteOpen ? '收起' : '一次貼上多行') + '</button><button class="btn ghost sm" data-act="saveTplSt">這個崗位存為範本</button>' +
-      (tpls.length ? '<select id="tpl-st" style="width:auto;min-height:32px">' + tpls.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + '</option>'; }).join('') + '</select><button class="btn ghost sm" data-act="applyTplSt">套用範本到這個崗位</button>' : '<span class="hint">還沒有含這個崗位的範本</span>') + '</div>';
-    if (S.ui.pasteOpen) h += '<div class="field" style="margin-top:8px"><label for="a-multi">每行一項，可用「｜」、「|」或 Tab 分隔：品項｜數量｜備註。階段使用上方選擇的值。</label><textarea id="a-multi" rows="6" placeholder="延長線｜5｜備用一條&#10;電池｜4"></textarea><div><button class="btn sm" data-act="addMulti" style="margin-top:8px">加入全部</button></div></div>';
-    h += '</section>';
+      (tpls.length ? '<div class="field"><label for="tpl-st">範本</label><select id="tpl-st">' + tpls.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + '</option>'; }).join('') + '</select></div>' : '') + '</div>';
+    if (!tpls.length) h += '<p class="hint" style="margin-top:16px">還沒有含這個崗位的範本。</p>';
+    if (S.ui.pasteOpen) h += '<div class="sect"><div class="field"><label for="a-multi">一次貼上多行：每行一項，可用「｜」、「|」或 Tab 分隔：品項｜數量｜備註。階段使用上方選擇的值。</label><textarea id="a-multi" rows="6" placeholder="延長線｜5｜備用一條&#10;電池｜4"></textarea></div><div class="row btns" style="margin-top:16px"><button class="btn" data-act="addMulti">加入全部</button></div></div>';
+    h += '<div class="foot"><button class="btn" data-act="addCk">新增項目</button><button class="btn ghost" data-act="togglePaste">' + (S.ui.pasteOpen ? '收起多行貼上' : '一次貼上多行') + '</button>' +
+      (tpls.length ? '<button class="btn ghost" data-act="applyTplSt">套用範本到這個崗位</button>' : '') + '<button class="btn ghost" data-act="saveTplSt">這個崗位存為範本</button></div></section>';
     var arch = S.D.ck.filter(function (c) { return c.station_id === st.id && c.archived; });
     if (arch.length) {
-      h += '<section class="blk"><button class="btn ghost sm" data-act="toggleArch">已刪除的項目（' + arch.length + '）' + (S.ui.showArch ? ' 收起' : ' 展開') + '</button>';
+      h += '<section class="panel">' + pHead('已刪除的項目（' + arch.length + '）', '刪除的項目保留紀錄，管理員可以還原。', '<button class="btn ghost sm" data-act="toggleArch">' + (S.ui.showArch ? '收起' : '展開') + '</button>');
       if (S.ui.showArch) arch.forEach(function (c) {
         var done = S.R.ck[c.id];
         h += '<div class="ck"><span></span><div><span class="strike">' + esc(c.title) + '</span> <span class="mut small">' + esc(c.qty || '') + '</span><div class="hint">' + esc(pname(c.archived_by)) + ' 於 ' + tm(c.archived_at) + ' 刪除' + (done ? '・已有勾選紀錄（' + esc(pname(done.by)) + ' ' + tm(done.at) + '）' : '') + '</div></div><div class="act">' +
@@ -1357,7 +1394,8 @@ function vBuy() {
   var notArrived = live.filter(function (b) { return b.status !== '已到'; }).length;
   var short = live.filter(function (b) { return R.buy[b.id] && R.buy[b.id].short; }).length;
   var notReady = live.filter(function (b) { return b.status !== '已到' || (R.buy[b.id] && R.buy[b.id].short); }).length;
-  var h = '<section class="blk"><h2>備料採購</h2><p class="sub">尚未到貨 <b>' + notArrived + '</b> 項・實收不足 <b>' + short + '</b> 項・尚未備齊 <b>' + notReady + '</b> 項。管理員新增品項與訂購數量；所有人都可以更新狀態與實收數量。</p>';
+  var h = '<section class="panel">' + pHead('備料採購', '管理員新增品項與訂購數量；所有人都可以在表格裡更新狀態與實收數量。') +
+    '<div class="stats"><div class="stat"><span>備料項目</span><b>' + live.length + '</b></div><div class="stat' + (notArrived ? ' warn' : '') + '"><span>尚未到貨</span><b>' + notArrived + '</b></div><div class="stat' + (short ? ' warn' : '') + '"><span>實收不足</span><b>' + short + '</b></div><div class="stat' + (notReady ? ' warn' : '') + '"><span>尚未備齊</span><b>' + notReady + '</b></div></div>';
   if (!live.length) h += '<div class="empty">還沒有備料項目。' + (m ? '可在下方新增。' : '') + '</div>';
   else {
     var A = live.slice().sort(function (a, b) {
@@ -1377,7 +1415,7 @@ function vBuy() {
     }).join('') + '</tbody></table></div>';
   }
   h += '</section>';
-  if (m) h += '<section class="blk"><h2>新增備料</h2>' + buyForm(null) + '</section>';
+  if (m) h += '<section class="panel">' + pHead('新增備料', '填入品項與訂購資訊；到貨後在上方表格更新狀態與實收數量。') + buyForm(null) + '</section>';
   return h;
 }
 function buyForm(b) {
@@ -1389,7 +1427,7 @@ function buyForm(b) {
   return '<div data-buyform="' + id + '"><div class="grid2 form">' + f('item_name', '品項') + f('per_serving', '單份用量') + f('total_need', '需求量') + f('unit', '單位', 'text', ' placeholder="箱、包、g"') +
     f('order_qty', '訂購數量', 'number', ' min="0" inputmode="decimal"') + f('supplier', '供應商') + f('eta', '預計到貨', 'date') +
     '<div class="field"><label>採購人</label><select data-bf="buyer_id"><option value="">—</option>' + S.G.people.filter(function (p) { return p.active || p.id === b.buyer_id; }).map(function (p) { return '<option value="' + p.id + '"' + (b.buyer_id === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></div>' +
-    f('note', '備註') + '</div><div class="row btns" style="margin-top:16px"><button class="btn' + (id ? ' sm' : '') + '" data-act="saveBuy" data-id="' + id + '">' + (id ? '儲存' : '新增') + '</button>' +
+    f('note', '備註') + '</div><div class="' + (id ? 'row btns" style="margin-top:16px' : 'foot') + '"><button class="btn' + (id ? ' sm' : '') + '" data-act="saveBuy" data-id="' + id + '">' + (id ? '儲存' : '新增備料') + '</button>' +
     (id ? '<button class="btn ghost sm" data-act="cancelBuy">取消</button><button class="btn warn sm" data-act="archBuy" data-id="' + id + '">刪除</button>' : '') + '</div></div>';
 }
 
@@ -1400,12 +1438,12 @@ function vTimeline() {
   var m = isMgr(), ev = curEvent();
   var rows = S.D.tl.filter(function (t) { return !t.archived; });
   var dates = uniq(rows.map(function (t) { return t.date; })).sort();
-  var h = '<section class="blk"><div class="row" style="justify-content:space-between"><h2 style="margin:0">時程</h2>' + (m ? '<button class="btn ghost sm" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯') + '</button>' : '') + '</div>';
-  if (!rows.length) h += '<div class="empty" style="margin-top:16px">還沒有時程。</div>';
+  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：每列修改後按「儲存」。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
+  if (!rows.length) h += '<section class="panel"><div class="empty">還沒有時程。</div></section>';
   dates.forEach(function (d) {
     var list = rows.filter(function (t) { return t.date === d; }).sort(function (a, b) { return a.sort - b.sort; });
     var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
-    h += '<h3 style="margin-top:24px">' + mdw(d) + (label ? ' <span class="tag">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink">今天</span>' : '') + '</h3>';
+    h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '', '<span>' + list.length + ' 項</span>');
     h += '<div class="tw"><table><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
     var lastPhase = null;
     list.forEach(function (t) {
@@ -1418,17 +1456,17 @@ function vTimeline() {
       }
       lastPhase = t.phase_label;
     });
-    h += '</tbody></table></div>';
+    h += '</tbody></table></div></section>';
   });
   if (m && S.ui.tlEdit) {
     var dopts = uniq([ev.count_date, ev.setup_date].concat(S.R.days).concat([addDays(ev.end_date, 1)]).filter(Boolean)).sort();
-    h += '<h3 style="margin-top:24px">新增時程</h3><div class="grid2 form" data-tlnew="1">' +
+    h += '<section class="panel">' + pHead('新增時程', '新增一列行程；同一天會依時間排序。') + '<div class="grid2 form" data-tlnew="1">' +
       '<div class="field"><label>日期</label><select data-tf="date">' + dopts.map(function (d) { return '<option value="' + d + '">' + mdw(d) + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label>區段</label><input type="text" data-tf="phase_label"></div><div class="field"><label>時間</label><input type="text" data-tf="time_text" placeholder="09:00–10:00"></div>' +
       '<div class="field"><label>內容</label><input type="text" data-tf="content"></div><div class="field"><label>人員</label><input type="text" data-tf="people"></div><div class="field"><label>地點</label><input type="text" data-tf="place"></div>' +
-      '<div class="field"><button class="btn" data-act="addTl">新增</button></div></div>';
+      '</div><div class="foot"><button class="btn" data-act="addTl">新增時程</button></div></section>';
   }
-  return h + '</section>';
+  return h + '</div>';
 }
 
 /* ---------------------------------------------------------------------------
@@ -1437,7 +1475,7 @@ function vTimeline() {
 function vItems() {
   var m = isMgr(), dis = m ? '' : ' disabled', R = S.R;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="blk"><h2>品項與預計量</h2><p class="sub">' + (m ? '管理員可以直接修改，離開欄位即儲存，修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。') + '</p>';
+  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? '管理員可以直接修改，離開欄位即儲存，修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。', '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
   if (flagged.length) h += '<div class="banner hold" style="margin:0 0 16px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
   h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
   var tp1 = 0, tpT = 0;
@@ -1456,7 +1494,7 @@ function vItems() {
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
-  h += '<section class="blk"><h2>濾掛</h2><div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
       return '<tr><td>' + (m ? '<input type="text" data-it="' + it.id + '|name" value="' + esc(it.name) + '" style="min-width:130px">' : esc(it.name)) + flagHtml(it, m) + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
@@ -1466,7 +1504,7 @@ function vItems() {
 
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
-    h += '<section class="blk"><h2>新增品項</h2><p class="sub">臨時新增也可以。濾掛可以選所屬豆款，或留空當作「只帶濾掛」。</p><div class="grid2 form" id="newitem">' +
+    h += '<section class="panel">' + pHead('新增品項', '臨時新增也可以。濾掛可以選所屬豆款，或留空當作「只帶濾掛」。') + '<div class="grid2 form" id="newitem">' +
       '<div class="field"><label>類型</label><select data-ni="kind"><option value="bean">咖啡豆</option><option value="drip">濾掛</option></select></div>' +
       '<div class="field"><label>名稱</label><input type="text" data-ni="name" placeholder="例：甜桃荔荔"></div>' +
       '<div class="field"><label>展台</label><select data-ni="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option>' + b + '</option>'; }).join('') + '</select></div>' +
@@ -1476,12 +1514,13 @@ function vItems() {
       '<div class="field"><label>總預計包數</label><input type="number" data-ni="plan_total"></div>' +
       '<div class="field"><label>試喝量 g（咖啡豆）</label><input type="number" data-ni="tasting_g" value="1800"></div>' +
       '<div class="field"><label>所屬豆款（濾掛）</label><select data-ni="parent_name"><option value="">只帶濾掛</option>' + beanOpts + '</select></div>' +
-      '<div class="field"><button class="btn" data-act="addItem">新增</button></div></div></section>';
-    h += '<section class="blk"><h2>匯入 CSV</h2><p class="sub">欄位：類型（咖啡豆／濾掛）、名稱、展台、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以從 Excel 另存 CSV，或直接貼上。</p>' +
-      '<div class="row"><input type="file" accept=".csv,text/csv" id="csvfile" style="max-width:280px"><button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button></div>' +
-      '<textarea id="csvtext" placeholder="或把 CSV 內容貼在這裡" style="margin-top:8px"></textarea><div class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="csvPreview">預覽</button></div>' + vCsvPreview() + '</section>';
+      '</div><div class="foot"><button class="btn" data-act="addItem">新增品項</button></div></section>';
+    h += '<section class="panel">' + pHead('匯入 CSV', '欄位：類型（咖啡豆／濾掛）、名稱、展台、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以從 Excel 另存 CSV，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
+      '<div class="field"><label for="csvfile">選擇檔案</label><input type="file" accept=".csv,text/csv" id="csvfile" style="max-width:320px"></div>' +
+      '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext"></textarea></div>' + vCsvPreview() +
+      '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button></div></section>';
     if (R.archived.length) {
-      h += '<section class="blk"><button class="btn ghost sm" data-act="toggleItemArch">已封存的品項（' + R.archived.length + '）' + (S.ui.itemArch ? ' 收起' : ' 展開') + '</button>';
+      h += '<section class="panel">' + pHead('已封存的品項（' + R.archived.length + '）', '封存的品項不會出現在盤點與結算，可以隨時還原。', '<button class="btn ghost sm" data-act="toggleItemArch">' + (S.ui.itemArch ? '收起' : '展開') + '</button>');
       if (S.ui.itemArch) h += R.archived.map(function (it) { return '<div class="log"><span class="tx strike">' + esc(itemName(it.id)) + '</span><button class="btn ghost sm" data-act="restoreItem" data-id="' + it.id + '">還原</button></div>'; }).join('');
       h += '</section>';
     }
@@ -1622,21 +1661,22 @@ function vLog() {
   });
   var days = uniq(E.map(function (e) { return e.day; })).filter(Boolean).sort().reverse();
   var allItems = S.R.beans.concat(S.R.drips);
-  var h = '<section class="blk"><h2>紀錄</h2><p class="sub">異動、盤點簽署、勾選與所有設定修改都會留下紀錄，不能刪除。沖銷以刪除線顯示。</p>' +
-    '<div class="grid2" style="margin-bottom:16px">' +
+  var h = '<section class="panel">' + pHead('紀錄', '異動、盤點簽署、勾選與所有設定修改都會留下紀錄，不能刪除。沖銷以刪除線顯示。', '', '<span>共 ' + list.length + ' 筆' + (list.length !== E.length ? '（全部 ' + E.length + ' 筆）' : '') + '</span>') +
+    '<div class="grid2" style="margin-bottom:24px">' +
     '<div class="field"><label>類型</label><select data-f="lk">' + ['全部', '異動', '盤點單', '勾選', '設定變更'].map(function (k) { return '<option' + (f.lk === k ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label>品項</label><select data-f="li"><option value="">全部</option>' + allItems.map(function (it) { return '<option value="' + it.id + '"' + (f.li === it.id ? ' selected' : '') + '>' + esc(itemName(it.id)) + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label>操作人</label><select data-f="lw"><option value="">全部</option>' + S.G.people.map(function (p) { return '<option value="' + p.id + '"' + (f.lw === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></div>' +
     '<div class="field"><label>日期</label><select data-f="ld"><option value="">全部</option>' + days.map(function (d) { return '<option value="' + d + '"' + (f.ld === d ? ' selected' : '') + '>' + mdw(d) + '</option>'; }).join('') + '</select></div></div>';
   var limit = 200 + S.ui.logMore;
-  h += '<p class="hint">共 ' + list.length + ' 筆</p>' + (list.length ? list.slice(0, limit).map(function (e) {
+  h += (list.length ? list.slice(0, limit).map(function (e) {
     return '<div class="log' + (e.void ? ' void' : '') + '"><span class="tm">' + tm(e.t) + '</span><span class="tag">' + e.k + '</span><span class="tx">' + e.html + '</span>' + whoHtml(e.who, e.mode) + '</div>';
   }).join('') : '<div class="empty">沒有符合的紀錄。</div>');
   if (list.length > limit) h += '<div style="margin-top:16px"><button class="btn ghost sm" data-act="logMore">顯示更多</button></div>';
-  h += '</section><section class="blk"><h2>匯出</h2><p class="sub">活動結束後建議全部匯出存檔。CSV 可用 Excel 或 Google 試算表開啟。資料庫為免費方案、沒有自動備份，建議每天收店盤點簽署後匯出一次「整場資料」。</p><div class="row">' +
+  h += '</section><section class="panel">' + pHead('匯出', '活動結束後建議全部匯出存檔。CSV 可用 Excel 或 Google 試算表開啟。資料庫為免費方案、沒有自動備份，建議每天收店盤點簽署後匯出一次「整場資料」。') +
+    '<h3>CSV</h3><div class="row btns">' +
     '<button class="btn ghost" data-act="exp" data-v="settle">結算 CSV</button><button class="btn ghost" data-act="exp" data-v="daily">每日銷售 CSV</button><button class="btn ghost" data-act="exp" data-v="moves">異動紀錄 CSV</button>' +
-    '<button class="btn ghost" data-act="exp" data-v="sheets">盤點單明細 CSV</button><button class="btn ghost" data-act="exp" data-v="check">勾選紀錄 CSV</button><button class="btn ghost" data-act="exp" data-v="audit">設定變更 CSV</button>' +
-    '<button class="btn" data-act="exp" data-v="json">整場資料（JSON，含簽名）</button></div></section>';
+    '<button class="btn ghost" data-act="exp" data-v="sheets">盤點單明細 CSV</button><button class="btn ghost" data-act="exp" data-v="check">勾選紀錄 CSV</button><button class="btn ghost" data-act="exp" data-v="audit">設定變更 CSV</button></div>' +
+    '<div class="foot"><button class="btn" data-act="exp" data-v="json">匯出整場資料（JSON，含簽名）</button></div></section>';
   return h;
 }
 function csvCell(v) { var s = v == null ? '' : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
