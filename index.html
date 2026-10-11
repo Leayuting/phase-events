@@ -334,7 +334,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 13;
+var APP_VERSION = 14;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1538,20 +1538,24 @@ function vItems() {
   return h;
 }
 /* 咖啡豆資料庫豆款清單 */
+/* 分類順序同咖啡豆資料庫：蜜處理・日曬、水洗、自然發酵、特殊發酵、堅果奶油、台灣競標、配方豆、其他 */
+var BEAN_CAT_ORDER = ['G', 'Y', 'P', 'R', 'B', 'T', 'X', 'O'];
 function loadBeanDb(force) {
   var B = S.beanDb;
   if (B.state === 'loading' || (B.state !== 'idle' && !force)) return;
   B.state = 'loading'; B.error = '';
   pageAll(function (a, b) {
-    return beansClient().from('beans').select('id,name_zh,name_en,category_zh,process_zh,region_zh,roast_zh,delisted_at').is('deleted_at', null).order('id').range(a, b);
+    return beansClient().from('beans').select('id,name_zh,name_en,category_code,category_zh,process_zh,region_zh,roast_zh').is('deleted_at', null).is('delisted_at', null).order('id', { ascending: false }).range(a, b);
   }).then(function (rows) {
+    function ci(r) { var i = BEAN_CAT_ORDER.indexOf(r.category_code); return i < 0 ? BEAN_CAT_ORDER.length : i; }
+    rows.sort(function (x, y) { return ci(x) - ci(y) || y.id - x.id; });
     var cnt = {};
     rows.forEach(function (r) { var n = (r.name_zh || '').trim(); cnt[n] = (cnt[n] || 0) + 1; });
     B.list = rows.filter(function (r) { return (r.name_zh || '').trim(); }).map(function (r) {
       var n = r.name_zh.trim(), extra = [r.process_zh, r.region_zh, r.roast_zh ? r.roast_zh + '焙' : ''].filter(Boolean);
       var dup = cnt[n] > 1;
-      return { id: r.id, name: n, dup: dup, delisted: !!r.delisted_at, cat: r.category_zh || '未分類',
-        label: n + (dup ? '（' + (extra.length ? extra.join('・') : '#' + r.id) + '）' : '') + (r.delisted_at ? '（已下架）' : ''),
+      return { id: r.id, name: n, dup: dup, cat: r.category_zh || '其他',
+        label: n + (dup ? '（' + (extra.length ? extra.join('・') : '#' + r.id) + '）' : ''),
         itemName: dup ? n + '（' + (r.process_zh || r.region_zh || '#' + r.id) + '）' : n };
     });
     B.state = 'ok'; render();
@@ -1574,8 +1578,7 @@ function vNewItem(beanOpts) {
     var used = {};
     S.D.items.forEach(function (it) { if (!it.archived && it.kind === 'bean' && it.bean_ref_id != null) used[it.bean_ref_id] = 1; });
     var groups = {}, order = [];
-    B.list.forEach(function (b) { var g = b.delisted ? '已下架' : b.cat; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(b); });
-    order.sort(function (x, y) { return x === '已下架' ? 1 : (y === '已下架' ? -1 : 0); });
+    B.list.forEach(function (b) { var g = b.cat; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(b); });
     nameField = '<div class="field wide2"><label for="ni-bean">名稱（咖啡豆資料庫）</label><select id="ni-bean" data-ni="bean"' + (B.state === 'ok' ? '' : ' disabled') + '>' +
       '<option value="">' + (B.state === 'ok' ? '請選擇豆款' : (B.state === 'error' ? '無法讀取豆款' : '載入中…')) + '</option>' +
       order.map(function (g) {
