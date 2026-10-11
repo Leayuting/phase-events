@@ -332,7 +332,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 11;
+var APP_VERSION = 12;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -778,7 +778,7 @@ function membersOf(evId) {
   return S.G.members.filter(function (m) { return m.event_id === evId; }).map(function (m) { return m.person_id; });
 }
 function canSeeEvent(e) {
-  if (!e) return false;
+  if (!e || e.deleted_at) return false;
   if (!S.me || isMgr() || !S.G.members) return true;
   return membersOf(e.id).indexOf(S.me.id) >= 0;
 }
@@ -928,6 +928,14 @@ function vListPage() {
         '<span class="go">進入活動 →</span></button>';
     }).join('') + '</div></section>';
   });
+  var dels = isMgr() ? (S.G.events || []).filter(function (e) { return e.deleted_at; }) : [];
+  if (dels.length) {
+    h += '<section class="evgrp"><h2>已刪除的活動<span class="mut small" style="font-weight:400;margin-left:8px">' + dels.length + ' 場</span></h2><div class="panels" style="padding-top:0"><section class="panel">' +
+      '<p class="sub" style="margin-top:0">刪除的活動不會出現在列表，盤點單、簽名、異動與清單資料都保留，按「還原」就會回來。只有管理員看得到這裡。</p>' +
+      dels.map(function (e) {
+        return '<div class="log"><span class="tx"><b>' + esc(e.name) + '</b> <span class="mut small">' + md(e.start_date) + ' – ' + md(e.end_date) + '</span></span><span class="mut small">' + esc(pname(e.deleted_by)) + ' 於 ' + tm(e.deleted_at) + ' 刪除</span><button class="btn ghost sm" data-act="restoreEvent" data-id="' + e.id + '">還原</button></div>';
+      }).join('') + '</section></div></section>';
+  }
   h += '<section class="evgrp"><h2>帳號與權限</h2><div class="panels" style="padding-top:0">' + (isMgr() ? vPeople() : '') + vAccount() + '</div></section>';
   return h + '</main>';
 }
@@ -1626,7 +1634,7 @@ var FIELD_LABEL = {
   start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
   content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調'
 };
-var SKIP_FIELDS = ['updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
+var SKIP_FIELDS = ['deleted_at', 'deleted_by', 'updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
 function fmtVal(k, v) {
   if (v === null || v === undefined || v === '') return '（空）';
   if (k === 'assignee_id' || k === 'buyer_id' || k === 'person_id' || k === 'confirmed_by') return pname(v);
@@ -1641,6 +1649,7 @@ function auditText(a) {
   var label = r.name || r.title || r.item_name || r.content || (r.item_id ? itemName(r.item_id) : '') || (r.station_id && r.person_id ? (station(r.station_id) || {}).name + '：' + pname(r.person_id) : '');
   if (a.table_name === 'evt_pins') return (a.action === '更改自己的 PIN' ? '更改自己的管理員 PIN' : '重設 ' + esc(pname(a.row_id)) + ' 的管理員 PIN');
   if (a.table_name === 'evt_shared_secret') return '更換共用密碼';
+  if (a.table_name === 'evt_events' && a.action === 'UPDATE' && (o.deleted_at || null) !== (n.deleted_at || null)) return (n.deleted_at ? '刪除活動：' : '還原活動：') + esc(label);
   if (a.action === 'INSERT') return '新增' + t + '：' + esc(label);
   if (a.action === 'DELETE') return '移除' + t + '：' + esc(label);
   var ch = [];
@@ -1774,7 +1783,7 @@ function vEvent() {
       '<div class="field"><label>狀態</label><select data-ef="status"' + (m ? '' : ' disabled') + '>' + ['籌備中', '進行中', '已結束'].map(function (s) { return '<option' + (ev.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +
       evField('note', '備註', 'text', ev.note, m) + '</div>' +
       '<p class="hint" style="margin-top:16px">狀態改為「已結束」後，崗位負責人的編輯權限自動失效。</p>' +
-      (m ? '<div class="foot"><button class="btn" data-act="saveEvent">儲存活動設定</button></div>' : '') + '</section>';
+      (m ? '<div class="foot"><button class="btn" data-act="saveEvent">儲存活動設定</button><button class="btn warn" data-act="delEvent" data-id="' + ev.id + '" style="margin-left:auto">刪除這場活動</button></div>' : '') + '</section>';
     if (m) h += vMembersCard(ev);
     if (m) {
       h += '<section class="panel"><h2>本次活動崗位</h2><p class="sub">設定此活動的工作崗位與分工</p>' +
@@ -2192,6 +2201,21 @@ var A = {
   nevMem: function (e) { var id = e.getAttribute('data-v'); S.ui.nevMem[id] = !S.ui.nevMem[id]; keepNev(); renderNow(); restoreNev(); },
   openNewEv: function () { S.ui.nevMem = {}; S.G.people.forEach(function (p) { if (p.active) S.ui.nevMem[p.id] = true; }); S.ui.newEv = '1'; renderNow(); var f = $('#nev-name'); if (f) f.focus(); },
   closeNewEv: function () { S.ui.newEv = ''; renderNow(); },
+  delEvent: function (e) {
+    var ev = byId(S.G.events, e.getAttribute('data-id'));
+    if (!ev) return;
+    if (!confirm('刪除活動「' + ev.name + '」？\n活動會從列表移除，所有人都看不到也不能修改；盤點單、簽名、異動與清單資料都會保留，管理員可以在活動列表下方「已刪除的活動」還原。')) return;
+    var typed = prompt('請輸入活動名稱「' + ev.name + '」確認刪除');
+    if (typed === null) return;
+    if (typed.trim() !== ev.name) { toast('名稱不符，沒有刪除', true); return; }
+    call('evt_event_delete', { p_event_id: ev.id, p_deleted: true }, ['events'], '已刪除活動：' + ev.name).then(function (r) {
+      if (r.ok) { S.ev = null; LS.set('phase_evt_last_event', ''); S.ui.picker = '1'; renderNow(); window.scrollTo(0, 0); }
+    });
+  },
+  restoreEvent: function (e) {
+    var ev = byId(S.G.events, e.getAttribute('data-id'));
+    call('evt_event_delete', { p_event_id: ev.id, p_deleted: false }, ['events'], '已還原活動：' + ev.name);
+  },
   saveEvent: function () {
     var p = { id: S.ev };
     Array.prototype.forEach.call(document.querySelectorAll('[data-ef]'), function (x) { p[x.getAttribute('data-ef')] = x.value; });
