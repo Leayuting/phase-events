@@ -136,6 +136,8 @@ details[open]>summary::before{transform:rotate(90deg)}
 .panel h3{margin:24px 0 8px}
 .panel .foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
 .panel .tw{margin:0 -8px;padding:0 8px}
+.grid2 .wide2{grid-column:span 2}
+@media (max-width:560px){.grid2 .wide2{grid-column:auto}}
 .panel tbody tr:last-child td{border-bottom:0}
 .phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px}
 .phead .ptitle{flex:1 1 320px;min-width:0}
@@ -332,7 +334,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 12;
+var APP_VERSION = 13;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -417,14 +419,14 @@ var S = {
   R: null,
   ev: null,
   loaded: false, offline: false, rt: '',
-  sig: {}, pinStatus: null, sharedStatus: null, busy: false,
+  sig: {}, beanDb: { state: 'idle', list: [], error: '' }, pinStatus: null, sharedStatus: null, busy: false,
   ui: {
     tab: 'count', st: '', ph: '全部', bt: '全部', lk: '全部', li: '', lw: '', ld: '',
     showDone: false, showArch: false, editId: null, pasteOpen: false,
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -462,6 +464,14 @@ function writeUrl() {
    Supabase：讀取、寫入（寫入一律透過伺服器端函式）
    ============================================================================ */
 var sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+/* 咖啡豆資料庫（另一個 Supabase 專案，phase-beans）：只讀取豆款清單，不寫入 */
+var BEANS_URL = 'https://knkpxeynkecfsmonmzvi.supabase.co';
+var BEANS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtua3B4ZXlua2VjZnNtb25tenZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyODUwNDEsImV4cCI6MjA5NDg2MTA0MX0.NUsXfRAEEG2RSeP_uwDGrvWdsuFj--WC6z10u55wiW0';
+var sbBeans = null;
+function beansClient() {
+  if (!sbBeans) sbBeans = window.supabase.createClient(BEANS_URL, BEANS_KEY, { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'phase-beans-ro' } });
+  return sbBeans;
+}
 
 function isNetErr(e) {
   var m = String((e && (e.message || e.details)) || e || '');
@@ -1493,7 +1503,7 @@ function vItems() {
     tp1 += num(x.plan1); tpT += num(x.planT);
     if (m && S.ui.itemEdit === it.id) return '<tr><td colspan="8">' + itemForm(it) + '</td></tr>';
     var drip = find(R.drips, function (d) { return d.parent_item_id === it.id; });
-    return '<tr><td style="min-width:150px"><b style="font-weight:600">' + esc(it.name) + '</b>' + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
+    return '<tr><td style="min-width:150px"><b style="font-weight:600">' + esc(it.name) + '</b>' + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
       '<td class="small mut" style="min-width:140px">' + esc(it.category || '—') + '</td>' +
       '<td class="n"><input type="number" min="1" data-it="' + it.id + '|spec_g" value="' + I(it.spec_g) + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(x.plan1) ? x.plan1 : '') + '"' + dis + '></td>' +
@@ -1514,17 +1524,7 @@ function vItems() {
 
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
-    h += '<section class="panel">' + pHead('新增品項', '臨時新增也可以。濾掛可以選所屬豆款，或留空當作「只帶濾掛」。') + '<div class="grid2 form" id="newitem">' +
-      '<div class="field"><label>類型</label><select data-ni="kind"><option value="bean">咖啡豆</option><option value="drip">濾掛</option></select></div>' +
-      '<div class="field"><label>名稱</label><input type="text" data-ni="name" placeholder="例：甜桃荔荔"></div>' +
-      '<div class="field"><label>展台</label><select data-ni="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option>' + b + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field"><label>分類</label><input type="text" data-ni="category"></div>' +
-      '<div class="field"><label>規格 g（咖啡豆）</label><input type="number" data-ni="spec_g" value="227"></div>' +
-      '<div class="field"><label>第一批包數</label><input type="number" data-ni="plan_batch1" value="0"></div>' +
-      '<div class="field"><label>總預計包數</label><input type="number" data-ni="plan_total"></div>' +
-      '<div class="field"><label>試喝量 g（咖啡豆）</label><input type="number" data-ni="tasting_g" value="1800"></div>' +
-      '<div class="field"><label>所屬豆款（濾掛）</label><select data-ni="parent_name"><option value="">只帶濾掛</option>' + beanOpts + '</select></div>' +
-      '</div><div class="foot"><button class="btn" data-act="addItem">新增品項</button></div></section>';
+    h += vNewItem(beanOpts);
     h += '<section class="panel">' + pHead('匯入 CSV', '欄位：類型（咖啡豆／濾掛）、名稱、展台、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以從 Excel 另存 CSV，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
       '<div class="field"><label for="csvfile">選擇檔案</label><input type="file" accept=".csv,text/csv" id="csvfile" style="max-width:320px"></div>' +
       '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext"></textarea></div>' + vCsvPreview() +
@@ -1537,6 +1537,67 @@ function vItems() {
   }
   return h;
 }
+/* 咖啡豆資料庫豆款清單 */
+function loadBeanDb(force) {
+  var B = S.beanDb;
+  if (B.state === 'loading' || (B.state !== 'idle' && !force)) return;
+  B.state = 'loading'; B.error = '';
+  pageAll(function (a, b) {
+    return beansClient().from('beans').select('id,name_zh,name_en,category_zh,process_zh,region_zh,roast_zh,delisted_at').is('deleted_at', null).order('id').range(a, b);
+  }).then(function (rows) {
+    var cnt = {};
+    rows.forEach(function (r) { var n = (r.name_zh || '').trim(); cnt[n] = (cnt[n] || 0) + 1; });
+    B.list = rows.filter(function (r) { return (r.name_zh || '').trim(); }).map(function (r) {
+      var n = r.name_zh.trim(), extra = [r.process_zh, r.region_zh, r.roast_zh ? r.roast_zh + '焙' : ''].filter(Boolean);
+      var dup = cnt[n] > 1;
+      return { id: r.id, name: n, dup: dup, delisted: !!r.delisted_at, cat: r.category_zh || '未分類',
+        label: n + (dup ? '（' + (extra.length ? extra.join('・') : '#' + r.id) + '）' : '') + (r.delisted_at ? '（已下架）' : ''),
+        itemName: dup ? n + '（' + (r.process_zh || r.region_zh || '#' + r.id) + '）' : n };
+    });
+    B.state = 'ok'; render();
+  }, function (e) { B.state = 'error'; B.error = (e && e.message) || String(e); render(); });
+}
+function niState() {
+  if (!S.ui.ni) S.ui.ni = { kind: 'bean', mode: 'db', bean: '', name: '', booth: '', category: '', spec_g: '227', plan_batch1: '0', plan_total: '', tasting_g: '1800', parent_name: '' };
+  return S.ui.ni;
+}
+function vNewItem(beanOpts) {
+  var n = niState(), B = S.beanDb, bean = n.kind === 'bean';
+  if (bean && n.mode === 'db') loadBeanDb();
+  function inp(k, label, type, extra) { return '<div class="field"><label for="ni-' + k + '">' + label + '</label><input type="' + (type || 'text') + '" id="ni-' + k + '" data-ni="' + k + '" value="' + esc(n[k] || '') + '"' + (extra || '') + '></div>'; }
+  var nameField;
+  if (bean && n.mode === 'db') {
+    var st = '';
+    if (B.state === 'loading' || B.state === 'idle') st = '<span class="hint">正在讀取咖啡豆資料庫…</span>';
+    else if (B.state === 'error') st = '<span class="hint" style="color:var(--warn)">讀取咖啡豆資料庫失敗：' + esc(B.error) + '</span><span class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="beanDbRetry" style="width:auto">重試</button><button class="btn ghost sm" data-act="niManual" style="width:auto">改用手動輸入</button></span>';
+    else if (!B.list.length) st = '<span class="hint">咖啡豆資料庫沒有可選的豆款。</span><span class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="niManual" style="width:auto">改用手動輸入</button></span>';
+    var used = {};
+    S.D.items.forEach(function (it) { if (!it.archived && it.kind === 'bean' && it.bean_ref_id != null) used[it.bean_ref_id] = 1; });
+    var groups = {}, order = [];
+    B.list.forEach(function (b) { var g = b.delisted ? '已下架' : b.cat; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(b); });
+    order.sort(function (x, y) { return x === '已下架' ? 1 : (y === '已下架' ? -1 : 0); });
+    nameField = '<div class="field wide2"><label for="ni-bean">名稱（咖啡豆資料庫）</label><select id="ni-bean" data-ni="bean"' + (B.state === 'ok' ? '' : ' disabled') + '>' +
+      '<option value="">' + (B.state === 'ok' ? '請選擇豆款' : (B.state === 'error' ? '無法讀取豆款' : '載入中…')) + '</option>' +
+      order.map(function (g) {
+        return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (b) {
+          return '<option value="' + b.id + '"' + (String(n.bean) === String(b.id) ? ' selected' : '') + '>' + esc(b.label) + (used[b.id] ? '（本場已有）' : '') + '</option>';
+        }).join('') + '</optgroup>';
+      }).join('') + '<option value="__manual">＋ 手動輸入（臨時豆款）</option></select>' + (st ? '<div>' + st + '</div>' : '') + '</div>';
+  } else {
+    nameField = '<div class="field wide2"><label for="ni-name">名稱' + (bean ? '（手動輸入）' : '') + '</label><input type="text" id="ni-name" data-ni="name" value="' + esc(n.name) + '" placeholder="' + (bean ? '臨時豆款名稱' : '濾掛名稱') + '">' +
+      (bean ? '<div><button class="btn ghost sm" data-act="niBackDb" style="margin-top:8px">改從咖啡豆資料庫選擇</button></div>' : '') + '</div>';
+  }
+  var h = '<section class="panel">' + pHead('新增品項', bean ? '咖啡豆請從咖啡豆資料庫選擇；資料庫沒有的臨時豆款可以選「手動輸入」。展台、規格、包數與試喝量是本次活動自己的設定，不會改到咖啡豆資料庫。' : '濾掛可以選所屬豆款，或選「只帶濾掛」。') +
+    '<div class="grid2 form" id="newitem"><div class="field"><label for="ni-kind">類型</label><select id="ni-kind" data-ni="kind"><option value="bean"' + (bean ? ' selected' : '') + '>咖啡豆</option><option value="drip"' + (bean ? '' : ' selected') + '>濾掛</option></select></div>' +
+    nameField +
+    '<div class="field"><label for="ni-booth">展台</label><select id="ni-booth" data-ni="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option' + (n.booth === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
+    (bean ? inp('category', '分類') + inp('spec_g', '規格 g', 'number', ' min="1"') : '') +
+    inp('plan_batch1', '第一批包數', 'number', ' min="0"') + inp('plan_total', '總預計包數', 'number', ' min="0"') +
+    (bean ? inp('tasting_g', '試喝量 g', 'number', ' min="0"') : '<div class="field"><label for="ni-parent">所屬豆款</label><select id="ni-parent" data-ni="parent_name"><option value="">只帶濾掛（不指定豆款）</option>' +
+      S.R.beans.map(function (it) { return '<option value="' + esc(it.name) + '"' + (n.parent_name === it.name ? ' selected' : '') + '>' + esc(it.name) + '</option>'; }).join('') + '</select><span class="hint">選項來自本次活動的咖啡豆品項。</span></div>') +
+    '</div><div class="foot"><button class="btn" data-act="addItem">新增品項</button></div></section>';
+  return h;
+}
 function itemOps(it) {
   return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除</button></span>';
 }
@@ -1545,7 +1606,8 @@ function itemForm(it) {
   function f(k, label, v, type, extra) {
     return '<div class="field"><label>' + label + '</label><input type="' + (type || 'text') + '" data-ie="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '></div>';
   }
-  var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3><div class="grid2 form">' +
+  var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3>' +
+    (bean && it.bean_ref_id != null ? '<p class="hint" style="margin:0 0 16px">連結咖啡豆資料庫：' + esc(it.bean_ref_name || '') + '（#' + it.bean_ref_id + '）。這裡的修改只影響本次活動，不會改到咖啡豆資料庫。</p>' : (bean ? '<p class="hint" style="margin:0 0 16px">手動輸入的豆款，沒有連結咖啡豆資料庫。</p>' : '')) + '<div class="grid2 form">' +
     f('name', '名稱', it.name) +
     (bean ? '<div class="field"><label>展台</label><select data-ie="booth"><option value="">—</option>' + BOOTHS.map(function (b) { return '<option' + (it.booth === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
       f('category', '分類', it.category) + f('spec_g', '規格 g', it.spec_g, 'number', ' min="1"')
@@ -1628,7 +1690,7 @@ var TABLE_LABEL = {
   evt_checklist_items: '清單項目', evt_checklist_templates: '範本', evt_checklist_template_items: '範本項目', evt_purchases: '備料', evt_timeline: '時程', evt_pins: 'PIN'
 };
 var FIELD_LABEL = {
-  name: '名稱', booth: '展台', category: '分類', spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g', archived: '封存', note: '備註',
+  name: '名稱', bean_ref_id: '咖啡豆資料庫 ID', bean_ref_name: '咖啡豆資料庫名稱', booth: '展台', category: '分類', spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g', archived: '封存', note: '備註',
   needs_confirm: '待確認', title: '品項', qty: '數量', purpose: '用途', phase: '階段', assignee_id: '指派', link_page: '連結', sort: '排序', status: '狀態',
   order_qty: '訂購數量', received_qty: '實收數量', supplier: '供應商', eta: '預計到貨', total_need: '需求量', unit: '單位', item_name: '品項', buyer_id: '採購人',
   start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
@@ -2154,12 +2216,27 @@ var A = {
   },
   restoreItem: function (e) { call('evt_item_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['items'], '已還原'); },
   toggleItemArch: function () { S.ui.itemArch = !S.ui.itemArch; renderNow(); },
+  beanDbRetry: function () { loadBeanDb(true); renderNow(); },
+  niManual: function () { var n = niState(); n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); },
+  niBackDb: function () { var n = niState(); n.mode = 'db'; n.name = ''; n.bean = ''; renderNow(); },
   addItem: function () {
-    var p = { event_id: S.ev };
-    Array.prototype.forEach.call(document.querySelectorAll('[data-ni]'), function (x) { p[x.getAttribute('data-ni')] = x.value; });
-    if (!p.name.trim()) { toast('請輸入名稱', true); return; }
-    if (p.kind === 'drip') { delete p.spec_g; delete p.tasting_g; } else delete p.parent_name;
-    call('evt_items_import', { p_event_id: S.ev, p_rows: [p] }, ['items', 'plan'], '已新增：' + p.name);
+    var n = niState(), bean = n.kind === 'bean';
+    Array.prototype.forEach.call(document.querySelectorAll('#newitem [data-ni]'), function (x) { var k = x.getAttribute('data-ni'); if (k !== 'kind' && !(k === 'bean' && x.value === '__manual')) n[k] = x.value; });
+    var p = { kind: n.kind, booth: n.booth, plan_batch1: n.plan_batch1, plan_total: n.plan_total };
+    if (bean && n.mode === 'db') {
+      var b = find(S.beanDb.list, function (x) { return String(x.id) === String(n.bean); });
+      if (!b) { toast('請選擇豆款，或改用手動輸入', true); return; }
+      p.name = b.itemName; p.bean_ref_id = String(b.id); p.bean_ref_name = b.name;
+    } else {
+      p.name = (n.name || '').trim();
+      if (!p.name) { toast('請輸入名稱', true); return; }
+    }
+    if (bean) { p.category = n.category; p.spec_g = n.spec_g; p.tasting_g = n.tasting_g; if (!(num(p.spec_g) > 0)) { toast('咖啡豆需要規格 g', true); return; } }
+    else p.parent_name = n.parent_name;
+    if (find(S.D.items, function (x) { return !x.archived && x.kind === p.kind && x.name === p.name; })) { toast('本場已有同名的' + (bean ? '咖啡豆' : '濾掛') + '「' + p.name + '」，要修改請按該品項的「編輯」', true); return; }
+    call('evt_items_import', { p_event_id: S.ev, p_rows: [p] }, ['items', 'plan'], '已新增：' + p.name).then(function (r) {
+      if (r.ok) { var k = n.kind; S.ui.ni = null; niState().kind = k; renderNow(); }
+    });
   },
   csvTemplate: function () {
     csvDownload('品項匯入範本.csv', [['類型', '名稱', '展台', '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註'],
@@ -2382,6 +2459,16 @@ document.addEventListener('change', function (ev) {
   }
   var f = t.getAttribute('data-f');
   if (f) { S.ui[f] = t.value; S.ui.logMore = 0; renderNow(); return; }
+  var nk = t.getAttribute('data-ni');
+  if (nk) {
+    var n = niState();
+    if (nk === 'kind') { n.kind = t.value; n.mode = 'db'; n.bean = ''; n.name = ''; n.parent_name = ''; renderNow(); return; }
+    if (nk === 'bean') {
+      if (t.value === '__manual') { n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); return; }
+      n.bean = t.value; return;
+    }
+    n[nk] = t.value; return;
+  }
   var it = t.getAttribute('data-it');
   if (it && isMgr()) {
     var pr2 = it.split('|'), p = { id: pr2[0] };
