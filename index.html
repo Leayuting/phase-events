@@ -184,6 +184,23 @@ details[open]>summary::before{transform:rotate(90deg)}
 .modal .banner{margin:0 0 24px}
 .modal .grid2{grid-template-columns:1fr 1fr}
 .modal .grid2 .wide{grid-column:1 / -1}
+#printarea{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  body.printing{background:#fff;padding:0;font-size:11pt;color:#000}
+  body.printing>*:not(#printarea){display:none!important}
+  body.printing #printarea{display:block}
+  #printarea h1{font-size:16pt;color:#000;margin:0}
+  #printarea .pm{font-size:9pt;color:#444;margin:2mm 0 4mm}
+  #printarea h2{font-size:12pt;color:#000;margin:6mm 0 2mm}
+  #printarea table{width:100%;border-collapse:collapse;font-size:9.5pt}
+  #printarea th,#printarea td{border:0.5pt solid #999;padding:1.2mm 2mm;text-align:left;vertical-align:top}
+  #printarea th{background:#eee;font-weight:600;color:#000}
+  #printarea td.n,#printarea th.n{text-align:right}
+  #printarea tr.grp td{background:#f4f4f4;font-weight:600}
+  #printarea tr.tot td{font-weight:700;border-top:1pt solid #000}
+  #printarea tr{page-break-inside:avoid}
+}
 #ver{position:fixed;right:10px;bottom:8px;font-size:11px;color:var(--mist);z-index:40;pointer-events:none}
 .login{max-width:420px;margin:12vh auto 0}
 .login .names{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:16px}
@@ -219,6 +236,7 @@ details[open]>summary::before{transform:rotate(90deg)}
 <div class="wrap" id="app"><div class="login"><div class="brand">Phase Coffee Roasters</div><p class="mut">載入中…</p></div></div>
 <div class="toast" id="toast" hidden></div>
 <div id="ver"></div>
+<div id="printarea" aria-hidden="true"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 /* ============================================================================
@@ -335,7 +353,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 15;
+var APP_VERSION = 16;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1514,6 +1532,8 @@ function vItems() {
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
+  var shareCard = '<section class="panel">' + pHead('複製與列印', '把目前的咖啡豆與濾掛清單複製下來，可以直接貼到 LINE、Excel 或 Google 試算表；也可以列印或存成 PDF（列印視窗的目的地選「另存為 PDF」）。已刪除的品項不包含在內。') +
+    '<div class="foot" style="margin-top:0;padding-top:0;border-top:0"><button class="btn" data-act="printItems">列印／存成 PDF</button><button class="btn ghost" data-act="copyItems" data-v="text">複製文字（LINE）</button><button class="btn ghost" data-act="copyItems" data-v="tsv">複製表格（Excel）</button></div></section>';
   h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」；要改所屬豆款請按「編輯」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
@@ -1522,6 +1542,7 @@ function vItems() {
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
         (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
+  h += shareCard;
 
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
@@ -1600,6 +1621,76 @@ function vNewItem(beanOpts) {
     (bean ? inp('tasting_g', '試喝量 g', 'number', ' min="0"') : '<div class="field"><label for="ni-parent">所屬豆款</label><select id="ni-parent" data-ni="parent_name"><option value="">只帶濾掛（不指定豆款）</option>' +
       S.R.beans.map(function (it) { return '<option value="' + esc(it.name) + '"' + (n.parent_name === it.name ? ' selected' : '') + '>' + esc(it.name) + '</option>'; }).join('') + '</select><span class="hint">選項來自本次活動的咖啡豆品項。</span></div>') +
     '</div><div class="foot"><button class="btn" data-act="addItem">新增品項</button></div></section>';
+  return h;
+}
+/* 品項清單：複製與列印 */
+function itemRows() {
+  var R = S.R, beans = [], drips = [];
+  R.beans.forEach(function (it) {
+    var x = R.item[it.id], d = find(R.drips, function (z) { return z.parent_item_id === it.id; });
+    beans.push({ booth: it.booth || '未分展台', name: it.name, cat: it.category || '', spec: it.spec_g, p1: x.plan1, pt: x.planT, tg: x.tasting, drip: d ? '有' : '', note: it.note || '' });
+  });
+  R.drips.forEach(function (it) {
+    var y = R.drip[it.id], par = item(it.parent_item_id);
+    drips.push({ name: it.name, parent: par ? par.name : '只帶濾掛', p1: y.plan1, pt: y.planT, note: it.note || '' });
+  });
+  return { beans: beans, drips: drips };
+}
+function nv(v) { return v == null || v === '' ? '' : String(v); }
+function itemsText(kind) {
+  var ev = curEvent(), r = itemRows(), L = [];
+  var head = ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + (ev.booth ? ' ' + ev.booth : '') + '）品項與預計量';
+  var s1 = 0, sT = 0, d1 = 0, dT = 0;
+  r.beans.forEach(function (b) { s1 += num(b.p1); sT += num(b.pt); });
+  r.drips.forEach(function (b) { d1 += num(b.p1); dT += num(b.pt); });
+  if (kind === 'tsv') {
+    L.push(head, '', '咖啡豆');
+    L.push(['展台', '咖啡豆', '分類', '規格g', '第一批', '總預計', '試喝量g', '濾掛', '備註'].join('\t'));
+    r.beans.forEach(function (b) { L.push([b.booth, b.name, b.cat, nv(b.spec), nv(b.p1), nv(b.pt), nv(b.tg), b.drip, b.note].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t')); });
+    L.push(['合計', r.beans.length + ' 款', '', '', s1, sT, '', '', ''].join('\t'));
+    L.push('', '濾掛');
+    L.push(['濾掛', '所屬豆款', '第一批', '總預計', '備註'].join('\t'));
+    r.drips.forEach(function (b) { L.push([b.name, b.parent, nv(b.p1), nv(b.pt), b.note].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t')); });
+    L.push(['合計', r.drips.length + ' 款', d1, dT, ''].join('\t'));
+    return L.join('\n');
+  }
+  L.push('【' + head + '】');
+  var g = null;
+  L.push('', '■ 咖啡豆 ' + r.beans.length + ' 款（第一批 ' + s1 + ' 包／總預計 ' + sT + ' 包）');
+  r.beans.forEach(function (b) {
+    if (b.booth !== g) { g = b.booth; L.push('', '〔' + g + '〕'); }
+    L.push('・' + b.name + (b.spec ? ' ' + b.spec + 'g' : '') + '｜第一批 ' + (nv(b.p1) || '—') + '｜總預計 ' + (nv(b.pt) || '—') + (b.note ? '｜' + b.note : ''));
+  });
+  L.push('', '■ 濾掛 ' + r.drips.length + ' 款（第一批 ' + d1 + ' 包／總預計 ' + dT + ' 包）');
+  r.drips.forEach(function (b) { L.push('・' + b.name + (b.parent === '只帶濾掛' ? '（只帶濾掛）' : '') + '｜第一批 ' + (nv(b.p1) || '—') + '｜總預計 ' + (nv(b.pt) || '—') + (b.note ? '｜' + b.note : '')); });
+  return L.join('\n');
+}
+function copyText(t) {
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok ? Promise.resolve() : Promise.reject(new Error('瀏覽器不允許複製'));
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(null, fallback);
+  return fallback();
+}
+function itemsPrintHtml() {
+  var ev = curEvent(), r = itemRows(), s1 = 0, sT = 0, d1 = 0, dT = 0, g = null;
+  var h = '<h1>' + esc(ev.name) + '　品項與預計量</h1><div class="pm">' + md(ev.start_date) + ' – ' + md(ev.end_date) + (ev.venue ? '・' + esc(ev.venue) : '') + (ev.booth ? ' ' + esc(ev.booth) : '') + (ev.setup_date ? '・佈場 ' + md(ev.setup_date) : '') + '・列印時間 ' + tm(new Date().toISOString()) + '・' + esc(S.me.name) + '</div>';
+  h += '<h2>咖啡豆（' + r.beans.length + ' 款）</h2><table><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th><th>備註</th></tr></thead><tbody>';
+  r.beans.forEach(function (b) {
+    if (b.booth !== g) { g = b.booth; h += '<tr class="grp"><td colspan="8">' + esc(g) + '</td></tr>'; }
+    s1 += num(b.p1); sT += num(b.pt);
+    h += '<tr><td>' + esc(b.name) + '</td><td>' + esc(b.cat) + '</td><td class="n">' + esc(nv(b.spec)) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td class="n">' + esc(nv(b.tg)) + '</td><td>' + b.drip + '</td><td>' + esc(b.note) + '</td></tr>';
+  });
+  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + s1 + '</td><td class="n">' + sT + '</td><td></td><td></td><td></td></tr></tbody></table>';
+  h += '<h2>濾掛（' + r.drips.length + ' 款）</h2><table><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th><th>備註</th></tr></thead><tbody>';
+  r.drips.forEach(function (b) { d1 += num(b.p1); dT += num(b.pt); h += '<tr><td>' + esc(b.name) + '</td><td>' + esc(b.parent) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td>' + esc(b.note) + '</td></tr>'; });
+  h += '<tr class="tot"><td>合計</td><td></td><td class="n">' + d1 + '</td><td class="n">' + dT + '</td><td></td></tr></tbody></table>';
   return h;
 }
 function itemOps(it) {
@@ -2247,6 +2338,17 @@ var A = {
   },
   restoreItem: function (e) { call('evt_item_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['items'], '已還原'); },
   toggleItemArch: function () { S.ui.itemArch = !S.ui.itemArch; renderNow(); },
+  copyItems: function (e) {
+    var k = e.getAttribute('data-v');
+    copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
+  },
+  printItems: function () {
+    $('#printarea').innerHTML = itemsPrintHtml();
+    document.body.classList.add('printing');
+    var done = function () { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); }, 50);
+  },
   beanDbRetry: function () { loadBeanDb(true); renderNow(); },
   niManual: function () { var n = niState(); n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); },
   niBackDb: function () { var n = niState(); n.mode = 'db'; n.name = ''; n.bean = ''; renderNow(); },
