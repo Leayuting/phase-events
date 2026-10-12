@@ -155,6 +155,11 @@ details[open]>summary::before{transform:rotate(90deg)}
 .panel h3{margin:24px 0 8px}
 .panel .foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
 .panel .tw{margin:0 -8px;padding:0 8px}
+.panel.folded>*:not(.phead){display:none!important}
+.panel.folded .phead{margin-bottom:0}
+.panel.folded .phead .sub{display:none}
+.panel.folded .paside>*:not(.foldbtn){display:none}
+.foldbtn{min-width:64px}
 .grid2 .wide2{grid-column:span 2}
 @media (max-width:560px){.grid2 .wide2{grid-column:auto}}
 .panel tbody tr:last-child td{border-bottom:0}
@@ -406,7 +411,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 36;
+var APP_VERSION = 37;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -446,6 +451,33 @@ var LS = {
   del: function (k) { try { window.localStorage.removeItem(k); } catch (e) {} }
 };
 var K_TOKEN = 'phase_evt_token';
+/* 卡片收合：每張卡片標題右邊有「收合／展開」，狀態記在這台裝置；工具類卡片預設收合 */
+var K_FOLD = 'phase_evt_fold';
+var FOLD_DEFAULT = /^(新增|匯入|已刪除|已封存|複製與列印|套用清單|將本次清單|共用密碼|人員$|帳號)/;
+var foldState = (function () { try { return JSON.parse(LS.get(K_FOLD) || '{}') || {}; } catch (e) { return {}; } })();
+function foldKey(panel) {
+  var h = panel.querySelector('h2');
+  var t = h ? h.textContent.replace(/[（(]\d+[）)]|\d+ 款|\d+ 項/g, '').trim() : '';
+  return t ? (S.ui.picker ? 'list' : S.ui.tab) + '|' + t : '';
+}
+function isFolded(key, title) { return foldState[key] != null ? !!foldState[key] : FOLD_DEFAULT.test(title); }
+function applyFolds() {
+  Array.prototype.forEach.call(document.querySelectorAll('#app section.panel'), function (p) {
+    var key = foldKey(p);
+    if (!key || p.querySelector('[data-act=fold]')) return;
+    var h2 = p.querySelector('h2'), title = h2.textContent.trim(), head = p.querySelector('.phead') || h2;
+    var btn = document.createElement('button');
+    btn.className = 'btn ghost sm foldbtn'; btn.setAttribute('data-act', 'fold'); btn.setAttribute('data-k', key);
+    var aside = head.classList && head.classList.contains('phead') ? head.querySelector('.paside') : null;
+    if (!aside && head.classList && head.classList.contains('phead')) { aside = document.createElement('div'); aside.className = 'paside'; head.appendChild(aside); }
+    if (aside) aside.appendChild(btn);
+    else { var wrap = document.createElement('div'); wrap.className = 'phead'; h2.parentNode.insertBefore(wrap, h2); var tt = document.createElement('div'); tt.className = 'ptitle'; wrap.appendChild(tt); tt.appendChild(h2); var sub = wrap.nextElementSibling; if (sub && sub.classList.contains('sub')) tt.appendChild(sub); var as = document.createElement('div'); as.className = 'paside'; as.appendChild(btn); wrap.appendChild(as); }
+    var f = isFolded(key, title);
+    p.classList.toggle('folded', f);
+    btn.textContent = f ? '展開' : '收合';
+    btn.setAttribute('aria-expanded', String(!f));
+  });
+}
 var K_ME = 'phase_evt_me';
 var K_DEV = 'phase_evt_device';
 var K_NAME = 'phase_evt_lastname';
@@ -961,6 +993,7 @@ function renderNow() {
   var y = window.scrollY;
   app.innerHTML = (S.ui.picker || (S.loaded && !curEvent()) ? vListPage() : vHeader() + '<main id="view">' + vBody() + '</main>') + (S.ui.newEv && isMgr() ? vNewEvent() : '');
   window.scrollTo(0, y);
+  applyFolds();
   if (S.ui.tab === 'count' && S.ui.signing) initPad();
   writeUrl();
 }
@@ -2999,6 +3032,11 @@ var A = {
     copyText(tlText(k)).then(function () { toast(k === 'tsv' ? '已複製時程表格，可以貼到 Excel 或 Google 試算表' : '已複製時程文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
   },
   printTl: function () { printHtml(tlPrintHtml()); },
+  fold: function (e) {
+    var k = e.getAttribute('data-k'), p = e.closest('section.panel'), f = !p.classList.contains('folded');
+    foldState[k] = f; LS.set(K_FOLD, JSON.stringify(foldState));
+    p.classList.toggle('folded', f); e.textContent = f ? '展開' : '收合'; e.setAttribute('aria-expanded', String(!f));
+  },
   copyItems: function (e) {
     var k = e.getAttribute('data-v');
     copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
