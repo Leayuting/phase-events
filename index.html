@@ -401,7 +401,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 27;
+var APP_VERSION = 28;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2425,19 +2425,20 @@ function memChips(sel, act) {
 }
 function selCount(sel) { return Object.keys(sel).filter(function (k) { return sel[k]; }).length; }
 function vMembersCard(ev) {
-  if (!S.G.members) return '<section class="panel"><h2>本次活動參加夥伴</h2><p class="sub">選擇這場活動有哪些夥伴參加</p><div class="banner hold" style="margin:0">需要先執行資料庫更新（v3 參加夥伴）才能使用。</div></section>';
-  if (!S.ui.mem || S.ui.memEv !== ev.id) {
-    S.ui.mem = {}; S.ui.memEv = ev.id;
-    membersOf(ev.id).forEach(function (id) { S.ui.mem[id] = true; });
-  }
-  var saved = membersOf(ev.id), sel = S.ui.mem, n = selCount(sel);
-  var dirty = n !== saved.length || saved.some(function (id) { return !sel[id]; });
-  return '<section class="panel"><h2>本次活動參加夥伴</h2><p class="sub">選擇這場活動有哪些夥伴參加。沒有參加的夥伴看不到這場活動，也不能修改；管理員登入不受限制。</p>' +
-    '<div class="row" style="margin-bottom:16px"><span class="small">已選 <b>' + n + '</b> 人' + (dirty ? '<span class="tag hold" style="margin-left:8px">尚未儲存</span>' : '') + '</span>' +
-    '<span class="row btns"><button class="btn ghost sm" data-act="memAll">全選</button><button class="btn ghost sm" data-act="memNone">全部取消</button></span></div>' +
-    memChips(sel, 'memToggle') +
-    '<p class="hint" style="margin-top:16px">新夥伴第一次登入後才會出現在名單裡；之後新建立的活動會預設加入所有啟用中的人。</p>' +
-    '<div class="foot"><button class="btn" data-act="saveMembers">儲存參加夥伴</button>' + (dirty ? '<button class="btn ghost" data-act="memReset">還原</button>' : '') + '</div></section>' + vCrewCard(ev);
+  var h = '<section class="panel">' + pHead('本次活動人員', '參加這場活動的夥伴。沒有參加的夥伴看不到這場活動，也不能修改；管理員登入不受限制。新增、移除都會立即儲存。');
+  if (!S.G.members) return h + '<div class="banner hold" style="margin:0">需要先執行資料庫更新（v3 參加夥伴）才能使用。</div></section>';
+  var rows = memberRows(ev.id), ids = rows.map(function (m) { return m.person_id; });
+  var others = S.G.people.filter(function (p) { return p.active && ids.indexOf(p.id) < 0; });
+  h += '<div class="row small" style="margin-bottom:16px"><span>共 <b>' + rows.length + '</b> 人</span>' + (others.length ? '<button class="btn ghost sm" data-act="memAddAll">全部加入（' + others.length + ' 人）</button>' : '') + '</div>';
+  h += rows.length ? '<div class="chips">' + rows.map(function (m) {
+    var p = person(m.person_id) || {};
+    return '<span class="chip" style="display:inline-flex;align-items:center;gap:8px;cursor:default;padding-right:6px">' + esc(p.name || '') + (p.is_manager ? '<span class="mut small">管理員</span>' : '') + (m.role ? '<span class="mut small">' + esc(m.role) + '</span>' : '') +
+      '<button class="btn warn sm" data-act="memRemove" data-id="' + m.person_id + '" style="min-height:28px;padding:0 8px" aria-label="移除 ' + esc(p.name || '') + '">移除</button></span>';
+  }).join('') + '</div>' : '<div class="empty">還沒有人員。</div>';
+  h += '<datalist id="mem-names">' + others.map(function (p) { return '<option value="' + esc(p.name) + '"></option>'; }).join('') + '</datalist>' +
+    '<div class="inline-add" style="margin-top:24px"><input type="text" id="mem-add" list="mem-names" maxlength="30" placeholder="輸入或選擇姓名" aria-label="新增人員姓名"><button class="btn" data-act="memAdd">新增人員</button></div>' +
+    '<p class="hint" style="margin-top:8px">可以選名單上的人，也可以輸入新名字（會同時加入人員名單）。移除只是不參加這場，不會刪除人員；已有的紀錄都保留。</p></section>';
+  return h + vCrewCard(ev);
 }
 function eventDays(ev) { var d = [], x = ev.start_date; while (x && x <= ev.end_date && d.length < 31) { d.push(x); x = addDays(x, 1); } return d; }
 function vCrewCard(ev) {
@@ -2929,6 +2930,34 @@ var A = {
   /* 活動 */
   openList: function () { S.pinStatus = null; S.ui.picker = '1'; S.ui.newEv = ''; renderNow(); window.scrollTo(0, 0); },
   enterEvent: function (e) { var id = e.getAttribute('data-id'); S.ui.picker = ''; if (id === S.ev) { renderNow(); } else { S.ui.tab = 'count'; switchEvent(id); } window.scrollTo(0, 0); },
+  memAdd: function () {
+    var n = val('#mem-add').trim().replace(/\s+/g, ' ');
+    if (!n) { toast('請輸入姓名', true); return; }
+    var ids = membersOf(S.ev), p = find(S.G.people, function (x) { return x.name.toLowerCase() === n.toLowerCase(); });
+    if (p && !p.active) { toast('「' + p.name + '」已停用，請先到「人員」名單啟用', true); return; }
+    if (p && ids.indexOf(p.id) >= 0) { toast('「' + p.name + '」已經在這場活動', true); return; }
+    var first = p ? Promise.resolve({ ok: true, data: p.id }) : call('evt_person_save', { p: { name: n } }, ['people']);
+    first.then(function (r) {
+      if (!r.ok) return;
+      call('evt_event_set_members', { p_event_id: S.ev, p_person_ids: ids.concat([r.data]) }, ['members'], '已加入：' + n).then(function (r2) { if (r2.ok) { var f = $('#mem-add'); if (f) f.value = ''; } });
+    });
+  },
+  memAddAll: function () {
+    var ids = membersOf(S.ev), add = S.G.people.filter(function (p) { return p.active && ids.indexOf(p.id) < 0; }).map(function (p) { return p.id; });
+    if (!confirm('把 ' + add.length + ' 位人員都加入這場活動？')) return;
+    call('evt_event_set_members', { p_event_id: S.ev, p_person_ids: ids.concat(add) }, ['members'], '已加入 ' + add.length + ' 人');
+  },
+  memRemove: function (e) {
+    var pid = e.getAttribute('data-id'), ids = membersOf(S.ev);
+    var own = S.D.stations.filter(function (st) { return !st.archived && ownersOf(st.id).indexOf(pid) >= 0; }).map(function (st) { return st.name; });
+    if (!confirm('把「' + pname(pid) + '」移出這場活動？\n他之後看不到也不能修改這場活動；已有的紀錄保留。' + (own.length ? '\n他目前是「' + own.join('、') + '」的負責人，負責人設定也會一併取消。' : ''))) return;
+    var chain = Promise.resolve({ ok: true });
+    S.D.stations.forEach(function (st) {
+      if (st.archived || ownersOf(st.id).indexOf(pid) < 0) return;
+      chain = chain.then(function (r) { if (!r.ok) return r; return call('evt_station_set_owners', { p_station_id: st.id, p_people: ownersOf(st.id).filter(function (x) { return x !== pid; }) }, ['owners']); });
+    });
+    chain.then(function (r) { if (!r.ok) return; call('evt_event_set_members', { p_event_id: S.ev, p_person_ids: ids.filter(function (x) { return x !== pid; }) }, ['members'], '已移出：' + pname(pid)); });
+  },
   memToggle: function (e) { var id = e.getAttribute('data-v'); S.ui.mem[id] = !S.ui.mem[id]; renderNow(); },
   memAll: function () { S.G.people.forEach(function (p) { if (p.active) S.ui.mem[p.id] = true; }); renderNow(); },
   memNone: function () { S.ui.mem = {}; renderNow(); },
