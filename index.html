@@ -405,7 +405,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 30;
+var APP_VERSION = 31;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1797,6 +1797,63 @@ function vTlImport(nExisting) {
   h += '<div class="foot"><button class="btn ghost" data-act="tlPreview">預覽</button>' + (P && P.blocks ? '<button class="btn" data-act="tlImport">匯入時程</button><button class="btn ghost" data-act="tlClear">清除</button>' : '') + '</div></section>';
   return h;
 }
+function tlData() {
+  var ev = curEvent(), rows = S.D.tl.filter(function (t) { return !t.archived; }), checks = {}, offBy = {};
+  S.D.stations.forEach(function (st) { if (!st.archived && st.check_date) (checks[st.check_date] = checks[st.check_date] || []).push(st); });
+  memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
+  var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
+  return {
+    crew: crewGroups(ev.id).filter(function (g) { return g.role; }), offBy: offBy,
+    days: dates.map(function (d) {
+      var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
+      var list = rows.filter(function (t) { return t.date === d; }).sort(function (a, b) { var x = a.sort_time || '99', y = b.sort_time || '99'; return x < y ? -1 : (x > y ? 1 : a.sort - b.sort); });
+      var ck = (checks[d] || []).map(function (st) { return { phase_label: '對點', time_text: '', content: st.name + ' 對點', people: ownersOf(st.id).map(pname).join('、'), place: '' }; });
+      return { date: d, label: label, rows: ck.concat(list), off: offBy[d] || [] };
+    })
+  };
+}
+function tlText(kind) {
+  var ev = curEvent(), D = tlData(), L = [];
+  var head = ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + '）時程';
+  function cl(v) { return String(v || '').replace(/[\t\n]/g, ' '); }
+  if (kind === 'tsv') {
+    L.push(head);
+    if (D.crew.length) { L.push('', '現場分工'); D.crew.forEach(function (g) { L.push([g.role, g.list.map(function (x) { return pname(x.person_id) + (x.is_support ? '（支援）' : ''); }).join('、')].join('\t')); }); }
+    L.push('', ['日期', '區段', '時間', '內容', '人員', '地點'].join('\t'));
+    D.days.forEach(function (d) { d.rows.forEach(function (r) { L.push([mdw(d.date) + (d.label ? ' ' + d.label : ''), cl(r.phase_label), cl(r.time_text), cl(r.content), cl(r.people), cl(r.place)].join('\t')); }); });
+    return L.join('\n');
+  }
+  L.push('【' + head + '】');
+  if (D.crew.length) { L.push('', '■ 現場分工'); D.crew.forEach(function (g) { L.push('・' + g.role + '：' + g.list.map(function (x) { return pname(x.person_id) + (x.is_support ? '（支援）' : ''); }).join('、')); }); }
+  D.days.forEach(function (d) {
+    L.push('', '■ ' + mdw(d.date) + (d.label ? ' ' + d.label : '') + (d.off.length ? '（請假：' + d.off.join('、') + '）' : ''));
+    var lp = null;
+    d.rows.forEach(function (r) {
+      if (r.phase_label && r.phase_label !== lp) L.push('〔' + r.phase_label + '〕');
+      lp = r.phase_label;
+      L.push('・' + (r.time_text ? r.time_text + ' ' : '') + r.content + (r.people ? '｜' + r.people : '') + (r.place ? '＠' + r.place : ''));
+    });
+  });
+  return L.join('\n');
+}
+function tlPrintHtml() {
+  var D = tlData(), h = printHead('時程');
+  if (D.crew.length) {
+    h += '<div class="sec"><h2>現場分工</h2><table><colgroup><col style="width:18%"><col></colgroup><thead><tr><th>位置</th><th>夥伴</th></tr></thead><tbody>' + D.crew.map(function (g) {
+      return '<tr><td>' + esc(g.role) + '</td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '（支援）' : ''); }).join('、') + '</td></tr>';
+    }).join('') + '</tbody></table>' + (Object.keys(D.offBy).length ? '<div class="ft" style="margin-top:2mm">請假：' + Object.keys(D.offBy).sort().map(function (d) { return mdw(d) + ' ' + esc(D.offBy[d].join('、')); }).join('；') + '</div>' : '') + '</div>';
+  }
+  D.days.forEach(function (d) {
+    h += '<div class="sec"><h2>' + mdw(d.date) + (d.label ? '<small>' + esc(d.label) + '</small>' : '') + (d.off.length ? '<small>請假：' + esc(d.off.join('、')) + '</small>' : '') + '</h2><table><colgroup><col style="width:13%"><col style="width:15%"><col style="width:34%"><col style="width:22%"><col></colgroup><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th></tr></thead><tbody>';
+    var lp = null;
+    d.rows.forEach(function (r) {
+      h += '<tr><td>' + (r.phase_label !== lp ? esc(r.phase_label || '') : '') + '</td><td>' + esc(r.time_text || '') + '</td><td>' + esc(r.content) + '</td><td>' + esc(r.people || '') + '</td><td>' + esc(r.place || '') + '</td></tr>';
+      lp = r.phase_label;
+    });
+    h += '</tbody></table></div>';
+  });
+  return h;
+}
 function tlSiblings(t) {
   return S.D.tl.filter(function (x) { return !x.archived && x.id !== t.id && x.date !== t.date && x.content === t.content && (x.phase_label || '') === (t.phase_label || '') && (x.time_text || '') === (t.time_text || ''); });
 }
@@ -1821,7 +1878,8 @@ function vTimeline() {
   var offBy = {};
   memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
-  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
+  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + '<span class="row btns">' + (rows.length ? '<button class="btn ghost" data-act="printTl">列印／存成 PDF</button><button class="btn ghost" data-act="copyTl" data-v="text">複製文字（LINE）</button><button class="btn ghost" data-act="copyTl" data-v="tsv">複製表格（Excel）</button>' : '') +
+    (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</span></div><div class="panels">';
   var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
   if (crew.length || m) {
     h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ' + (S.ui.crewEdit ? '' : 'ghost ') + 'sm" data-act="crewEdit">' + (S.ui.crewEdit ? '完成' : (crew.length ? '編輯分工' : '新增分配')) + '</button>' : '');
@@ -2922,6 +2980,11 @@ var A = {
       S.ui.tlimp = null; toast('已匯入 ' + r.data.added + ' 列時程' + (r.data.archived ? '，刪除舊的 ' + r.data.archived + ' 列' : '')); renderNow();
     });
   },
+  copyTl: function (e) {
+    var k = e.getAttribute('data-v');
+    copyText(tlText(k)).then(function () { toast(k === 'tsv' ? '已複製時程表格，可以貼到 Excel 或 Google 試算表' : '已複製時程文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
+  },
+  printTl: function () { printHtml(tlPrintHtml()); },
   copyItems: function (e) {
     var k = e.getAttribute('data-v');
     copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
