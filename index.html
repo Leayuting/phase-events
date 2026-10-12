@@ -126,6 +126,7 @@ td input[type=text],td input[type=date],td select{min-height:40px;height:40px}
 .log .tx{flex:1 1 220px;min-width:0}
 .log.void .tx{text-decoration:line-through;color:var(--mut)}
 .ck{display:grid;grid-template-columns:32px 1fr auto;gap:8px 16px;align-items:start;padding:16px 0;border-bottom:1px solid var(--line)}
+.ck input[type=checkbox][disabled]{cursor:not-allowed;opacity:.45}
 .ck input[type=checkbox]{width:26px;height:26px;margin:3px 0 0;accent-color:var(--ink);cursor:pointer}
 .ck>div:nth-child(2){padding-top:4px;min-width:0}
 .ck .t{font-weight:500}
@@ -250,6 +251,14 @@ details[open]>summary::before{transform:rotate(90deg)}
   .who .row.btns{width:100%}
   .who .row.btns .btn{flex:1 1 auto}
   .phead .paside{width:100%}
+  table.tlt thead{display:none}
+  table.tlt tr{display:grid;grid-template-columns:104px 1fr;column-gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  table.tlt td{border:0;padding:0;line-height:1.5}
+  table.tlt td:nth-child(1){grid-column:1 / -1}
+  table.tlt td:nth-child(1):empty{display:none}
+  table.tlt td:nth-child(2){grid-row:span 3;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);font-weight:600}
+  table.tlt td:nth-child(4),table.tlt td:nth-child(5){grid-column:2}
+  table.tlt td:nth-child(5):empty,table.tlt td:nth-child(4):empty{display:none}
   .foot .btn{flex:1 1 auto}
   .inline-add input{max-width:none}
   .evlist select{max-width:100%}
@@ -392,7 +401,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 24;
+var APP_VERSION = 26;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -484,7 +493,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1396,7 +1405,7 @@ function ckRow(c, showSt) {
   }
   var q = c.qty ? (/^\d+$/.test(c.qty) ? '× ' + esc(c.qty) : esc(c.qty)) : '';
   var as = assignees(c);
-  return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="tick" data-id="' + c.id + '"' + (done ? ' checked' : '') + ' aria-label="' + esc(c.title) + '"><div>' +
+  return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="tick" data-id="' + c.id + '"' + (done ? ' checked' : '') + (can ? '' : ' disabled title="只有這個崗位的負責人或管理員可以勾選"') + ' aria-label="' + esc(c.title) + '"><div>' +
     '<span class="t">' + esc(c.title) + '</span> ' + (q ? '<span class="tag">' + q + '</span> ' : '') + '<span class="tag">' + esc(c.phase) + '</span>' +
     (showSt && st ? ' <span class="tag">' + esc(st.name) + '</span>' : '') +
     (c.assignee_id ? ' <span class="tag ok">' + esc(pname(c.assignee_id)) + '</span>' : (as.length ? '' : ' <span class="tag warn">未分配</span>')) +
@@ -1437,8 +1446,8 @@ function vCheck() {
 
   if (real && st) {
     var owners = ownersOf(st.id), a2 = live.filter(function (c) { return c.station_id === st.id; }), d2 = a2.filter(function (c) { return R.ck[c.id]; }).length;
-    h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '你可以勾選；新增與編輯由崗位負責人或管理員處理。'),
-      can ? '' : '<span class="tag">僅可勾選</span>',
+    h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '勾選、新增與編輯由這個崗位的負責人或管理員處理，你可以查看進度。'),
+      can ? '' : '<span class="tag">僅可查看</span>',
       '<span>負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span>對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span>已完成 ' + d2 + ' / ' + a2.length + '</span>');
     if (mgr) {
       var mem = membersOf(S.ev);
@@ -1704,6 +1713,82 @@ function buyForm(b) {
 /* ---------------------------------------------------------------------------
    時程
    --------------------------------------------------------------------------- */
+/* 匯入時程細流：時間（日期或每日時段）｜活動項目｜時間｜內容｜人員｜地點，支援合併儲存格 */
+function firstTime(t) {
+  var m = String(t || '').match(/(\d{1,2})[:：](\d{2})/);
+  if (!m) return null;
+  var h = +m[1], mi = +m[2];
+  if (h > 23 || mi > 59) return null;
+  return (h < 10 ? '0' : '') + h + ':' + m[2];
+}
+function tlParse(text) {
+  var ev = curEvent(), rows = splitDelim(text), hi = -1;
+  for (var i = 0; i < rows.length && hi < 0; i++) {
+    var r = rows[i].map(function (x) { return String(x).replace(/\s/g, ''); });
+    if (r.some(function (x) { return x === '內容'; }) && r.some(function (x) { return /時間|日期/.test(x); })) hi = i;
+  }
+  if (hi < 0) return { error: '找不到標題列：需要有「內容」欄，以及「時間」或「日期」欄（可以再加「活動項目」「人員」「地點」）。' };
+  var head = rows[hi].map(function (x) { return String(x).replace(/\s/g, ''); }), col = {}, times = [];
+  head.forEach(function (x, j) {
+    if (/時間/.test(x)) times.push(j);
+    else if (/日期/.test(x) && col.dt == null) col.dt = j;
+    else if (/活動項目|區段|項目/.test(x) && col.ph == null) col.ph = j;
+    else if (x === '內容' && col.ct == null) col.ct = j;
+    else if (/人員|負責/.test(x) && col.pp == null) col.pp = j;
+    else if (/地點/.test(x) && col.pl == null) col.pl = j;
+  });
+  if (col.dt == null && times.length >= 2) { col.blk = times[0]; col.tm = times[1]; } else { col.tm = times[0]; if (col.dt != null) col.blk = col.dt; }
+  function cell(r, k) { return col[k] == null ? '' : String(r[col[k]] == null ? '' : r[col[k]]).trim(); }
+  var blocks = [], cur = null, days = eventDays(ev), pre = [];
+  if (ev.setup_date && days.indexOf(ev.setup_date) < 0) pre.push(ev.setup_date);
+  rows.slice(hi + 1).forEach(function (r) {
+    var b = cell(r, 'blk'), ph = cell(r, 'ph');
+    if ((b && (!cur || b !== cur.raw)) || (ph && cur && ph !== cur.phase && !b)) {
+      var d = parseMD(b, ev), rest = String(b).replace(/(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*(日)?\s*([（(][^）)]*[）)])?/, '').trim();
+      cur = { raw: b || (cur ? cur.raw : ''), phase: ph || '', date: d, span: rest, rows: [], tm: '', pl: '' };
+      blocks.push(cur);
+    }
+    if (!cur) { cur = { raw: '', phase: ph, date: null, span: '', rows: [], tm: '', pl: '' }; blocks.push(cur); }
+    if (ph && !cur.phase) cur.phase = ph;
+    if (cell(r, 'tm')) cur.tm = cell(r, 'tm');
+    if (cell(r, 'pl')) cur.pl = cell(r, 'pl');
+    var ct = cell(r, 'ct');
+    if (!ct) return;
+    var tt = cur.tm || cur.span;
+    cur.rows.push({ time_text: tt.replace(/\s+/g, ''), sort_time: firstTime(tt), content: ct.replace(/\s*\n\s*/g, ' '), people: cell(r, 'pp').replace(/\s*\n\s*/g, ' '), place: cur.pl });
+  });
+  blocks = blocks.filter(function (x) { return x.rows.length; });
+  if (!blocks.length) return { error: '標題列下面沒有內容。' };
+  var explicitWrap = {};
+  blocks.forEach(function (x) { if (x.date && /撤場/.test(x.phase)) explicitWrap[x.date] = 1; });
+  blocks.forEach(function (x) {
+    x.days = {};
+    if (x.date) { x.days[x.date] = true; return; }
+    days.forEach(function (d) { x.days[d] = !(explicitWrap[d] && /撤場/.test(x.phase)); });
+  });
+  return { blocks: blocks, days: days, replace: true };
+}
+function vTlImport(nExisting) {
+  var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上或上傳 CSV：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。') +
+    '<div class="field"><label for="tl-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="tl-file" style="max-width:320px"></div>' +
+    '<div class="field" style="margin-top:16px"><label for="tl-text">或貼上表格</label><textarea id="tl-text" rows="6" placeholder="時間&#9;活動項目&#9;時間&#9;內容&#9;人員&#9;地點&#10;10/29&#9;佈場&#9;9:00-9:30&#9;佈展人員集合 上貨車&#9;凱.鍵.Hedy&#9;中山店"></textarea></div>';
+  if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
+  if (P && P.blocks) {
+    var total = 0;
+    P.blocks.forEach(function (b) { Object.keys(b.days).forEach(function (d) { if (b.days[d]) total += b.rows.length; }); });
+    h += '<div class="sect"><h3>預覽：' + P.blocks.length + ' 個區塊，展開後共 ' + total + ' 列時程</h3><div class="tw"><table class="top"><thead><tr><th>區塊</th><th>套用日期</th><th>內容</th></tr></thead><tbody>' + P.blocks.map(function (b, i) {
+      var dayHtml = b.date ? '<span class="tag ink">' + mdw(b.date) + '</span>' : '<div class="chips">' + P.days.map(function (d) {
+        return '<button class="chip" data-act="tlDay" data-v="' + i + '|' + d + '" aria-pressed="' + !!b.days[d] + '">' + md(d) + '</button>';
+      }).join('') + '</div><div class="hint" style="margin-top:4px">每天的流程</div>';
+      return '<tr><td style="line-height:1.5;min-width:120px"><b style="font-weight:600">' + esc(b.phase || '（未命名）') + '</b><div class="hint">' + esc(b.raw.replace(/\n/g, ' ')) + '</div></td><td style="line-height:1.5;min-width:200px">' + dayHtml + '</td><td style="line-height:1.5">' +
+        b.rows.map(function (r) { return '<div><span class="mut small nowrap">' + esc(r.time_text || '—') + '</span>　' + esc(r.content) + (r.people ? ' <span class="mut small">／' + esc(r.people) + '</span>' : '') + (r.place ? ' <span class="mut small">＠' + esc(r.place) + '</span>' : '') + '</div>'; }).join('') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' +
+      (nExisting ? '<label class="row small" style="margin-top:16px;gap:8px;cursor:pointer"><input type="checkbox" data-act="tlReplace"' + (P.replace ? ' checked' : '') + '> 取代目前的 ' + nExisting + ' 列時程（舊的會刪除，紀錄裡查得到）</label>' : '') +
+      '<p class="hint" style="margin-top:16px">同一天的時程會依開始時間排序。最後一天如果有自己的撤場區塊，每天的「撤場」預設不套用到那一天；其他需要調整的，點日期切換。</p></div>';
+  }
+  h += '<div class="foot"><button class="btn ghost" data-act="tlPreview">預覽</button>' + (P && P.blocks ? '<button class="btn" data-act="tlImport">匯入時程</button><button class="btn ghost" data-act="tlClear">清除</button>' : '') + '</div></section>';
+  return h;
+}
 function vTimeline() {
   var m = isMgr(), ev = curEvent();
   var rows = S.D.tl.filter(function (t) { return !t.archived; });
@@ -1728,7 +1813,7 @@ function vTimeline() {
     var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
     h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '',
       '<span>' + (list.length + ck.length) + ' 項</span>' + (offBy[d] ? '<span>請假：' + esc(offBy[d].join('、')) + '</span>' : ''));
-    h += '<div class="tw"><table><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
+    h += '<div class="tw"><table' + (S.ui.tlEdit ? '' : ' class="tlt"') + '><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
     var lastPhase = null;
     ck.forEach(function (st, i) {
       h += '<tr><td class="small mut">' + (i === 0 ? '對點' : '') + '</td><td></td><td>' + esc(st.name) + ' 對點 <span class="tag">來自清單</span></td><td class="small">' + esc(ownersOf(st.id).map(pname).join('、') || '未指定') + '</td><td class="small mut"></td>' + (S.ui.tlEdit ? '<td class="ops"><button class="btn ghost sm" data-act="go" data-v="check">到清單修改</button></td>' : '') + '</tr>';
@@ -1753,6 +1838,7 @@ function vTimeline() {
       '<div class="field"><label>內容</label><input type="text" data-tf="content"></div><div class="field"><label>人員</label><input type="text" data-tf="people"></div><div class="field"><label>地點</label><input type="text" data-tf="place"></div>' +
       '</div><div class="foot"><button class="btn" data-act="addTl">新增時程</button></div></section>';
   }
+  if (m) h += vTlImport(rows.length);
   return h + '</div>';
 }
 
@@ -2745,6 +2831,27 @@ var A = {
       sb.rpc('evt_member_set', { p_token: S.token, p_event_id: S.ev, p_person_id: j.pid, p: { role: j.role, is_support: j.sup } }).then(function (r) { if (r.error) { handleErr(r.error); reload(['members']); return; } next(); }, handleErr);
     })();
   },
+  tlPreview: function () {
+    var f = $('#tl-file'), t = val('#tl-text');
+    function go(text) { S.ui.tlimp = tlParse(text); renderNow(); }
+    if (f && f.files && f.files[0]) { var rd = new FileReader(); rd.onload = function () { go(rd.result); }; rd.readAsText(f.files[0], 'utf-8'); }
+    else if (t.trim()) go(t);
+    else toast('請選擇檔案或貼上表格', true);
+  },
+  tlClear: function () { S.ui.tlimp = null; renderNow(); },
+  tlDay: function (e) { var v = e.getAttribute('data-v').split('|'), b = S.ui.tlimp.blocks[+v[0]]; b.days[v[1]] = !b.days[v[1]]; renderNow(); },
+  tlImport: function () {
+    var P = S.ui.tlimp, out = [];
+    P.blocks.forEach(function (b, bi) { Object.keys(b.days).forEach(function (d) { if (!b.days[d]) return; b.rows.forEach(function (r, ri) { out.push({ k: d + '|' + (r.sort_time || b.rows.reduce(function (a, x) { return a || x.sort_time; }, null) || '99:99') + '|' + (1000 + bi) + '|' + (1000 + ri), row: { date: d, phase_label: b.phase, time_text: r.time_text, sort_time: r.sort_time, content: r.content, people: r.people, place: r.place } }); }); }); });
+    if (!out.length) { toast('沒有要匯入的時程', true); return; }
+    out.sort(function (a, b) { return a.k < b.k ? -1 : 1; });
+    var n = S.D.tl.filter(function (t) { return !t.archived; }).length, rep = !!P.replace && n > 0;
+    if (!confirm('匯入 ' + out.length + ' 列時程？' + (rep ? '目前的 ' + n + ' 列會先刪除。' : ''))) return;
+    call('evt_timeline_import', { p_event_id: S.ev, p_rows: out.map(function (x) { return x.row; }), p_replace: rep }, ['tl']).then(function (r) {
+      if (!r.ok) return;
+      S.ui.tlimp = null; toast('已匯入 ' + r.data.added + ' 列時程' + (r.data.archived ? '，刪除舊的 ' + r.data.archived + ' 列' : '')); renderNow();
+    });
+  },
   copyItems: function (e) {
     var k = e.getAttribute('data-v');
     copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
@@ -2910,7 +3017,7 @@ var A = {
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
-var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc'];
+var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
 
 document.addEventListener('keydown', function (ev) {
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
@@ -2984,6 +3091,7 @@ document.addEventListener('change', function (ev) {
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
   if (a === 'buyRec') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { received_qty: t.value === '' ? null : t.value } }, ['buys'], '已更新實收數量'); return; }
   if (a === 'stDate') { call('evt_station_save', { p: { id: S.ui.st, check_date: t.value } }, ['stations'], '已更新對點日期'); return; }
+  if (a === 'tlReplace') { S.ui.tlimp.replace = t.checked; return; }
   if (a === 'prepInc') { var ps = S.ui.prep.stations[+t.getAttribute('data-v')]; ps.skip = !t.checked; renderNow(); return; }
   if (a === 'mSupport') { call('evt_member_set', { p_event_id: S.ev, p_person_id: t.getAttribute('data-id'), p: { is_support: t.checked } }, ['members'], '已更新：' + pname(t.getAttribute('data-id'))); return; }
   var mr = t.getAttribute('data-mrole');
