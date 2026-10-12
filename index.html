@@ -401,7 +401,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 26;
+var APP_VERSION = 27;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -493,7 +493,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1799,9 +1799,11 @@ function vTimeline() {
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
   var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：每列修改後按「儲存」。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
   var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
-  if (crew.length) {
-    h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ghost sm" data-act="tab" data-v="event">修改分工</button>' : '') +
-      '<div class="tw"><table><thead><tr><th style="width:96px">位置</th><th>夥伴</th></tr></thead><tbody>' + crew.map(function (g) {
+  if (crew.length || m) {
+    h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ' + (S.ui.crewEdit ? '' : 'ghost ') + 'sm" data-act="crewEdit">' + (S.ui.crewEdit ? '完成' : (crew.length ? '編輯分工' : '新增分配')) + '</button>' : '');
+    if (m && S.ui.crewEdit) h += crewEditor(ev) + '</section>';
+    else if (!crew.length) h += '<div class="empty">還沒有分配現場位置。按右上角「新增分配」開始。</div></section>';
+    else h += '<div class="tw"><table><thead><tr><th style="width:96px">位置</th><th>夥伴</th></tr></thead><tbody>' + crew.map(function (g) {
         return '<tr><td><b style="font-weight:600">' + esc(g.role) + '</b></td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '<span class="mut small">（支援）</span>' : ''); }).join('、') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       (Object.keys(offBy).length ? '<p class="hint" style="margin-top:16px">請假：' + Object.keys(offBy).sort().map(function (d) { return mdw(d) + ' ' + esc(offBy[d].join('、')); }).join('；') + '</p>' : '') + '</section>';
@@ -2439,11 +2441,19 @@ function vMembersCard(ev) {
 }
 function eventDays(ev) { var d = [], x = ev.start_date; while (x && x <= ev.end_date && d.length < 31) { d.push(x); x = addDays(x, 1); } return d; }
 function vCrewCard(ev) {
-  var h = '<section class="panel">' + pHead('現場分工', '活動期間每位夥伴固定站的位置，會顯示在「時程」分頁最上方。有人請假時，點那一天標記；修改後立即儲存。');
-  if (!S.memberCols) return h + '<div class="banner hold" style="margin:0">需要先執行資料庫更新（v3f 前置作業與現場分工）才能使用。</div></section>';
-  var rows = memberRows(ev.id), days = eventDays(ev);
-  if (!rows.length) return h + '<div class="empty">還沒有參加夥伴。</div></section>';
+  return '<section class="panel">' + pHead('現場分工', '活動期間每位夥伴固定站的位置，會顯示在「時程」分頁最上方。有人請假時，點那一天標記；修改後立即儲存。') + crewEditor(ev) + '</section>';
+}
+function crewEditor(ev) {
+  if (!S.memberCols) return '<div class="banner hold" style="margin:0">需要先執行資料庫更新（v3f 前置作業與現場分工）才能使用。</div>';
+  var rows = memberRows(ev.id), days = eventDays(ev), h = '';
+  var ids = rows.map(function (m) { return m.person_id; });
   h += '<datalist id="roles">' + ROLES.concat(['特調', '後勤']).map(function (r) { return '<option value="' + r + '"></option>'; }).join('') + '</datalist>';
+  h += '<div class="grid2 form" style="margin-bottom:24px"><div class="field"><label for="crew-add-p">夥伴</label><select id="crew-add-p"><option value="">請選擇</option>' +
+    S.G.people.filter(function (p) { return p.active; }).map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + (ids.indexOf(p.id) < 0 ? '（尚未參加，會一併加入）' : '') + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="crew-add-r">現場位置</label><input type="text" id="crew-add-r" list="roles" placeholder="例：櫃檯"></div>' +
+    '<div class="field"><label>&nbsp;</label><label class="row small" style="gap:8px;min-height:44px;cursor:pointer"><input type="checkbox" id="crew-add-s"> 支援</label></div>' +
+    '<div class="field"><label>&nbsp;</label><button class="btn" data-act="crewAdd">新增分配</button></div></div>';
+  if (!rows.length) return h + '<div class="empty">還沒有參加夥伴。</div>';
   h += '<div class="tw"><table class="top"><thead><tr><th>夥伴</th><th style="min-width:140px">現場位置</th><th>支援</th><th>請假日期</th></tr></thead><tbody>' + rows.map(function (m) {
     var off = m.off_dates || [];
     return '<tr><td class="nowrap" style="line-height:40px"><b style="font-weight:600">' + esc(pname(m.person_id)) + '</b></td>' +
@@ -2456,7 +2466,7 @@ function vCrewCard(ev) {
   }).join('') + '</tbody></table></div>';
   h += '<details class="sect"><summary class="small"><b>從試算表貼上分工</b></summary><div style="padding-top:8px"><div class="field"><label for="crew-paste">每列「位置、姓名」，位置可以只寫在第一列（合併儲存格）；姓名可用「、」分隔，寫「（支援）」會標記支援。可以直接從 Google 試算表或 Excel 複製兩欄貼上。</label>' +
     '<textarea id="crew-paste" rows="6" placeholder="櫃檯&#9;怡蓁&#10;沖煮&#9;凱&#10;銷售&#9;Hedy&#10;&#9;鍵&#10;&#9;小馬（支援）"></textarea></div><div class="row btns" style="margin-top:16px"><button class="btn" data-act="crewPaste">套用分工</button></div></div></details>';
-  return h + '</section>';
+  return h;
 }
 var nevKeep = null;
 function keepNev() { nevKeep = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-nev]'), function (x) { nevKeep[x.getAttribute('data-nev')] = x.value; }); }
@@ -2802,6 +2812,17 @@ var A = {
       S.ui.prep = null; S.ui.st = '';
       toast('已匯入：新增 ' + d.stations_new + ' 個崗位、' + d.items_new + ' 項清單' + (d.items_updated ? '，更新 ' + d.items_updated + ' 項' : '') + (d.items_moved ? '，搬移 ' + d.items_moved + ' 項' : '') + (d.stations_archived ? '，封存 ' + d.stations_archived + ' 個舊崗位' : ''));
       renderNow();
+    });
+  },
+  crewEdit: function () { S.ui.crewEdit = !S.ui.crewEdit; renderNow(); },
+  crewAdd: function () {
+    var pid = val('#crew-add-p'), role = val('#crew-add-r').trim(), sup = !!($('#crew-add-s') && $('#crew-add-s').checked);
+    if (!pid) { toast('請選擇夥伴', true); return; }
+    if (!role) { toast('請輸入現場位置', true); return; }
+    var ids = membersOf(S.ev), first = ids.indexOf(pid) >= 0 ? Promise.resolve({ ok: true }) : call('evt_event_set_members', { p_event_id: S.ev, p_person_ids: ids.concat([pid]) }, ['members']);
+    first.then(function (r) {
+      if (!r.ok) return;
+      call('evt_member_set', { p_event_id: S.ev, p_person_id: pid, p: { role: role, is_support: sup } }, ['members'], '已分配：' + pname(pid) + '・' + role + (sup ? '（支援）' : ''));
     });
   },
   mOff: function (e) {
