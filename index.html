@@ -392,7 +392,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 23;
+var APP_VERSION = 24;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2138,6 +2138,12 @@ function fmtVal(k, v) {
   if (v === false) return '否';
   return String(v);
 }
+/* 崗位負責人的紀錄沒有活動欄位，會出現在每一場；只留本場崗位的 */
+function auditMine(a) {
+  if (a.table_name !== 'evt_station_owners') return true;
+  var r = a.new_data || a.old_data || {};
+  return !!station(r.station_id);
+}
 function auditText(a) {
   var t = TABLE_LABEL[a.table_name] || a.table_name, o = a.old_data || {}, n = a.new_data || {}, r = a.new_data || a.old_data || {};
   var label = r.name || r.title || r.item_name || r.content || (r.item_id ? itemName(r.item_id) : '') || (r.station_id && r.person_id ? (station(r.station_id) || {}).name + '：' + pname(r.person_id) : '');
@@ -2174,7 +2180,7 @@ function logEntries() {
     var c = ckBy[l.item_id];
     E.push({ k: '勾選', t: l.created_at, who: l.person_id, mode: l.auth_mode, item: null, date: l.created_at.slice(0, 10), html: (l.action === '完成' ? '完成' : '取消完成') + ' ' + esc(c ? (station(c.station_id) || {}).name + '：' + c.title : '') });
   });
-  S.D.audit.forEach(function (a) {
+  S.D.audit.filter(auditMine).forEach(function (a) {
     var r = a.new_data || a.old_data || {};
     E.push({ k: '設定變更', t: a.created_at, who: a.person_id, mode: a.auth_mode, item: r.item_id || (a.table_name === 'evt_items' ? r.id : null), date: a.created_at.slice(0, 10), html: auditText(a) });
   });
@@ -2254,7 +2260,7 @@ function exportData(kind) {
     csvDownload(base + '_勾選紀錄.csv', r5);
   } else if (kind === 'audit') {
     var r6 = [['時間', '對象', '動作', '內容', '操作人', '登入方式']];
-    S.D.audit.forEach(function (a) { var div = document.createElement('div'); div.innerHTML = auditText(a); r6.push([tm(a.created_at), TABLE_LABEL[a.table_name] || a.table_name, a.action, div.textContent, pname(a.person_id), modeLabel(a.auth_mode)]); });
+    S.D.audit.filter(auditMine).forEach(function (a) { var div = document.createElement('div'); div.innerHTML = auditText(a); r6.push([tm(a.created_at), TABLE_LABEL[a.table_name] || a.table_name, a.action, div.textContent, pname(a.person_id), modeLabel(a.auth_mode)]); });
     csvDownload(base + '_設定變更.csv', r6);
   } else if (kind === 'json') {
     toast('匯出中，正在讀取簽名…');
