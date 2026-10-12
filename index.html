@@ -401,7 +401,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 28;
+var APP_VERSION = 29;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -559,7 +559,11 @@ function pageAll(mk) {
 }
 function strip(rows, key) { rows.forEach(function (r) { delete r[key]; }); return rows; }
 var LOAD = {
-  people: function () { return pageAll(function (a, b) { return sb.from('evt_people').select('id,name,is_manager,active,sort').order('sort').order('name').range(a, b); }); },
+  /* 已刪除的人員只用來顯示過去紀錄上的名字（S.peopleAll），名單與選單一律用 S.G.people */
+  people: function () {
+    return pageAll(function (a, b) { return sb.from('evt_people').select('*').order('sort').order('name').range(a, b); })
+      .then(function (r) { S.peopleAll = r; return r.filter(function (p) { return !p.deleted_at; }); });
+  },
   events: function () { return pageAll(function (a, b) { return sb.from('evt_events').select('*').order('start_date', { ascending: false }).range(a, b); }); },
   templates: function () { return pageAll(function (a, b) { return sb.from('evt_checklist_templates').select('id,name,station_names,note,updated_at').order('name').range(a, b); }); },
   /* 參加夥伴：資料庫還沒執行 v3 更新時回傳 null，視為所有人都可看到 */
@@ -887,7 +891,7 @@ function canSeeEvent(e) {
 }
 function visibleEvents() { return (S.G.events || []).filter(canSeeEvent); }
 function curEvent() { var e = byId(S.G.events, S.ev); return canSeeEvent(e) ? e : null; }
-function person(id) { return byId(S.G.people, id); }
+function person(id) { return byId(S.peopleAll || S.G.people, id); }
 function pname(id) { var p = person(id); return p ? p.name : '—'; }
 /* 登入方式標示：只讀紀錄當下保存的值；舊資料沒有這個值，一律標為「歷史紀錄」，不推算 */
 function modeLabel(m) { return m === 'admin' ? '管理員' : (m === 'partner' ? '一般登入' : '歷史紀錄'); }
@@ -2500,7 +2504,7 @@ function vPeople() {
     '<div class="grid2 form"><div class="field"><label for="sp-new">新的共用密碼（8 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new" autocomplete="new-password"></div>' +
     '<div class="field"><label for="sp-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new2" autocomplete="new-password"></div>' +
     '</div><div class="foot"><button class="btn" data-act="setShared">' + (sh && sh.is_set ? '更換共用密碼' : '設定共用密碼') + '</button></div></section>';
-  h += '<section class="panel"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯的名字可以在這裡停用。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 4 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th></tr></thead><tbody>';
+  h += '<section class="panel"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯或不需要的名字可以停用或刪除。刪除後過去紀錄上的名字仍會保留。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 4 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th><th class="ops"></th></tr></thead><tbody>';
   S.G.people.forEach(function (p) {
     var s = st[p.id] || {};
     var pinTxt = '<span class="mut small">一般登入</span>', setTxt = '';
@@ -2509,7 +2513,7 @@ function vPeople() {
       setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-newpin="' + p.id + '" placeholder="4 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
     }
     h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 管理員"></td>' +
-      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td></tr>';
+      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td><td class="ops">' + (p.id === S.me.id ? '' : '<button class="btn warn sm" data-act="personDel" data-id="' + p.id + '">刪除</button>') + '</td></tr>';
   });
   h += '</tbody></table></div><div class="inline-add"><input type="text" id="newperson" placeholder="新增人員姓名" aria-label="新增人員姓名" maxlength="30"><button class="btn ghost" data-act="addPerson">新增人員</button></div></section>';
   return h;
@@ -3048,6 +3052,16 @@ var A = {
     if (n !== n2) { toast('兩次輸入的共用密碼不一樣', true); return; }
     if (S.sharedStatus && S.sharedStatus.is_set && !confirm('更換共用密碼？\n所有一般登入會立即失效，大家需要用新密碼重新登入。')) return;
     call('evt_set_shared_password', { p_new: n }, [], '已設定共用密碼').then(function (r) { if (r.ok) { S.pinStatus = null; S.sharedStatus = null; renderNow(); } });
+  },
+  personDel: function (e) {
+    var id = e.getAttribute('data-id'), n = pname(id);
+    if (!confirm('刪除人員「' + n + '」？\n會移出所有活動、取消崗位負責人，他的登入也會立即失效。\n過去的盤點、勾選、補貨紀錄上仍會顯示這個名字。')) return;
+    call('evt_person_delete', { p_person_id: id }, ['people', 'members', 'owners'], '').then(function (r) {
+      if (!r.ok) return;
+      S.pinStatus = null;
+      toast(r.data === 'removed' ? '已刪除：' + n : '已刪除：' + n + '（過去紀錄上的名字保留）');
+      renderNow();
+    });
   },
   addPerson: function () {
     var n = val('#newperson').trim();
