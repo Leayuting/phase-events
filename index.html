@@ -411,7 +411,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 37;
+var APP_VERSION = 38;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -606,8 +606,8 @@ var LOAD = {
   /* 參加夥伴：資料庫還沒執行 v3 更新時回傳 null，視為所有人都可看到 */
   /* 參加夥伴：沒有現場分工欄位（v3f 之前）時退回基本欄位；連表都沒有（v3 之前）時回傳 null */
   members: function () {
-    return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id,role,is_support,off_dates').range(a, b); })
-      .then(function (r) { S.memberCols = true; return r; }, function (e) {
+    return pageAll(function (a, b) { return sb.from('evt_event_members').select('*').range(a, b); })
+      .then(function (r) { S.memberCols = !r.length || ('role' in r[0]); S.supCols = !r.length || ('support_dates' in r[0]); return r; }, function (e) {
         if (isNetErr(e)) throw e;
         S.memberCols = false;
         return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id').range(a, b); })
@@ -898,6 +898,12 @@ var CALC = {
    身分與權限（畫面上的判斷；真正的權限由伺服器端函式把關）
    ============================================================================ */
 var ROLES = ['櫃檯', '沖煮', '銷售'];
+function supLabel(m) {
+  if (!m || !m.is_support) return '';
+  var d = m.support_dates || [];
+  return '（支援' + (d.length ? ' ' + d.map(md).join('、') : '') + '）';
+}
+function supOn(m, day) { return !!(m && m.is_support && (!(m.support_dates || []).length || m.support_dates.indexOf(day) >= 0)); }
 function memberRows(evId) {
   if (!S.G.members) return [];
   var order = {};
@@ -1865,13 +1871,13 @@ function tlText(kind) {
   function cl(v) { return String(v || '').replace(/[\t\n]/g, ' '); }
   if (kind === 'tsv') {
     L.push(head);
-    if (D.crew.length) { L.push('', '現場分工'); D.crew.forEach(function (g) { L.push([g.role, g.list.map(function (x) { return pname(x.person_id) + (x.is_support ? '（支援）' : ''); }).join('、')].join('\t')); }); }
+    if (D.crew.length) { L.push('', '現場分工'); D.crew.forEach(function (g) { L.push([g.role, g.list.map(function (x) { return pname(x.person_id) + supLabel(x); }).join('、')].join('\t')); }); }
     L.push('', ['日期', '區段', '時間', '內容', '人員', '地點'].join('\t'));
     D.days.forEach(function (d) { d.rows.forEach(function (r) { L.push([mdw(d.date) + (d.label ? ' ' + d.label : ''), cl(r.phase_label), cl(r.time_text), cl(r.content), cl(r.people), cl(r.place)].join('\t')); }); });
     return L.join('\n');
   }
   L.push('【' + head + '】');
-  if (D.crew.length) { L.push('', '■ 現場分工'); D.crew.forEach(function (g) { L.push('・' + g.role + '：' + g.list.map(function (x) { return pname(x.person_id) + (x.is_support ? '（支援）' : ''); }).join('、')); }); }
+  if (D.crew.length) { L.push('', '■ 現場分工'); D.crew.forEach(function (g) { L.push('・' + g.role + '：' + g.list.map(function (x) { return pname(x.person_id) + supLabel(x); }).join('、')); }); }
   D.days.forEach(function (d) {
     L.push('', '■ ' + mdw(d.date) + (d.label ? ' ' + d.label : '') + (d.off.length ? '（請假：' + d.off.join('、') + '）' : ''));
     var lp = null;
@@ -1887,7 +1893,7 @@ function tlPrintHtml() {
   var D = tlData(), h = printHead('時程');
   if (D.crew.length) {
     h += '<div class="sec"><h2>現場分工</h2><table><colgroup><col style="width:18%"><col></colgroup><thead><tr><th>位置</th><th>夥伴</th></tr></thead><tbody>' + D.crew.map(function (g) {
-      return '<tr><td>' + esc(g.role) + '</td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '（支援）' : ''); }).join('、') + '</td></tr>';
+      return '<tr><td>' + esc(g.role) + '</td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + esc(supLabel(x)); }).join('、') + '</td></tr>';
     }).join('') + '</tbody></table>' + (Object.keys(D.offBy).length ? '<div class="ft" style="margin-top:2mm">請假：' + Object.keys(D.offBy).sort().map(function (d) { return mdw(d) + ' ' + esc(D.offBy[d].join('、')); }).join('；') + '</div>' : '') + '</div>';
   }
   D.days.forEach(function (d) {
@@ -1924,6 +1930,8 @@ function vTimeline() {
   S.D.stations.forEach(function (st) { if (!st.archived && st.check_date) (checks[st.check_date] = checks[st.check_date] || []).push(st); });
   var offBy = {};
   memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
+  var supBy = {};
+  memberRows(ev.id).forEach(function (m) { if (m.is_support) (m.support_dates || []).forEach(function (d) { (supBy[d] = supBy[d] || []).push(pname(m.person_id)); }); });
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
   var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + '<span class="row btns">' + (rows.length ? '<button class="btn" data-act="printTl">列印／存成 PDF</button><button class="btn" data-act="copyTl" data-v="text">複製文字（LINE）</button><button class="btn" data-act="copyTl" data-v="tsv">複製表格（Excel）</button>' : '') +
     (m ? '<button class="btn" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</span></div><div class="panels">';
@@ -1933,7 +1941,7 @@ function vTimeline() {
     if (m && S.ui.crewEdit) h += crewEditor(ev) + '</section>';
     else if (!crew.length) h += '<div class="empty">還沒有分配現場位置。按右上角「新增分配」開始。</div></section>';
     else h += '<div class="tw"><table><thead><tr><th style="width:96px">位置</th><th>夥伴</th></tr></thead><tbody>' + crew.map(function (g) {
-        return '<tr><td><b style="font-weight:600">' + esc(g.role) + '</b></td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '<span class="mut small">（支援）</span>' : ''); }).join('、') + '</td></tr>';
+        return '<tr><td><b style="font-weight:600">' + esc(g.role) + '</b></td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '<span class="mut small">' + esc(supLabel(x)) + '</span>' : ''); }).join('、') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       (Object.keys(offBy).length ? '<p class="hint" style="margin-top:16px">請假：' + Object.keys(offBy).sort().map(function (d) { return mdw(d) + ' ' + esc(offBy[d].join('、')); }).join('；') + '</p>' : '') + '</section>';
   }
@@ -1946,7 +1954,7 @@ function vTimeline() {
     var ck = checks[d] || [];
     var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
     h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '',
-      '<span>' + (list.length + ck.length) + ' 項</span>' + (offBy[d] ? '<span>請假：' + esc(offBy[d].join('、')) + '</span>' : ''));
+      '<span>' + (list.length + ck.length) + ' 項</span>' + (supBy[d] ? '<span>支援：' + esc(supBy[d].join('、')) + '</span>' : '') + (offBy[d] ? '<span>請假：' + esc(offBy[d].join('、')) + '</span>' : ''));
     h += '<div class="tw"><table class="tlt"><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
     var lastPhase = null;
     ck.forEach(function (st, i) {
@@ -2370,7 +2378,7 @@ function auditText(a) {
   if (a.table_name === 'evt_shared_secret') return '更換共用密碼';
   if (a.table_name === 'evt_events' && a.action === 'UPDATE' && (o.deleted_at || null) !== (n.deleted_at || null)) return (n.deleted_at ? '刪除活動：' : '還原活動：') + esc(label);
   if (a.action === '更新現場分工') {
-    var f = function (x) { x = x || {}; return (x['現場位置'] || '未分配') + (x['支援'] ? '（支援）' : '') + ((x['請假'] || []).length ? '・請假 ' + x['請假'].map(md).join('、') : ''); };
+    var f = function (x) { x = x || {}; return (x['現場位置'] || '未分配') + (x['支援'] ? '（支援' + ((x['支援日期'] || []).length ? ' ' + x['支援日期'].map(md).join('、') : '') + '）' : '') + ((x['請假'] || []).length ? '・請假 ' + x['請假'].map(md).join('、') : ''); };
     return '更新現場分工：' + esc(n['姓名'] || '') + '（' + esc(f(o)) + ' → ' + esc(f(n)) + '）';
   }
   if (a.action === 'INSERT') return '新增' + t + '：' + esc(label);
@@ -2590,7 +2598,11 @@ function crewEditor(ev) {
     var off = m.off_dates || [];
     return '<tr><td class="nowrap" style="line-height:40px"><b style="font-weight:600">' + esc(pname(m.person_id)) + '</b></td>' +
       '<td><input type="text" list="roles" data-mrole="' + m.person_id + '" value="' + esc(m.role || '') + '" placeholder="例：櫃檯" aria-label="' + esc(pname(m.person_id)) + ' 現場位置" style="min-width:120px"></td>' +
-      '<td style="line-height:40px"><input type="checkbox" data-act="mSupport" data-id="' + m.person_id + '"' + (m.is_support ? ' checked' : '') + ' aria-label="' + esc(pname(m.person_id)) + ' 支援"></td>' +
+      '<td style="min-width:120px"><label class="row small" style="gap:8px;min-height:40px;cursor:pointer"><input type="checkbox" data-act="mSupport" data-id="' + m.person_id + '"' + (m.is_support ? ' checked' : '') + ' aria-label="' + esc(pname(m.person_id)) + ' 支援"> 支援</label>' +
+        (m.is_support && S.supCols ? '<div class="chips" style="flex-wrap:nowrap;margin-top:4px">' + days.map(function (d) {
+          var on = (m.support_dates || []).indexOf(d) >= 0;
+          return '<button class="chip" data-act="mSup" data-id="' + m.person_id + '" data-v="' + d + '" aria-pressed="' + on + '">' + md(d) + '</button>';
+        }).join('') + '</div><div class="hint" style="margin-top:4px">' + ((m.support_dates || []).length ? '只在選取的日期支援' : '沒選日期＝整場支援') + '</div>' : '') + '</td>' +
       '<td><div class="chips" style="flex-wrap:nowrap">' + days.map(function (d) {
         var on = off.indexOf(d) >= 0;
         return '<button class="chip" data-act="mOff" data-id="' + m.person_id + '" data-v="' + d + '" aria-pressed="' + on + '" title="' + (on ? '取消請假' : '標記請假') + '">' + md(d) + (on ? ' 請假' : '') + '</button>';
@@ -2979,6 +2991,12 @@ var A = {
       call('evt_member_set', { p_event_id: S.ev, p_person_id: pid, p: { role: role, is_support: sup } }, ['members'], '已分配：' + pname(pid) + '・' + role + (sup ? '（支援）' : ''));
     });
   },
+  mSup: function (e) {
+    var pid = e.getAttribute('data-id'), d = e.getAttribute('data-v'), m = find(memberRows(S.ev), function (x) { return x.person_id === pid; });
+    var sd = (m.support_dates || []).slice(), i = sd.indexOf(d);
+    if (i >= 0) sd.splice(i, 1); else sd.push(d);
+    call('evt_member_set', { p_event_id: S.ev, p_person_id: pid, p: { support_dates: sd } }, ['members'], pname(pid) + '：' + (sd.length ? '支援 ' + sd.sort().map(md).join('、') : '整場支援'));
+  },
   mOff: function (e) {
     var pid = e.getAttribute('data-id'), d = e.getAttribute('data-v'), m = find(memberRows(S.ev), function (x) { return x.person_id === pid; });
     var off = (m.off_dates || []).slice(), i = off.indexOf(d);
@@ -3346,7 +3364,7 @@ document.addEventListener('change', function (ev) {
   if (a === 'stDate') { call('evt_station_save', { p: { id: S.ui.st, check_date: t.value } }, ['stations'], '已更新對點日期'); return; }
   if (a === 'tlReplace') { S.ui.tlimp.replace = t.checked; return; }
   if (a === 'prepInc') { var ps = S.ui.prep.stations[+t.getAttribute('data-v')]; ps.skip = !t.checked; renderNow(); return; }
-  if (a === 'mSupport') { call('evt_member_set', { p_event_id: S.ev, p_person_id: t.getAttribute('data-id'), p: { is_support: t.checked } }, ['members'], '已更新：' + pname(t.getAttribute('data-id'))); return; }
+  if (a === 'mSupport') { var sp = { is_support: t.checked }; if (!t.checked && S.supCols) sp.support_dates = []; call('evt_member_set', { p_event_id: S.ev, p_person_id: t.getAttribute('data-id'), p: sp }, ['members'], '已更新：' + pname(t.getAttribute('data-id'))); return; }
   var mr = t.getAttribute('data-mrole');
   if (mr) { call('evt_member_set', { p_event_id: S.ev, p_person_id: mr, p: { role: t.value.trim() } }, ['members'], '已更新現場位置：' + pname(mr)); return; }
   var po = t.getAttribute('data-prepold');
