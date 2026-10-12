@@ -175,6 +175,7 @@ details[open]>summary::before{transform:rotate(90deg)}
 .stat.warn b{color:var(--warn)}
 .sect{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
 .sect>h3{margin:0 0 8px}
+.pmeta .ownline{color:var(--warn);font-weight:700}
 .ownerbox{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 16px;margin-bottom:24px}
 .ownerbox[open]{padding-bottom:16px}
 .pagebar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;padding-top:32px}
@@ -405,7 +406,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 34;
+var APP_VERSION = 35;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1456,7 +1457,7 @@ function vCheck() {
     var owners = ownersOf(st.id), a2 = live.filter(function (c) { return c.station_id === st.id; }), d2 = a2.filter(function (c) { return R.ck[c.id]; }).length;
     h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '勾選、新增與編輯由這個崗位的負責人或管理員處理，你可以查看進度。'),
       mgr ? '<span class="row btns"><button class="btn ghost sm" data-act="stEditToggle">' + (S.ui.stEdit ? '收起崗位設定' : '編輯崗位') + '</button><button class="btn warn sm" data-act="stDelete" data-id="' + st.id + '">刪除崗位</button></span>' : (can ? '' : '<span class="tag">僅可查看</span>'),
-      '<span>負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span>對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span>已完成 ' + d2 + ' / ' + a2.length + '</span>');
+      '<span class="ownline">負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span>對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span>已完成 ' + d2 + ' / ' + a2.length + '</span>');
     if (mgr) {
       var mem = membersOf(S.ev);
       h += '<details class="ownerbox"' + (owners.length && !S.ui.stEdit ? '' : ' open') + '><summary class="small"><b>崗位設定：名稱、負責人、對點日期</b><span class="mut">（管理員）</span></summary><div style="padding:8px 0 0">' +
