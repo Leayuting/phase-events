@@ -259,6 +259,10 @@ details[open]>summary::before{transform:rotate(90deg)}
   table.tlt td:nth-child(2){grid-row:span 3;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);font-weight:600}
   table.tlt td:nth-child(4),table.tlt td:nth-child(5){grid-column:2}
   table.tlt td:nth-child(5):empty,table.tlt td:nth-child(4):empty{display:none}
+  table.tlt td.ops{grid-column:2;text-align:left;padding-top:8px}
+  table.tlt td.ops .row{justify-content:flex-start!important}
+  table.tlt tr.tlform{display:block}
+  table.tlt tr.tlform td{display:block}
   .foot .btn{flex:1 1 auto}
   .inline-add input{max-width:none}
   .evlist select{max-width:100%}
@@ -401,7 +405,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 29;
+var APP_VERSION = 30;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -493,7 +497,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1793,6 +1797,22 @@ function vTlImport(nExisting) {
   h += '<div class="foot"><button class="btn ghost" data-act="tlPreview">預覽</button>' + (P && P.blocks ? '<button class="btn" data-act="tlImport">匯入時程</button><button class="btn ghost" data-act="tlClear">清除</button>' : '') + '</div></section>';
   return h;
 }
+function tlSiblings(t) {
+  return S.D.tl.filter(function (x) { return !x.archived && x.id !== t.id && x.date !== t.date && x.content === t.content && (x.phase_label || '') === (t.phase_label || '') && (x.time_text || '') === (t.time_text || ''); });
+}
+function tlDates(ev, cur) {
+  return uniq([ev.count_date, ev.setup_date].concat(eventDays(ev)).concat([addDays(ev.end_date, 1), cur]).filter(Boolean)).sort();
+}
+function tlForm(t, ev) {
+  var sib = tlSiblings(t);
+  function f(k, label, ph) { return '<div class="field"><label>' + label + '</label><input type="text" data-tfe="' + k + '" value="' + esc(t[k] || '') + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></div>'; }
+  return '<div class="sect" style="margin:0;padding:16px 0 8px;border-top:0"><h3>編輯時程</h3><div class="grid2 form">' +
+    '<div class="field"><label>日期</label><select data-tfe="date">' + tlDates(ev, t.date).map(function (d) { return '<option value="' + d + '"' + (d === t.date ? ' selected' : '') + '>' + mdw(d) + '</option>'; }).join('') + '</select></div>' +
+    f('phase_label', '區段') + f('time_text', '時間', '09:00-10:00') + '<div class="field wide2"><label>內容</label><input type="text" data-tfe="content" value="' + esc(t.content) + '"></div>' +
+    f('people', '人員') + f('place', '地點') + '</div>' +
+    (sib.length ? '<label class="row small" style="margin-top:16px;gap:8px;cursor:pointer"><input type="checkbox" id="tl-sync" checked> 其他 ' + sib.length + ' 天（' + sib.map(function (x) { return md(x.date); }).join('、') + '）的同一列也一起修改（日期除外）</label>' : '') +
+    '<div class="row btns" style="margin-top:16px"><button class="btn sm" data-act="saveTlRow" data-id="' + t.id + '">儲存</button><button class="btn ghost sm" data-act="tlRowCancel">取消</button><button class="btn warn sm" data-act="archTlRow" data-id="' + t.id + '">刪除' + (sib.length ? '（依上面勾選）' : '') + '</button></div></div>';
+}
 function vTimeline() {
   var m = isMgr(), ev = curEvent();
   var rows = S.D.tl.filter(function (t) { return !t.archived; });
@@ -1801,7 +1821,7 @@ function vTimeline() {
   var offBy = {};
   memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
-  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：每列修改後按「儲存」。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
+  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
   var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
   if (crew.length || m) {
     h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ' + (S.ui.crewEdit ? '' : 'ghost ') + 'sm" data-act="crewEdit">' + (S.ui.crewEdit ? '完成' : (crew.length ? '編輯分工' : '新增分配')) + '</button>' : '');
@@ -1814,23 +1834,25 @@ function vTimeline() {
   }
   if (!dates.length) h += '<section class="panel"><div class="empty">還沒有時程。</div></section>';
   dates.forEach(function (d) {
-    var list = rows.filter(function (t) { return t.date === d; }).sort(function (a, b) { return a.sort - b.sort; });
+    var list = rows.filter(function (t) { return t.date === d; }).sort(function (a, b) {
+      var x = a.sort_time || '99', y = b.sort_time || '99';
+      return x < y ? -1 : (x > y ? 1 : a.sort - b.sort);
+    });
     var ck = checks[d] || [];
     var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
     h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '',
       '<span>' + (list.length + ck.length) + ' 項</span>' + (offBy[d] ? '<span>請假：' + esc(offBy[d].join('、')) + '</span>' : ''));
-    h += '<div class="tw"><table' + (S.ui.tlEdit ? '' : ' class="tlt"') + '><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
+    h += '<div class="tw"><table class="tlt"><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
     var lastPhase = null;
     ck.forEach(function (st, i) {
       h += '<tr><td class="small mut">' + (i === 0 ? '對點' : '') + '</td><td></td><td>' + esc(st.name) + ' 對點 <span class="tag">來自清單</span></td><td class="small">' + esc(ownersOf(st.id).map(pname).join('、') || '未指定') + '</td><td class="small mut"></td>' + (S.ui.tlEdit ? '<td class="ops"><button class="btn ghost sm" data-act="go" data-v="check">到清單修改</button></td>' : '') + '</tr>';
     });
     list.forEach(function (t) {
-      if (S.ui.tlEdit) {
-        h += '<tr data-tl="' + t.id + '"><td><input type="text" data-tf="phase_label" value="' + esc(t.phase_label) + '" style="min-width:90px"></td><td><input type="text" data-tf="time_text" value="' + esc(t.time_text) + '" style="min-width:100px"></td>' +
-          '<td><input type="text" data-tf="content" value="' + esc(t.content) + '" style="min-width:180px"></td><td><input type="text" data-tf="people" value="' + esc(t.people) + '" style="min-width:140px"></td><td><input type="text" data-tf="place" value="' + esc(t.place) + '" style="min-width:110px"></td>' +
-          '<td class="ops"><button class="btn sm" data-act="saveTl" data-id="' + t.id + '">儲存</button> <button class="btn ghost sm" data-act="archTl" data-id="' + t.id + '">刪除</button></td></tr>';
+      if (S.ui.tlEdit && S.ui.tlRow === t.id) {
+        h += '<tr class="tlform"><td colspan="6">' + tlForm(t, ev) + '</td></tr>';
       } else {
-        h += '<tr><td class="small mut">' + (t.phase_label !== lastPhase ? esc(t.phase_label || '') : '') + '</td><td class="nowrap">' + esc(t.time_text || '') + '</td><td>' + esc(t.content) + '</td><td class="small">' + esc(t.people || '') + '</td><td class="small mut">' + esc(t.place || '') + '</td></tr>';
+        h += '<tr><td class="small mut">' + (t.phase_label !== lastPhase ? esc(t.phase_label || '') : '') + '</td><td class="nowrap">' + esc(t.time_text || '') + '</td><td>' + esc(t.content) + '</td><td class="small">' + esc(t.people || '') + '</td><td class="small mut">' + esc(t.place || '') + '</td>' +
+          (S.ui.tlEdit ? '<td class="ops"><span class="row btns" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn ghost sm" data-act="tlRowEdit" data-id="' + t.id + '">編輯</button><button class="btn warn sm" data-act="archTl" data-id="' + t.id + '">刪除</button></span></td>' : '') + '</tr>';
       }
       lastPhase = t.phase_label;
     });
@@ -2735,7 +2757,28 @@ var A = {
   },
 
   /* 時程 */
-  tlEdit: function () { S.ui.tlEdit = !S.ui.tlEdit; renderNow(); },
+  tlEdit: function () { S.ui.tlEdit = !S.ui.tlEdit; S.ui.tlRow = null; renderNow(); },
+  tlRowEdit: function (e) { S.ui.tlRow = e.getAttribute('data-id'); renderNow(); },
+  tlRowCancel: function () { S.ui.tlRow = null; renderNow(); },
+  saveTlRow: function (e) {
+    var id = e.getAttribute('data-id'), t = byId(S.D.tl, id), p = {};
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tfe]'), function (x) { p[x.getAttribute('data-tfe')] = x.value.trim(); });
+    if (!p.content) { toast('內容不能空白', true); return; }
+    p.sort_time = firstTime(p.time_text) || '';
+    var sync = $('#tl-sync') && $('#tl-sync').checked ? tlSiblings(t) : [];
+    var chain = call('evt_timeline_save', { p: assign({ id: id }, p) }, []);
+    sync.forEach(function (x) {
+      chain = chain.then(function (r) { if (!r.ok) return r; var q = assign({ id: x.id }, p); delete q.date; return call('evt_timeline_save', { p: q }, []); });
+    });
+    chain.then(function (r) { reload(['tl']); if (r.ok) { S.ui.tlRow = null; toast('已儲存' + (sync.length ? '（共 ' + (sync.length + 1) + ' 天）' : '')); renderNow(); } });
+  },
+  archTlRow: function (e) {
+    var id = e.getAttribute('data-id'), t = byId(S.D.tl, id), sync = $('#tl-sync') && $('#tl-sync').checked ? tlSiblings(t) : [];
+    if (!confirm('刪除這筆時程' + (sync.length ? '，以及其他 ' + sync.length + ' 天的同一列' : '') + '？')) return;
+    var chain = call('evt_timeline_save', { p: { id: id, archived: true } }, []);
+    sync.forEach(function (x) { chain = chain.then(function (r) { if (!r.ok) return r; return call('evt_timeline_save', { p: { id: x.id, archived: true } }, []); }); });
+    chain.then(function (r) { reload(['tl']); if (r.ok) { S.ui.tlRow = null; toast('已刪除' + (sync.length ? '（共 ' + (sync.length + 1) + ' 天）' : '')); renderNow(); } });
+  },
   saveTl: function (e) {
     var id = e.getAttribute('data-id'), tr = document.querySelector('[data-tl="' + id + '"]'), p = { id: id };
     Array.prototype.forEach.call(tr.querySelectorAll('[data-tf]'), function (x) { p[x.getAttribute('data-tf')] = x.value; });
@@ -2747,6 +2790,7 @@ var A = {
     var box = document.querySelector('[data-tlnew]'), p = { event_id: S.ev };
     Array.prototype.forEach.call(box.querySelectorAll('[data-tf]'), function (x) { p[x.getAttribute('data-tf')] = x.value; });
     if (!p.content.trim()) { toast('請輸入內容', true); return; }
+    p.sort_time = firstTime(p.time_text) || '';
     call('evt_timeline_save', { p: p }, ['tl'], '已新增');
   },
 
