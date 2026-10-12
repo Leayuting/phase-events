@@ -405,7 +405,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 31;
+var APP_VERSION = 32;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1878,8 +1878,8 @@ function vTimeline() {
   var offBy = {};
   memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
-  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + '<span class="row btns">' + (rows.length ? '<button class="btn ghost" data-act="printTl">列印／存成 PDF</button><button class="btn ghost" data-act="copyTl" data-v="text">複製文字（LINE）</button><button class="btn ghost" data-act="copyTl" data-v="tsv">複製表格（Excel）</button>' : '') +
-    (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</span></div><div class="panels">';
+  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + '<span class="row btns">' + (rows.length ? '<button class="btn" data-act="printTl">列印／存成 PDF</button><button class="btn" data-act="copyTl" data-v="text">複製文字（LINE）</button><button class="btn" data-act="copyTl" data-v="tsv">複製表格（Excel）</button>' : '') +
+    (m ? '<button class="btn" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</span></div><div class="panels">';
   var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
   if (crew.length || m) {
     h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ' + (S.ui.crewEdit ? '' : 'ghost ') + 'sm" data-act="crewEdit">' + (S.ui.crewEdit ? '完成' : (crew.length ? '編輯分工' : '新增分配')) + '</button>' : '');
