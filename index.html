@@ -392,7 +392,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 22;
+var APP_VERSION = 23;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1513,13 +1513,15 @@ function parseMD(v, ev) {
   if (s > addDays(ev.end_date, 120)) s = (y - 1) + s.slice(4);
   return s;
 }
-function prepParse(text) {
-  var ev = curEvent(), rows = splitDelim(text), hi = -1, col = {};
-  for (var i = 0; i < rows.length && hi < 0; i++) {
-    var r = rows[i].map(function (x) { return String(x).replace(/\s/g, ''); });
-    if (r.some(function (x) { return /崗位/.test(x); }) && r.some(function (x) { return /內容|項目/.test(x); })) hi = i;
-  }
-  if (hi < 0) return { error: '找不到標題列：需要有「崗位」和「內容」兩欄（可以再加「負責人」「對點日期」「階段」「數量」「備註」）。' };
+function stCore(n) { return String(n || '').replace(/[（(][^）)]*[）)]/g, '').replace(/\s+/g, '').replace(/區$/, ''); }
+function stParts(n) { return stCore(n).split(/[／\/、]/).map(function (y) { return y.replace(/區$/, ''); }).filter(Boolean); }
+function stMatch(a, b) {
+  var A = stParts(a), B = stParts(b);
+  return A.some(function (x) { return B.some(function (y) { return x === y || x.indexOf(y) >= 0 || y.indexOf(x) >= 0; }); });
+}
+/* 表格型態一：前置作業／職責分配（崗位｜內容｜負責人｜對點日期） */
+function prepParseDuty(rows, hi, ev) {
+  var col = {}, warn = [];
   rows[hi].forEach(function (x, j) {
     x = String(x).replace(/\s/g, '');
     if (/崗位/.test(x) && col.st == null) col.st = j;
@@ -1531,7 +1533,7 @@ function prepParse(text) {
     else if (/備註/.test(x)) col.nt = j;
   });
   function cell(r, k) { return col[k] == null ? '' : String(r[col[k]] == null ? '' : r[col[k]]).trim(); }
-  var out = [], cur = null, warn = [];
+  var out = [], cur = null;
   rows.slice(hi + 1).forEach(function (r) {
     var stn = cell(r, 'st').replace(/\s*\n\s*/g, ' ');
     if (stn) { cur = find(out, function (x) { return x.name === stn; }); if (!cur) { cur = { name: stn, owners: [], date: null, items: [] }; out.push(cur); } }
@@ -1548,35 +1550,93 @@ function prepParse(text) {
       if (!find(cur.items, function (x) { return x.title === t; })) cur.items.push({ title: t, phase: '事前', qty: '', note: '' });
     });
   });
-  if (!out.length) return { error: '標題列下面沒有資料。' };
-  out.forEach(function (st) { if (!st.items.length) st.items.push({ title: st.name, phase: '事前', qty: '', note: '' }); });
+  out.forEach(function (st) {
+    if (!st.items.length) st.items.push({ title: st.name, phase: '事前', qty: '', note: '' });
+    st.skip = !st.owners.length && !st.date;
+  });
+  return { stations: out, warn: warn, kind: '前置作業／職責分配' };
+}
+/* 表格型態二：各崗位清單（標題列「義式／沖煮區（凱）」，下一列每區各有 品項｜用途｜數量｜確認｜備註） */
+function prepParseLists(rows, hi) {
+  var head = rows[hi].map(function (x) { return String(x || '').replace(/\s/g, ''); }), starts = [];
+  head.forEach(function (x, j) { if (x === '品項') starts.push(j); });
+  var title = hi > 0 ? rows[hi - 1] : [], out = [];
+  /* 「品項」左邊沒有標題的欄：內容都是文字（器具、物料、零找金）就當分類欄；有數字或打勾的是上一區的備註欄 */
+  function isCat(c) {
+    if (c < 0 || head[c] || starts.indexOf(c) >= 0) return false;
+    var vals = rows.slice(hi + 1).map(function (r) { return String(r[c] == null ? '' : r[c]).trim(); }).filter(Boolean);
+    return vals.length > 0 && !vals.some(function (x) { return /\d|^(v|ok|✓|✔)$/i.test(x); });
+  }
+  starts.forEach(function (j, k) {
+    var catCol = isCat(j - 1) ? j - 1 : -1;
+    var end = k + 1 < starts.length ? starts[k + 1] - (isCat(starts[k + 1] - 1) ? 1 : 0) : head.length;
+    var from = catCol >= 0 ? catCol : j, tt = '';
+    for (var c = from; c < end && !tt; c++) tt = String(title[c] || '').trim();
+    if (!tt) for (c = from - 1; c >= 0 && !tt; c--) tt = String(title[c] || '').trim();
+    var m = tt.match(/[（(]([^）)]*)[）)]/);
+    var st = { name: tt.replace(/[（(][^）)]*[）)]/g, '').trim() || ('崗位 ' + (k + 1)), owners: m ? splitNames(m[1]) : [], date: null, items: [] };
+    var col = { nt: [] };
+    for (c = j + 1; c < end; c++) {
+      if (/用途/.test(head[c])) col.pu = c;
+      else if (/數量/.test(head[c])) col.qt = c;
+      else if (/確認|勾選/.test(head[c])) col.ok = c;
+      else col.nt.push(c);
+    }
+    var cat = '';
+    rows.slice(hi + 1).forEach(function (r) {
+      function v(i) { return i == null ? '' : String(r[i] == null ? '' : r[i]).trim(); }
+      if (catCol >= 0 && v(catCol)) cat = v(catCol);
+      var t = v(j).replace(/\s*\n\s*/g, ' ');
+      if (!t || t === '品項') return;
+      if (/^\d+$/.test(t) && cat) t = cat + ' ' + t;
+      var notes = [];
+      if (v(col.pu)) notes.push('用途：' + v(col.pu));
+      col.nt.forEach(function (i) { var x = v(i); if (x && !/^(ok|v|✓|✔|○|是)$/i.test(x)) notes.push(x); });
+      if (!find(st.items, function (x) { return x.title === t; })) st.items.push({ title: t, phase: '事前', qty: v(col.qt), note: notes.join('；') });
+    });
+    st.skip = !st.items.length;
+    out.push(st);
+  });
+  return { stations: out, warn: [], kind: '各崗位清單' };
+}
+function prepParse(text) {
+  var ev = curEvent(), rows = splitDelim(text), res = null;
+  for (var i = 0; i < rows.length && !res; i++) {
+    var r = rows[i].map(function (x) { return String(x).replace(/\s/g, ''); });
+    if (r.filter(function (x) { return x === '品項'; }).length >= 1 && !r.some(function (x) { return /崗位/.test(x); })) res = prepParseLists(rows, i);
+    else if (r.some(function (x) { return /崗位/.test(x); }) && r.some(function (x) { return /內容|項目/.test(x); })) res = prepParseDuty(rows, i, ev);
+  }
+  if (!res) return { error: '看不出表格格式：「前置作業／職責分配」需要「崗位」和「內容」兩欄；「各崗位清單」需要每區有「品項」欄，上一列是崗位名稱（括號內寫負責人）。' };
+  if (!res.stations.length) return { error: '標題列下面沒有資料。' };
+  var live = S.D.stations.filter(function (x) { return !x.archived; });
+  res.stations.forEach(function (st) {
+    var ex = find(live, function (x) { return x.name === st.name; }) || find(live, function (x) { return stMatch(x.name, st.name); });
+    st.orig = st.name;
+    if (ex) { st.target = ex.name; st.exOwners = ownersOf(ex.id).map(pname); }
+  });
   var known = {}, newp = [];
   S.G.people.forEach(function (p) { known[p.name.toLowerCase()] = p; });
-  out.forEach(function (st) { st.owners.forEach(function (n) { var p = known[n.toLowerCase()]; if (!p && newp.indexOf(n) < 0) newp.push(n); else if (p && !p.active) warn.push('「' + n + '」已停用，匯入會失敗，請先到人員名單啟用'); }); });
-  if (newp.length) warn.push('名單上沒有：' + newp.join('、') + '。匯入時會自動新增為夥伴並加入這場活動，請確認不是打錯字。');
-  var core = function (n) { return n.replace(/[（(][^）)]*[）)]/g, '').replace(/區$/, '').trim(); };
+  res.stations.forEach(function (st) { st.owners.forEach(function (n) { var p = known[n.toLowerCase()]; if (!p && newp.indexOf(n) < 0) newp.push(n); else if (p && !p.active) res.warn.push('「' + n + '」已停用，匯入會失敗，請先到人員名單啟用'); }); });
+  if (newp.length) res.warn.push('名單上沒有：' + newp.join('、') + '。匯入時會自動新增為夥伴並加入這場活動，請確認不是打錯字。');
   var old = {};
-  S.D.stations.filter(function (x) { return !x.archived && !find(out, function (o) { return o.name === x.name; }); }).forEach(function (x) {
-    var parts = core(x.name).split(/[／\/、]/).map(function (y) { return y.replace(/區$/, '').trim(); }).filter(Boolean);
-    var to = find(out, function (o) { var c = core(o.name); return parts.some(function (pt) { return c.indexOf(pt) >= 0 || pt.indexOf(c) >= 0; }); });
-    var n = S.D.ck.filter(function (c) { return c.station_id === x.id && !c.archived; }).length;
-    old[x.id] = { action: to ? 'merge' : (n ? 'keep' : 'archive'), to: to ? to.name : out[0].name, n: n };
+  live.filter(function (x) { return !find(res.stations, function (o) { return o.target === x.name || o.name === x.name; }); }).forEach(function (x) {
+    old[x.id] = { action: 'keep', to: res.stations[0].target || res.stations[0].name, n: S.D.ck.filter(function (c) { return c.station_id === x.id && !c.archived; }).length };
   });
-  return { stations: out, warn: warn, old: old };
+  res.old = old;
+  return res;
 }
 function vPrepImport() {
-  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入前置作業', '把「前置作業／職責分配」表一次匯入：崗位、負責人、對點日期，內容會變成該崗位的「事前」清單（一格多行會拆成多項）。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
+  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
     '<div class="field"><label for="prep-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="prep-file" style="max-width:320px"></div>' +
     '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)"></textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.stations) {
     var nItems = 0;
-    P.stations.forEach(function (st) { nItems += st.items.length; });
-    h += '<div class="sect"><h3>預覽：' + P.stations.length + ' 個崗位、' + nItems + ' 項清單</h3>' +
+    P.stations.forEach(function (st) { if (!st.skip) nItems += st.items.length; });
+    h += '<div class="sect"><h3>預覽（' + esc(P.kind) + '）：' + P.stations.filter(function (x) { return !x.skip; }).length + ' 個崗位、' + nItems + ' 項清單</h3>' +
       (P.warn.length ? '<div class="banner hold" style="margin:0 0 16px">' + P.warn.map(esc).join('<br>') + '</div>' : '') +
-      '<div class="tw"><table class="top"><thead><tr><th>崗位</th><th>負責人</th><th>對點日期</th><th>事前清單</th></tr></thead><tbody>' + P.stations.map(function (st) {
-        var ex = find(S.D.stations, function (x) { return !x.archived && x.name === st.name; });
-        return '<tr><td style="line-height:1.5"><b style="font-weight:600">' + esc(st.name) + '</b><div class="hint">' + (ex ? '沿用既有崗位' : '新崗位') + '</div></td><td style="line-height:1.5">' + (st.owners.length ? esc(st.owners.join('、')) : '<span class="mut">未填</span>') + '</td>' +
+      '<div class="tw"><table class="top"><thead><tr><th>匯入</th><th>崗位</th><th>負責人</th><th>對點日期</th><th>清單（' + P.stations.reduce(function (a, x) { return a + x.items.length; }, 0) + ' 項）</th></tr></thead><tbody>' + P.stations.map(function (st, i) {
+        return '<tr' + (st.skip ? ' style="opacity:.55"' : '') + '><td style="line-height:40px"><input type="checkbox" data-act="prepInc" data-v="' + i + '"' + (st.skip ? '' : ' checked') + ' aria-label="匯入 ' + esc(st.orig) + '"></td><td style="line-height:1.5"><b style="font-weight:600">' + esc(st.orig) + '</b><div class="hint">' + (st.target ? (st.target === st.orig ? '沿用既有崗位' : '併入既有崗位「' + esc(st.target) + '」') : '新崗位') + (st.skip ? '・預設不匯入（' + (P.kind === '各崗位清單' ? '沒有品項' : '沒有負責人與日期') + '）' : '') + '</div></td><td style="line-height:1.5">' + (st.owners.length ? esc(st.owners.join('、')) : '<span class="mut">未填</span>') + '</td>' +
           '<td style="line-height:1.5" class="nowrap">' + (st.date ? mdw(st.date) : '<span class="mut">未填</span>') + '</td><td style="line-height:1.5">' + st.items.map(function (it) { return '・' + esc(it.title) + (it.phase !== '事前' ? ' <span class="tag">' + esc(it.phase) + '</span>' : ''); }).join('<br>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     var oldIds = Object.keys(P.old);
@@ -1585,13 +1645,13 @@ function vPrepImport() {
         var o = P.old[id], st = station(id);
         return '<div class="log"><span class="tx"><b style="font-weight:600">' + esc(st ? st.name : '') + '</b> <span class="mut small">' + o.n + ' 項清單</span></span>' +
           '<select data-prepold="' + id + '" style="width:auto;min-width:200px"><option value="keep"' + (o.action === 'keep' ? ' selected' : '') + '>保留</option>' +
-          P.stations.map(function (x) { return '<option value="merge|' + esc(x.name) + '"' + (o.action === 'merge' && o.to === x.name ? ' selected' : '') + '>併入「' + esc(x.name) + '」</option>'; }).join('') +
+          P.stations.filter(function (x) { return !x.skip; }).map(function (x) { var nmx = x.target || x.name; return '<option value="merge|' + esc(nmx) + '"' + (o.action === 'merge' && o.to === nmx ? ' selected' : '') + '>併入「' + esc(nmx) + '」</option>'; }).join('') +
           '<option value="archive"' + (o.action === 'archive' ? ' selected' : '') + '>封存</option></select></div>';
       }).join('');
     }
-    h += '<p class="hint" style="margin-top:16px">負責人會以表上的名單為準（整組取代）；同一崗位已有的同名清單項目只更新，不會重複新增。</p></div>';
+    h += '<p class="hint" style="margin-top:16px">名稱相近的崗位會自動合併（例如「櫃檯（不封箱）」併入「櫃檯區」），負責人取兩邊的聯集；同一崗位已有的同名清單項目只更新數量與備註，不會重複新增。表上的「確認」欄不會匯入，這場活動的清單一律從未勾選開始，由負責人自己勾。</p></div>';
   }
-  h += '<div class="foot"><button class="btn ghost" data-act="prepPreview">預覽</button>' + (P && P.stations ? '<button class="btn" data-act="prepImport">匯入 ' + P.stations.length + ' 個崗位</button><button class="btn ghost" data-act="prepClear">清除</button>' : '') + '</div></section>';
+  h += '<div class="foot"><button class="btn ghost" data-act="prepPreview">預覽</button>' + (P && P.stations ? '<button class="btn" data-act="prepImport">匯入 ' + P.stations.filter(function (x) { return !x.skip; }).length + ' 個崗位</button><button class="btn ghost" data-act="prepClear">清除</button>' : '') + '</div></section>';
   return h;
 }
 
@@ -2634,11 +2694,16 @@ var A = {
   },
   prepClear: function () { S.ui.prep = null; renderNow(); },
   prepImport: function () {
-    var P = S.ui.prep, rows = [], old = [];
-    P.stations.forEach(function (st) { st.items.forEach(function (it) { rows.push({ station: st.name, owners: st.owners, check_date: st.date, title: it.title, phase: it.phase, qty: it.qty, note: it.note }); }); });
+    var P = S.ui.prep, rows = [], old = [], inc = P.stations.filter(function (x) { return !x.skip; });
+    if (!inc.length) { toast('沒有勾選要匯入的崗位', true); return; }
+    inc.forEach(function (st) {
+      var name = st.target || st.name, own = (st.exOwners || []).slice();
+      st.owners.forEach(function (n) { if (own.indexOf(n) < 0) own.push(n); });
+      st.items.forEach(function (it) { rows.push({ station: name, owners: own, check_date: st.date, title: it.title, phase: it.phase, qty: it.qty, note: it.note }); });
+    });
     Object.keys(P.old).forEach(function (id) { var o = P.old[id]; old.push({ station_id: id, action: o.action, to: o.to }); });
     var nm = old.filter(function (o) { return o.action !== 'keep'; }).length;
-    if (!confirm('匯入 ' + P.stations.length + ' 個崗位？負責人會以表上為準' + (nm ? '；' + nm + ' 個舊崗位會併入或封存' : '') + '。')) return;
+    if (!confirm('匯入 ' + inc.length + ' 個崗位、' + rows.length + ' 項清單？' + (nm ? nm + ' 個舊崗位會併入或封存。' : ''))) return;
     call('evt_prep_import', { p_event_id: S.ev, p_rows: rows, p_old: old }, ['stations', 'owners', 'ck', 'people', 'members']).then(function (r) {
       if (!r.ok) return;
       var d = r.data || {};
@@ -2839,7 +2904,7 @@ var A = {
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
-var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport'];
+var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc'];
 
 document.addEventListener('keydown', function (ev) {
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
@@ -2913,6 +2978,7 @@ document.addEventListener('change', function (ev) {
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
   if (a === 'buyRec') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { received_qty: t.value === '' ? null : t.value } }, ['buys'], '已更新實收數量'); return; }
   if (a === 'stDate') { call('evt_station_save', { p: { id: S.ui.st, check_date: t.value } }, ['stations'], '已更新對點日期'); return; }
+  if (a === 'prepInc') { var ps = S.ui.prep.stations[+t.getAttribute('data-v')]; ps.skip = !t.checked; renderNow(); return; }
   if (a === 'mSupport') { call('evt_member_set', { p_event_id: S.ev, p_person_id: t.getAttribute('data-id'), p: { is_support: t.checked } }, ['members'], '已更新：' + pname(t.getAttribute('data-id'))); return; }
   var mr = t.getAttribute('data-mrole');
   if (mr) { call('evt_member_set', { p_event_id: S.ev, p_person_id: mr, p: { role: t.value.trim() } }, ['members'], '已更新現場位置：' + pname(mr)); return; }
