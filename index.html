@@ -130,6 +130,7 @@ td input[type=text],td input[type=date],td select{min-height:40px;height:40px}
 .ck input[type=checkbox]{width:26px;height:26px;margin:3px 0 0;accent-color:var(--ink);cursor:pointer}
 .ck>div:nth-child(2){padding-top:4px;min-width:0}
 .ck .t{font-weight:500}
+.ck .ckdate{font-size:12px;color:#A89A8C;font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:4px}
 .ck.done .t{text-decoration:line-through;color:var(--mut)}
 .ck .act{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .bar{height:8px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:8px}
@@ -411,7 +412,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 38;
+var APP_VERSION = 39;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1454,12 +1455,12 @@ function ckRow(c, showSt) {
   var q = c.qty ? (/^\d+$/.test(c.qty) ? '× ' + esc(c.qty) : esc(c.qty)) : '';
   var as = assignees(c);
   return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="tick" data-id="' + c.id + '"' + (done ? ' checked' : '') + (can ? '' : ' disabled title="只有這個崗位的負責人或管理員可以勾選"') + ' aria-label="' + esc(c.title) + '"><div>' +
-    '<span class="t">' + esc(c.title) + '</span> ' + (q ? '<span class="tag">' + q + '</span> ' : '') + '<span class="tag">' + esc(c.phase) + '</span>' +
+    '<span class="t">' + esc(c.title) + '</span> ' + (done ? '<span class="ckdate" title="' + esc(pname(done.by)) + ' 確認">' + tm(done.at) + '</span> ' : '') + (q ? '<span class="tag">' + q + '</span> ' : '') + '<span class="tag">' + esc(c.phase) + '</span>' +
     (showSt && st ? ' <span class="tag">' + esc(st.name) + '</span>' : '') +
     (c.assignee_id ? ' <span class="tag ok">' + esc(pname(c.assignee_id)) + '</span>' : (as.length ? '' : ' <span class="tag warn">未分配</span>')) +
     (c.purpose ? '<div class="small mut">用途：' + esc(c.purpose) + '</div>' : '') +
     (c.note ? '<div class="small mut">' + esc(c.note) + '</div>' : '') +
-    (done ? '<div class="small mut">' + esc(pname(done.by)) + ' ' + modeTag(done.mode) + ' ・ ' + tm(done.at) + ' 完成</div>' : '') + '</div><div class="act">' +
+    (done ? '<div class="small mut">' + esc(pname(done.by)) + ' ' + modeTag(done.mode) + ' 確認</div>' : '') + '</div><div class="act">' +
     (c.link_page ? '<button class="btn ghost sm" data-act="go" data-v="' + c.link_page + '">' + esc(linkName(c.link_page)) + ' ›</button>' : '') +
     (can && !showSt ? '<button class="btn ghost sm" data-act="moveCk" data-id="' + c.id + '" data-v="-1" aria-label="上移">↑</button><button class="btn ghost sm" data-act="moveCk" data-id="' + c.id + '" data-v="1" aria-label="下移">↓</button>' : '') +
     (can ? '<button class="btn ghost sm" data-act="editCk" data-id="' + c.id + '">編輯</button><button class="btn ghost sm" data-act="archCk" data-id="' + c.id + '">刪除</button>' : '') + '</div></div>';
