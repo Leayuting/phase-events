@@ -368,7 +368,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 19;
+var APP_VERSION = 20;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1059,9 +1059,9 @@ function vCount() {
   var recent = S.D.moves.slice().reverse().slice(0, 10);
   h += '<section class="panel">' + pHead('最近紀錄', '最近 10 筆補貨、上架與出杯紀錄。填錯時按「沖銷」，原紀錄會保留；完整紀錄在「紀錄」分頁。') +
     (recent.length ? recent.map(moveRow).join('') : '<div class="empty">還沒有快速紀錄。</div>') + '</section>';
-  h += '<section class="panel">' + pHead('品項現況', '各品項的帶出、補貨、最新盤點與帶回數量。', '<div class="chips" role="group" aria-label="展台">' +
+  h += '<section class="panel">' + pHead('品項現況', '各品項的帶出、補貨、最新盤點與帶回數量。列印會依目前選的展台輸出。', '<div class="chips" role="group" aria-label="展台">' +
     ['全部'].concat(BOOTHS).concat(['濾掛']).map(function (b) { return '<button class="chip" data-act="bt" data-v="' + b + '" aria-pressed="' + (S.ui.bt === b) + '">' + b + '</button>'; }).join('') + '</div>') +
-    vItemCards() + '</section>';
+    vItemCards() + '<div class="foot"><button class="btn ghost" data-act="printStatus">列印／存成 PDF</button></div></section>';
   h += '<section class="panel">' + pHead('已簽署的盤點單', '簽署後鎖定不能修改；點開可以看明細與簽名。同一天同類型有多張時，以最後簽署的為準。') + vSheets() + '</section>';
   return h;
 }
@@ -1723,6 +1723,55 @@ function itemsPrintHtml() {
   h += '<div class="ft">已刪除的品項不列入。數字為本次活動的預計量。' + (nw ? '有 ' + nw + ' 個品項標示「注意」，請確認後再使用。' : '') + '</div>';
   return h;
 }
+function printHtml(html) {
+  $('#printarea').innerHTML = html;
+  document.body.classList.add('printing');
+  var done = function () { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(function () { window.print(); }, 50);
+}
+function printHead(title, extra) {
+  var ev = curEvent();
+  return '<div class="ph"><div class="br">PHASE COFFEE ROASTERS ・ 活動系統</div><h1>' + esc(ev.name) + '　' + title + '</h1><div class="pm">' + md(ev.start_date) + ' – ' + md(ev.end_date) + (ev.venue ? '・' + esc(ev.venue) : '') + (ev.booth ? ' ' + esc(ev.booth) : '') + (extra ? '・' + extra : '') + '・列印時間 ' + tm(new Date().toISOString()) + '・' + esc(S.me.name) + '</div></div>';
+}
+function warnHtml(w, note) { return (w.length ? '<div class="warn">注意：' + esc(w.join('；')) + '</div>' : '') + esc(note || ''); }
+function statusPrintHtml() {
+  var R = S.R, bt = S.ui.bt, nw = 0, g = null;
+  var h = printHead('品項現況', '展台：' + esc(bt));
+  if (bt !== '濾掛') {
+    var list = R.beans.filter(function (it) { return bt === '全部' || it.booth === bt; });
+    var T = { out: 0, rep: 0, lt: 0, back: 0, used: 0 };
+    h += '<div class="sec"><h2>咖啡豆<small>' + list.length + ' 款</small></h2><table><colgroup><col style="width:17%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:7%"><col style="width:15%"><col></colgroup>' +
+      '<thead><tr><th>咖啡豆</th><th class="n">帶出</th><th class="n">補貨</th><th class="n">倉庫</th><th class="n">檯面</th><th class="n">最新盤點</th><th class="n">帶回</th><th>最新盤點單</th><th>試喝（已用／預計 g）</th></tr></thead><tbody>';
+    list.forEach(function (it) {
+      var x = R.item[it.id], L = x.latest, w = [];
+      if (it.booth !== g) { g = it.booth; h += '<tr class="grp"><td colspan="9">展台：' + esc(g || '未分展台') + '</td></tr>'; }
+      if (x.out == null) w.push('沒有帶出數字');
+      if (!L) w.push('尚無盤點');
+      if (x.tastingLeft != null && x.tastingLeft < 0) w.push('試喝超過預計 ' + I(-x.tastingLeft) + ' g');
+      if (w.length) nw++;
+      T.out += num(x.out); T.rep += num(x.rep); T.lt += L ? num(L.total) : 0; T.back += num(x.back); T.used += num(x.used);
+      h += '<tr><td>' + esc(it.name) + warnHtml(w) + '</td><td class="n">' + I(x.out) + '</td><td class="n">' + I(x.rep) + '</td><td class="n">' + (L ? I(L.wh) : '—') + '</td><td class="n">' + (L ? I(L.tb) : '—') + '</td><td class="n">' + I(L ? L.total : null) + '</td><td class="n">' + I(x.back) + '</td>' +
+        '<td>' + (L ? esc(L.sheet.type) + ' ' + md(L.sheet.biz_date) : '—') + '</td><td>' + I(x.used) + '／' + I(x.tasting) + '，剩 ' + I(x.tastingLeft) + (x.brewLeft ? '（' + md(x.brewLeft.sheet.biz_date) + ' 實測 ' + I(x.brewLeft.g) + '）' : '') + '</td></tr>';
+    });
+    h += '<tr class="tot"><td>合計 ' + list.length + ' 款</td><td class="n">' + T.out + '</td><td class="n">' + T.rep + '</td><td></td><td></td><td class="n">' + T.lt + '</td><td class="n">' + T.back + '</td><td></td><td>已用 ' + T.used + ' g</td></tr></tbody></table></div>';
+  }
+  if ((bt === '全部' || bt === '濾掛') && R.drips.length) {
+    var d1 = 0, dT = 0, dR = 0;
+    h += '<div class="sec"><h2>濾掛<small>' + R.drips.length + ' 款・不做盤點，只記補貨</small></h2><table><colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col></colgroup>' +
+      '<thead><tr><th>濾掛</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">補貨累計</th><th>備註</th></tr></thead><tbody>';
+    R.drips.forEach(function (it) {
+      var y = R.drip[it.id], w = [];
+      if (y.planT == null) w.push('總預計未填');
+      if (w.length) nw++;
+      d1 += num(y.plan1); dT += num(y.planT); dR += num(y.rep);
+      h += '<tr><td>' + esc(it.name) + (it.parent_item_id ? '' : '（只帶濾掛）') + '</td><td class="n">' + I(y.plan1) + '</td><td class="n">' + I(y.planT) + '</td><td class="n">' + I(y.rep) + '</td><td>' + warnHtml(w, it.note) + '</td></tr>';
+    });
+    h += '<tr class="tot"><td>合計 ' + R.drips.length + ' 款</td><td class="n">' + d1 + '</td><td class="n">' + dT + '</td><td class="n">' + dR + '</td><td></td></tr></tbody></table></div>';
+  }
+  h += '<div class="ft">最新盤點為最近一張已簽署的盤點單（同一天同類型以最後簽署的為準）；數字不含沖銷的紀錄。' + (nw ? '有 ' + nw + ' 個品項標示「注意」。' : '') + '</div>';
+  return h;
+}
 function itemOps(it) {
   return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除</button></span>';
 }
@@ -2372,13 +2421,8 @@ var A = {
     var k = e.getAttribute('data-v');
     copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
   },
-  printItems: function () {
-    $('#printarea').innerHTML = itemsPrintHtml();
-    document.body.classList.add('printing');
-    var done = function () { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
-    window.addEventListener('afterprint', done);
-    setTimeout(function () { window.print(); }, 50);
-  },
+  printItems: function () { printHtml(itemsPrintHtml()); },
+  printStatus: function () { printHtml(statusPrintHtml()); },
   beanDbRetry: function () { loadBeanDb(true); renderNow(); },
   niManual: function () { var n = niState(); n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); },
   niBackDb: function () { var n = niState(); n.mode = 'db'; n.name = ''; n.bean = ''; renderNow(); },
