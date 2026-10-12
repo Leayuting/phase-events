@@ -38,7 +38,8 @@ h2{font-size:18px;font-weight:600;line-height:1.4;margin:0 0 8px;color:var(--ink
 h3{font-size:15px;font-weight:600;line-height:1.5;margin:0 0 8px}
 .brand{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);font-weight:500}
 .brand::before{content:"";display:inline-block;width:18px;height:1px;background:var(--gold);vertical-align:middle;margin-right:8px}
-header.top{padding:24px 0 0}
+header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
+.hrow>div:first-child{flex:1 1 280px}
 .hrow{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-end;justify-content:space-between;margin-top:8px}
 .meta{color:var(--mut);font-size:13px;margin-top:4px}
 .who{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0}
@@ -89,6 +90,15 @@ section.blk:last-child{border-bottom:0}
 .field .btn{width:100%}
 input[type=text],input[type=number],input[type=date],input[type=password],input[type=search],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0 12px;min-height:44px;width:100%;min-width:0}
 textarea{padding:12px;min-height:96px}
+input[type=text],input[type=number],input[type=date],input[type=password],input[type=search],select{height:44px;line-height:normal;font-size:16px;max-width:100%;display:block}
+input[type=date]{-webkit-appearance:none;appearance:none;text-align:left;padding-right:12px}
+input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+input[type=date]::-webkit-datetime-edit{padding:0;line-height:42px}
+input[type=date]{line-height:42px}
+input[type=date]::-webkit-calendar-picker-indicator{opacity:.6}
+input[type=number]{-moz-appearance:textfield}
+.field{max-width:100%}
+.field>input,.field>select,.field>textarea{width:100%}
 select{-webkit-appearance:none;appearance:none;padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23184652' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 input::placeholder,textarea::placeholder{color:#9C8B7B}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
@@ -107,9 +117,9 @@ table.top td .btn{line-height:1.2}
 table.top tr.grp td{line-height:1.5}
 tr.grp td{background:var(--soft);padding-top:8px;padding-bottom:8px;font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.06em}
 tr.tot td{font-weight:600;border-top:2px solid var(--gold)}
-td input[type=number]{width:84px;text-align:right;min-height:40px}
+td input[type=number]{width:84px;text-align:right;min-height:40px;height:40px;display:inline-block}
 td .sect input[type=number]{width:100%;text-align:left}
-td input[type=text],td input[type=date],td select{min-height:40px}
+td input[type=text],td input[type=date],td select{min-height:40px;height:40px}
 .empty{padding:24px;text-align:center;color:var(--mut);border:1px dashed var(--gold);border-radius:4px;font-size:14px}
 .log{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
 .log .tm{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums;min-width:84px}
@@ -230,6 +240,20 @@ details[open]>summary::before{transform:rotate(90deg)}
 .strike{text-decoration:line-through;color:var(--mut)}
 .nowrap{white-space:nowrap}
 .hint{font-size:12px;color:var(--mut)}
+@media (max-width:600px){
+  .grid2,.panel .grid2,.modal .grid2{grid-template-columns:1fr}
+  .grid2>*{grid-column:auto!important}
+  .hrow{flex-direction:column;align-items:stretch;gap:16px}
+  .hrow>div:first-child{flex:none}
+  .row>.field{flex:1 1 100%;width:auto!important}
+  .who{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:12px;border-top:1px solid var(--line)}
+  .who .row.btns{width:100%}
+  .who .row.btns .btn{flex:1 1 auto}
+  .phead .paside{width:100%}
+  .foot .btn{flex:1 1 auto}
+  .inline-add input{max-width:none}
+  .evlist select{max-width:100%}
+}
 @media (max-width:560px){
   h1{font-size:22px}
   .card .nums b{font-size:18px}
@@ -368,7 +392,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 20;
+var APP_VERSION = 21;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
