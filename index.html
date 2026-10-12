@@ -392,7 +392,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 21;
+var APP_VERSION = 22;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -484,7 +484,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -554,9 +554,15 @@ var LOAD = {
   events: function () { return pageAll(function (a, b) { return sb.from('evt_events').select('*').order('start_date', { ascending: false }).range(a, b); }); },
   templates: function () { return pageAll(function (a, b) { return sb.from('evt_checklist_templates').select('id,name,station_names,note,updated_at').order('name').range(a, b); }); },
   /* 參加夥伴：資料庫還沒執行 v3 更新時回傳 null，視為所有人都可看到 */
+  /* 參加夥伴：沒有現場分工欄位（v3f 之前）時退回基本欄位；連表都沒有（v3 之前）時回傳 null */
   members: function () {
-    return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id').range(a, b); })
-      .then(function (r) { return r; }, function (e) { if (isNetErr(e)) throw e; return null; });
+    return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id,role,is_support,off_dates').range(a, b); })
+      .then(function (r) { S.memberCols = true; return r; }, function (e) {
+        if (isNetErr(e)) throw e;
+        S.memberCols = false;
+        return pageAll(function (a, b) { return sb.from('evt_event_members').select('event_id,person_id').range(a, b); })
+          .then(function (r) { return r; }, function (e2) { if (isNetErr(e2)) throw e2; return null; });
+      });
   },
   tplItems: function () { return pageAll(function (a, b) { return sb.from('evt_checklist_template_items').select('id,template_id,station_name,phase,title').range(a, b); }); },
   stations: function (ev) { return pageAll(function (a, b) { return sb.from('evt_stations').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
@@ -841,6 +847,26 @@ var CALC = {
 /* ============================================================================
    身分與權限（畫面上的判斷；真正的權限由伺服器端函式把關）
    ============================================================================ */
+var ROLES = ['櫃檯', '沖煮', '銷售'];
+function memberRows(evId) {
+  if (!S.G.members) return [];
+  var order = {};
+  S.G.people.forEach(function (p, i) { order[p.id] = i; });
+  return S.G.members.filter(function (m) { return m.event_id === evId; }).sort(function (a, b) { return (order[a.person_id] || 0) - (order[b.person_id] || 0); });
+}
+function crewGroups(evId) {
+  var g = {}, keys = [];
+  memberRows(evId).forEach(function (m) {
+    var r = m.role || '';
+    if (!g[r]) { g[r] = []; keys.push(r); }
+    g[r].push(m);
+  });
+  keys.sort(function (a, b) {
+    function k(x) { var i = ROLES.indexOf(x); return x === '' ? 999 : (i < 0 ? 100 : i); }
+    return k(a) - k(b);
+  });
+  return keys.map(function (k) { return { role: k, list: g[k] }; });
+}
 function membersOf(evId) {
   if (!S.G.members) return S.G.people.filter(function (p) { return p.active; }).map(function (p) { return p.id; });
   return S.G.members.filter(function (m) { return m.event_id === evId; }).map(function (m) { return m.person_id; });
@@ -1458,6 +1484,114 @@ function vCheck() {
       h += '</section>';
     }
   }
+  if (mgr) h += vPrepImport();
+  return h;
+}
+/* 匯入前置作業：崗位｜內容｜負責人｜對點日期（可多加 階段、數量、備註），支援合併儲存格與一格多行 */
+function splitDelim(text) {
+  var t = String(text || '').replace(/^\ufeff/, ''), d = t.indexOf('\t') >= 0 ? '\t' : ',', rows = [], row = [], f = '', q = false, i, c;
+  for (i = 0; i < t.length; i++) {
+    c = t.charAt(i);
+    if (q) { if (c === '"') { if (t.charAt(i + 1) === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"' && f === '') q = true;
+    else if (c === d) { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t.charAt(i + 1) === '\n') i++; row.push(f); f = ''; rows.push(row); row = []; }
+    else f += c;
+  }
+  row.push(f); rows.push(row);
+  return rows.filter(function (r) { return r.join('').trim(); });
+}
+function splitNames(v) {
+  return String(v || '').replace(/[（(][^）)]*[）)]/g, '').split(/[\/、,，;；\n]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+}
+function parseMD(v, ev) {
+  var m = String(v || '').match(/(\d{1,2})\s*[\/月.-]\s*(\d{1,2})/);
+  if (!m) return null;
+  var y = +String(ev.start_date).slice(0, 4), mo = +m[1], da = +m[2];
+  if (mo < 1 || mo > 12 || da < 1 || da > 31) return null;
+  var s = y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da;
+  if (s > addDays(ev.end_date, 120)) s = (y - 1) + s.slice(4);
+  return s;
+}
+function prepParse(text) {
+  var ev = curEvent(), rows = splitDelim(text), hi = -1, col = {};
+  for (var i = 0; i < rows.length && hi < 0; i++) {
+    var r = rows[i].map(function (x) { return String(x).replace(/\s/g, ''); });
+    if (r.some(function (x) { return /崗位/.test(x); }) && r.some(function (x) { return /內容|項目/.test(x); })) hi = i;
+  }
+  if (hi < 0) return { error: '找不到標題列：需要有「崗位」和「內容」兩欄（可以再加「負責人」「對點日期」「階段」「數量」「備註」）。' };
+  rows[hi].forEach(function (x, j) {
+    x = String(x).replace(/\s/g, '');
+    if (/崗位/.test(x) && col.st == null) col.st = j;
+    else if (/內容|項目/.test(x) && col.ct == null) col.ct = j;
+    else if (/負責/.test(x) && col.ow == null) col.ow = j;
+    else if (/日期|對點/.test(x) && col.dt == null) col.dt = j;
+    else if (/階段/.test(x)) col.ph = j;
+    else if (/數量/.test(x)) col.qt = j;
+    else if (/備註/.test(x)) col.nt = j;
+  });
+  function cell(r, k) { return col[k] == null ? '' : String(r[col[k]] == null ? '' : r[col[k]]).trim(); }
+  var out = [], cur = null, warn = [];
+  rows.slice(hi + 1).forEach(function (r) {
+    var stn = cell(r, 'st').replace(/\s*\n\s*/g, ' ');
+    if (stn) { cur = find(out, function (x) { return x.name === stn; }); if (!cur) { cur = { name: stn, owners: [], date: null, items: [] }; out.push(cur); } }
+    if (!cur) return;
+    splitNames(cell(r, 'ow')).forEach(function (n) { if (cur.owners.indexOf(n) < 0) cur.owners.push(n); });
+    var dc = cell(r, 'dt'), dd = parseMD(dc, ev);
+    if (dd && !cur.date) cur.date = dd;
+    var ph = cell(r, 'ph'), qt = cell(r, 'qt'), nt = cell(r, 'nt');
+    if (ph && PHASES.indexOf(ph) < 0) { warn.push('「' + ph + '」不是可用的階段，改用「事前」'); ph = ''; }
+    cell(r, 'ct').split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (t) {
+      if (!find(cur.items, function (x) { return x.title === t; })) cur.items.push({ title: t, phase: ph || '事前', qty: qt, note: nt });
+    });
+    if (!dd && dc) dc.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (t) {
+      if (!find(cur.items, function (x) { return x.title === t; })) cur.items.push({ title: t, phase: '事前', qty: '', note: '' });
+    });
+  });
+  if (!out.length) return { error: '標題列下面沒有資料。' };
+  out.forEach(function (st) { if (!st.items.length) st.items.push({ title: st.name, phase: '事前', qty: '', note: '' }); });
+  var known = {}, newp = [];
+  S.G.people.forEach(function (p) { known[p.name.toLowerCase()] = p; });
+  out.forEach(function (st) { st.owners.forEach(function (n) { var p = known[n.toLowerCase()]; if (!p && newp.indexOf(n) < 0) newp.push(n); else if (p && !p.active) warn.push('「' + n + '」已停用，匯入會失敗，請先到人員名單啟用'); }); });
+  if (newp.length) warn.push('名單上沒有：' + newp.join('、') + '。匯入時會自動新增為夥伴並加入這場活動，請確認不是打錯字。');
+  var core = function (n) { return n.replace(/[（(][^）)]*[）)]/g, '').replace(/區$/, '').trim(); };
+  var old = {};
+  S.D.stations.filter(function (x) { return !x.archived && !find(out, function (o) { return o.name === x.name; }); }).forEach(function (x) {
+    var parts = core(x.name).split(/[／\/、]/).map(function (y) { return y.replace(/區$/, '').trim(); }).filter(Boolean);
+    var to = find(out, function (o) { var c = core(o.name); return parts.some(function (pt) { return c.indexOf(pt) >= 0 || pt.indexOf(c) >= 0; }); });
+    var n = S.D.ck.filter(function (c) { return c.station_id === x.id && !c.archived; }).length;
+    old[x.id] = { action: to ? 'merge' : (n ? 'keep' : 'archive'), to: to ? to.name : out[0].name, n: n };
+  });
+  return { stations: out, warn: warn, old: old };
+}
+function vPrepImport() {
+  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入前置作業', '把「前置作業／職責分配」表一次匯入：崗位、負責人、對點日期，內容會變成該崗位的「事前」清單（一格多行會拆成多項）。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
+    '<div class="field"><label for="prep-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="prep-file" style="max-width:320px"></div>' +
+    '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)"></textarea></div>';
+  if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
+  if (P && P.stations) {
+    var nItems = 0;
+    P.stations.forEach(function (st) { nItems += st.items.length; });
+    h += '<div class="sect"><h3>預覽：' + P.stations.length + ' 個崗位、' + nItems + ' 項清單</h3>' +
+      (P.warn.length ? '<div class="banner hold" style="margin:0 0 16px">' + P.warn.map(esc).join('<br>') + '</div>' : '') +
+      '<div class="tw"><table class="top"><thead><tr><th>崗位</th><th>負責人</th><th>對點日期</th><th>事前清單</th></tr></thead><tbody>' + P.stations.map(function (st) {
+        var ex = find(S.D.stations, function (x) { return !x.archived && x.name === st.name; });
+        return '<tr><td style="line-height:1.5"><b style="font-weight:600">' + esc(st.name) + '</b><div class="hint">' + (ex ? '沿用既有崗位' : '新崗位') + '</div></td><td style="line-height:1.5">' + (st.owners.length ? esc(st.owners.join('、')) : '<span class="mut">未填</span>') + '</td>' +
+          '<td style="line-height:1.5" class="nowrap">' + (st.date ? mdw(st.date) : '<span class="mut">未填</span>') + '</td><td style="line-height:1.5">' + st.items.map(function (it) { return '・' + esc(it.title) + (it.phase !== '事前' ? ' <span class="tag">' + esc(it.phase) + '</span>' : ''); }).join('<br>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    var oldIds = Object.keys(P.old);
+    if (oldIds.length) {
+      h += '<h3 style="margin-top:24px">不在表上的既有崗位</h3><p class="hint" style="margin:0 0 8px">「併入」會把清單項目（含勾選紀錄）搬到新崗位後封存舊崗位；「封存」會連同清單一起隱藏，可以再還原。</p>' + oldIds.map(function (id) {
+        var o = P.old[id], st = station(id);
+        return '<div class="log"><span class="tx"><b style="font-weight:600">' + esc(st ? st.name : '') + '</b> <span class="mut small">' + o.n + ' 項清單</span></span>' +
+          '<select data-prepold="' + id + '" style="width:auto;min-width:200px"><option value="keep"' + (o.action === 'keep' ? ' selected' : '') + '>保留</option>' +
+          P.stations.map(function (x) { return '<option value="merge|' + esc(x.name) + '"' + (o.action === 'merge' && o.to === x.name ? ' selected' : '') + '>併入「' + esc(x.name) + '」</option>'; }).join('') +
+          '<option value="archive"' + (o.action === 'archive' ? ' selected' : '') + '>封存</option></select></div>';
+      }).join('');
+    }
+    h += '<p class="hint" style="margin-top:16px">負責人會以表上的名單為準（整組取代）；同一崗位已有的同名清單項目只更新，不會重複新增。</p></div>';
+  }
+  h += '<div class="foot"><button class="btn ghost" data-act="prepPreview">預覽</button>' + (P && P.stations ? '<button class="btn" data-act="prepImport">匯入 ' + P.stations.length + ' 個崗位</button><button class="btn ghost" data-act="prepClear">清除</button>' : '') + '</div></section>';
   return h;
 }
 
@@ -1513,15 +1647,32 @@ function buyForm(b) {
 function vTimeline() {
   var m = isMgr(), ev = curEvent();
   var rows = S.D.tl.filter(function (t) { return !t.archived; });
-  var dates = uniq(rows.map(function (t) { return t.date; })).sort();
+  var checks = {};
+  S.D.stations.forEach(function (st) { if (!st.archived && st.check_date) (checks[st.check_date] = checks[st.check_date] || []).push(st); });
+  var offBy = {};
+  memberRows(ev.id).forEach(function (m) { (m.off_dates || []).forEach(function (d) { (offBy[d] = offBy[d] || []).push(pname(m.person_id)); }); });
+  var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
   var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：每列修改後按「儲存」。' : '。') + '</p></div>' + (m ? '<button class="btn ' + (S.ui.tlEdit ? '' : 'ghost') + '" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</div><div class="panels">';
-  if (!rows.length) h += '<section class="panel"><div class="empty">還沒有時程。</div></section>';
+  var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
+  if (crew.length) {
+    h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ghost sm" data-act="tab" data-v="event">修改分工</button>' : '') +
+      '<div class="tw"><table><thead><tr><th style="width:96px">位置</th><th>夥伴</th></tr></thead><tbody>' + crew.map(function (g) {
+        return '<tr><td><b style="font-weight:600">' + esc(g.role) + '</b></td><td>' + g.list.map(function (x) { return esc(pname(x.person_id)) + (x.is_support ? '<span class="mut small">（支援）</span>' : ''); }).join('、') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (Object.keys(offBy).length ? '<p class="hint" style="margin-top:16px">請假：' + Object.keys(offBy).sort().map(function (d) { return mdw(d) + ' ' + esc(offBy[d].join('、')); }).join('；') + '</p>' : '') + '</section>';
+  }
+  if (!dates.length) h += '<section class="panel"><div class="empty">還沒有時程。</div></section>';
   dates.forEach(function (d) {
     var list = rows.filter(function (t) { return t.date === d; }).sort(function (a, b) { return a.sort - b.sort; });
+    var ck = checks[d] || [];
     var label = d === ev.setup_date ? '佈場' : (d === ev.count_date ? '帶出對點' : (d >= ev.start_date && d <= ev.end_date ? '活動第 ' + (Math.round((parseD(d) - parseD(ev.start_date)) / 864e5) + 1) + ' 天' : ''));
-    h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '', '<span>' + list.length + ' 項</span>');
+    h += '<section class="panel">' + pHead(mdw(d) + (label ? ' <span class="tag" style="vertical-align:middle">' + label + '</span>' : '') + (d === todayStr() ? ' <span class="tag ink" style="vertical-align:middle">今天</span>' : ''), '', '',
+      '<span>' + (list.length + ck.length) + ' 項</span>' + (offBy[d] ? '<span>請假：' + esc(offBy[d].join('、')) + '</span>' : ''));
     h += '<div class="tw"><table><thead><tr><th>區段</th><th>時間</th><th>內容</th><th>人員</th><th>地點</th>' + (S.ui.tlEdit ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
     var lastPhase = null;
+    ck.forEach(function (st, i) {
+      h += '<tr><td class="small mut">' + (i === 0 ? '對點' : '') + '</td><td></td><td>' + esc(st.name) + ' 對點 <span class="tag">來自清單</span></td><td class="small">' + esc(ownersOf(st.id).map(pname).join('、') || '未指定') + '</td><td class="small mut"></td>' + (S.ui.tlEdit ? '<td class="ops"><button class="btn ghost sm" data-act="go" data-v="check">到清單修改</button></td>' : '') + '</tr>';
+    });
     list.forEach(function (t) {
       if (S.ui.tlEdit) {
         h += '<tr data-tl="' + t.id + '"><td><input type="text" data-tf="phase_label" value="' + esc(t.phase_label) + '" style="min-width:90px"></td><td><input type="text" data-tf="time_text" value="' + esc(t.time_text) + '" style="min-width:100px"></td>' +
@@ -1933,6 +2084,10 @@ function auditText(a) {
   if (a.table_name === 'evt_pins') return (a.action === '更改自己的 PIN' ? '更改自己的管理員 PIN' : '重設 ' + esc(pname(a.row_id)) + ' 的管理員 PIN');
   if (a.table_name === 'evt_shared_secret') return '更換共用密碼';
   if (a.table_name === 'evt_events' && a.action === 'UPDATE' && (o.deleted_at || null) !== (n.deleted_at || null)) return (n.deleted_at ? '刪除活動：' : '還原活動：') + esc(label);
+  if (a.action === '更新現場分工') {
+    var f = function (x) { x = x || {}; return (x['現場位置'] || '未分配') + (x['支援'] ? '（支援）' : '') + ((x['請假'] || []).length ? '・請假 ' + x['請假'].map(md).join('、') : ''); };
+    return '更新現場分工：' + esc(n['姓名'] || '') + '（' + esc(f(o)) + ' → ' + esc(f(n)) + '）';
+  }
   if (a.action === 'INSERT') return '新增' + t + '：' + esc(label);
   if (a.action === 'DELETE') return '移除' + t + '：' + esc(label);
   var ch = [];
@@ -2128,7 +2283,28 @@ function vMembersCard(ev) {
     '<span class="row btns"><button class="btn ghost sm" data-act="memAll">全選</button><button class="btn ghost sm" data-act="memNone">全部取消</button></span></div>' +
     memChips(sel, 'memToggle') +
     '<p class="hint" style="margin-top:16px">新夥伴第一次登入後才會出現在名單裡；之後新建立的活動會預設加入所有啟用中的人。</p>' +
-    '<div class="foot"><button class="btn" data-act="saveMembers">儲存參加夥伴</button>' + (dirty ? '<button class="btn ghost" data-act="memReset">還原</button>' : '') + '</div></section>';
+    '<div class="foot"><button class="btn" data-act="saveMembers">儲存參加夥伴</button>' + (dirty ? '<button class="btn ghost" data-act="memReset">還原</button>' : '') + '</div></section>' + vCrewCard(ev);
+}
+function eventDays(ev) { var d = [], x = ev.start_date; while (x && x <= ev.end_date && d.length < 31) { d.push(x); x = addDays(x, 1); } return d; }
+function vCrewCard(ev) {
+  var h = '<section class="panel">' + pHead('現場分工', '活動期間每位夥伴固定站的位置，會顯示在「時程」分頁最上方。有人請假時，點那一天標記；修改後立即儲存。');
+  if (!S.memberCols) return h + '<div class="banner hold" style="margin:0">需要先執行資料庫更新（v3f 前置作業與現場分工）才能使用。</div></section>';
+  var rows = memberRows(ev.id), days = eventDays(ev);
+  if (!rows.length) return h + '<div class="empty">還沒有參加夥伴。</div></section>';
+  h += '<datalist id="roles">' + ROLES.concat(['特調', '後勤']).map(function (r) { return '<option value="' + r + '"></option>'; }).join('') + '</datalist>';
+  h += '<div class="tw"><table class="top"><thead><tr><th>夥伴</th><th style="min-width:140px">現場位置</th><th>支援</th><th>請假日期</th></tr></thead><tbody>' + rows.map(function (m) {
+    var off = m.off_dates || [];
+    return '<tr><td class="nowrap" style="line-height:40px"><b style="font-weight:600">' + esc(pname(m.person_id)) + '</b></td>' +
+      '<td><input type="text" list="roles" data-mrole="' + m.person_id + '" value="' + esc(m.role || '') + '" placeholder="例：櫃檯" aria-label="' + esc(pname(m.person_id)) + ' 現場位置" style="min-width:120px"></td>' +
+      '<td style="line-height:40px"><input type="checkbox" data-act="mSupport" data-id="' + m.person_id + '"' + (m.is_support ? ' checked' : '') + ' aria-label="' + esc(pname(m.person_id)) + ' 支援"></td>' +
+      '<td><div class="chips" style="flex-wrap:nowrap">' + days.map(function (d) {
+        var on = off.indexOf(d) >= 0;
+        return '<button class="chip" data-act="mOff" data-id="' + m.person_id + '" data-v="' + d + '" aria-pressed="' + on + '" title="' + (on ? '取消請假' : '標記請假') + '">' + md(d) + (on ? ' 請假' : '') + '</button>';
+      }).join('') + '</div></td></tr>';
+  }).join('') + '</tbody></table></div>';
+  h += '<details class="sect"><summary class="small"><b>從試算表貼上分工</b></summary><div style="padding-top:8px"><div class="field"><label for="crew-paste">每列「位置、姓名」，位置可以只寫在第一列（合併儲存格）；姓名可用「、」分隔，寫「（支援）」會標記支援。可以直接從 Google 試算表或 Excel 複製兩欄貼上。</label>' +
+    '<textarea id="crew-paste" rows="6" placeholder="櫃檯&#9;怡蓁&#10;沖煮&#9;凱&#10;銷售&#9;Hedy&#10;&#9;鍵&#10;&#9;小馬（支援）"></textarea></div><div class="row btns" style="margin-top:16px"><button class="btn" data-act="crewPaste">套用分工</button></div></div></details>';
+  return h + '</section>';
 }
 var nevKeep = null;
 function keepNev() { nevKeep = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-nev]'), function (x) { nevKeep[x.getAttribute('data-nev')] = x.value; }); }
@@ -2441,6 +2617,63 @@ var A = {
   },
   restoreItem: function (e) { call('evt_item_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['items'], '已還原'); },
   toggleItemArch: function () { S.ui.itemArch = !S.ui.itemArch; renderNow(); },
+  prepTemplate: function () {
+    csvDownload('前置作業匯入範本.csv', [['崗位', '內容', '負責人', '對點日期', '階段', '數量', '備註'],
+      ['櫃檯（不封箱）', '櫃檯區所需物品攜帶', '怡蓁', '10/28', '', '', ''], ['', '確認並裝箱', '', '', '', '', ''], ['', '錢／POS 自行攜帶', '', '', '', '', ''],
+      ['沖煮（不封箱）', '沖煮區器具／水準備', '凱', '10/28', '', '', ''], ['', '試喝沖煮豆包裝', '坤良、建勳', '', '', '', ''],
+      ['商品-咖啡豆', '烘豆／包豆', '坤良、建勳', '10/28', '', '', ''], ['', '裝箱確認（封箱）', '', '', '', '', ''], ['', '外箱標記種類／數量', '', '', '', '', ''],
+      ['商品-濾掛', '濾掛種類確認／封箱', '鍵、Hedy', '10/28', '', '', ''],
+      ['全部品項總對點', '全部品項總對點＋封箱', '怡蓁', '10/28', '', '', '']]);
+  },
+  prepPreview: function () {
+    var f = $('#prep-file'), t = val('#prep-text');
+    function go(text) { S.ui.prep = prepParse(text); renderNow(); }
+    if (f && f.files && f.files[0]) { var rd = new FileReader(); rd.onload = function () { go(rd.result); }; rd.readAsText(f.files[0], 'utf-8'); }
+    else if (t.trim()) go(t);
+    else toast('請選擇檔案或貼上表格', true);
+  },
+  prepClear: function () { S.ui.prep = null; renderNow(); },
+  prepImport: function () {
+    var P = S.ui.prep, rows = [], old = [];
+    P.stations.forEach(function (st) { st.items.forEach(function (it) { rows.push({ station: st.name, owners: st.owners, check_date: st.date, title: it.title, phase: it.phase, qty: it.qty, note: it.note }); }); });
+    Object.keys(P.old).forEach(function (id) { var o = P.old[id]; old.push({ station_id: id, action: o.action, to: o.to }); });
+    var nm = old.filter(function (o) { return o.action !== 'keep'; }).length;
+    if (!confirm('匯入 ' + P.stations.length + ' 個崗位？負責人會以表上為準' + (nm ? '；' + nm + ' 個舊崗位會併入或封存' : '') + '。')) return;
+    call('evt_prep_import', { p_event_id: S.ev, p_rows: rows, p_old: old }, ['stations', 'owners', 'ck', 'people', 'members']).then(function (r) {
+      if (!r.ok) return;
+      var d = r.data || {};
+      S.ui.prep = null; S.ui.st = '';
+      toast('已匯入：新增 ' + d.stations_new + ' 個崗位、' + d.items_new + ' 項清單' + (d.items_updated ? '，更新 ' + d.items_updated + ' 項' : '') + (d.items_moved ? '，搬移 ' + d.items_moved + ' 項' : '') + (d.stations_archived ? '，封存 ' + d.stations_archived + ' 個舊崗位' : ''));
+      renderNow();
+    });
+  },
+  mOff: function (e) {
+    var pid = e.getAttribute('data-id'), d = e.getAttribute('data-v'), m = find(memberRows(S.ev), function (x) { return x.person_id === pid; });
+    var off = (m.off_dates || []).slice(), i = off.indexOf(d);
+    if (i >= 0) off.splice(i, 1); else off.push(d);
+    call('evt_member_set', { p_event_id: S.ev, p_person_id: pid, p: { off_dates: off } }, ['members'], (i >= 0 ? '已取消請假：' : '已標記請假：') + pname(pid) + ' ' + md(d));
+  },
+  crewPaste: function () {
+    var rows = splitDelim(val('#crew-paste')), role = '', jobs = [], miss = [], mem = memberRows(S.ev);
+    rows.forEach(function (r) {
+      if (String(r[0] || '').trim()) role = String(r[0]).trim();
+      String(r[1] || '').split(/[、,，\/\n]+/).forEach(function (raw) {
+        var sup = /支援/.test(raw), nm = raw.replace(/[（(][^）)]*[）)]/g, '').replace(/支援/g, '').trim();
+        if (!nm) return;
+        var p = find(S.G.people, function (x) { return x.name.toLowerCase() === nm.toLowerCase(); });
+        if (!p || !find(mem, function (x) { return x.person_id === p.id; })) { miss.push(nm); return; }
+        jobs.push({ pid: p.id, role: role, sup: sup });
+      });
+    });
+    if (!jobs.length) { toast(miss.length ? '這些名字不在參加夥伴裡：' + miss.join('、') : '沒有讀到分工，請確認是「位置、姓名」兩欄', true); return; }
+    if (!confirm('套用 ' + jobs.length + ' 位夥伴的現場位置？' + (miss.length ? '\n不在參加夥伴裡、會略過：' + miss.join('、') : ''))) return;
+    var i = 0;
+    (function next() {
+      if (i >= jobs.length) { reload(['members']); toast('已套用 ' + jobs.length + ' 位夥伴的分工' + (miss.length ? '，略過：' + miss.join('、') : '')); return; }
+      var j = jobs[i++];
+      sb.rpc('evt_member_set', { p_token: S.token, p_event_id: S.ev, p_person_id: j.pid, p: { role: j.role, is_support: j.sup } }).then(function (r) { if (r.error) { handleErr(r.error); reload(['members']); return; } next(); }, handleErr);
+    })();
+  },
   copyItems: function (e) {
     var k = e.getAttribute('data-v');
     copyText(itemsText(k)).then(function () { toast(k === 'tsv' ? '已複製表格，可以貼到 Excel 或 Google 試算表' : '已複製文字，可以貼到 LINE 或訊息'); }, function (er) { toast('複製失敗：' + er.message, true); });
@@ -2606,7 +2839,7 @@ var A = {
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
-var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate'];
+var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport'];
 
 document.addEventListener('keydown', function (ev) {
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
@@ -2680,6 +2913,11 @@ document.addEventListener('change', function (ev) {
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
   if (a === 'buyRec') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { received_qty: t.value === '' ? null : t.value } }, ['buys'], '已更新實收數量'); return; }
   if (a === 'stDate') { call('evt_station_save', { p: { id: S.ui.st, check_date: t.value } }, ['stations'], '已更新對點日期'); return; }
+  if (a === 'mSupport') { call('evt_member_set', { p_event_id: S.ev, p_person_id: t.getAttribute('data-id'), p: { is_support: t.checked } }, ['members'], '已更新：' + pname(t.getAttribute('data-id'))); return; }
+  var mr = t.getAttribute('data-mrole');
+  if (mr) { call('evt_member_set', { p_event_id: S.ev, p_person_id: mr, p: { role: t.value.trim() } }, ['members'], '已更新現場位置：' + pname(mr)); return; }
+  var po = t.getAttribute('data-prepold');
+  if (po && S.ui.prep && S.ui.prep.old[po]) { var pv = t.value.split('|'); S.ui.prep.old[po].action = pv[0]; if (pv[1]) S.ui.prep.old[po].to = pv[1]; return; }
   var k = t.getAttribute('data-k');
   if (k === 'cdate') { S.ui.cdate = t.value; return; }
   var q = t.getAttribute('data-q');
