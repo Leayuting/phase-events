@@ -405,7 +405,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 33;
+var APP_VERSION = 34;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -497,7 +497,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, nst: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, nst: null, stEdit: false, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1455,11 +1455,13 @@ function vCheck() {
   if (real && st) {
     var owners = ownersOf(st.id), a2 = live.filter(function (c) { return c.station_id === st.id; }), d2 = a2.filter(function (c) { return R.ck[c.id]; }).length;
     h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '勾選、新增與編輯由這個崗位的負責人或管理員處理，你可以查看進度。'),
-      can ? '' : '<span class="tag">僅可查看</span>',
+      mgr ? '<span class="row btns"><button class="btn ghost sm" data-act="stEditToggle">' + (S.ui.stEdit ? '收起崗位設定' : '編輯崗位') + '</button><button class="btn warn sm" data-act="stDelete" data-id="' + st.id + '">刪除崗位</button></span>' : (can ? '' : '<span class="tag">僅可查看</span>'),
       '<span>負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span>對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span>已完成 ' + d2 + ' / ' + a2.length + '</span>');
     if (mgr) {
       var mem = membersOf(S.ev);
-      h += '<details class="ownerbox"' + (owners.length ? '' : ' open') + '><summary class="small"><b>負責人與對點日期</b><span class="mut">（管理員設定）</span></summary><div style="padding:8px 0 0"><div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
+      h += '<details class="ownerbox"' + (owners.length && !S.ui.stEdit ? '' : ' open') + '><summary class="small"><b>崗位設定：名稱、負責人、對點日期</b><span class="mut">（管理員）</span></summary><div style="padding:8px 0 0">' +
+        '<div class="field" style="margin-bottom:16px"><label for="st-name">崗位名稱</label><div class="inline-add" style="margin-top:0"><input type="text" id="st-name" value="' + esc(st.name) + '"><button class="btn sm" data-act="stRename" data-id="' + st.id + '">儲存名稱</button></div></div>' +
+        '<div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
         return '<button class="chip" data-act="owner" data-v="' + p.id + '" aria-pressed="' + (owners.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>';
       }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div></details>';
     }
@@ -2758,7 +2760,7 @@ var A = {
   showCalc: function (e) { S.ui.showCalc = e.checked; renderNow(); },
 
   /* Checklist */
-  station: function (e) { S.ui.st = e.getAttribute('data-v'); S.ui.editId = null; S.ui.showArch = false; renderNow(); },
+  station: function (e) { S.ui.st = e.getAttribute('data-v'); S.ui.editId = null; S.ui.showArch = false; S.ui.stEdit = false; renderNow(); },
   phase: function (e) { S.ui.ph = e.getAttribute('data-v'); renderNow(); },
   tick: function (e) { call('evt_check_set', { p_item_id: e.getAttribute('data-id'), p_done: e.checked }, ['cklog']).then(function (r) { if (!r.ok) renderNow(); }); },
   owner: function (e) {
@@ -3131,6 +3133,18 @@ var A = {
         reload(['stations', 'owners']).then(function () { S.ui.nst = {}; S.ui.st = id; toast('已新增崗位：' + n + (own.length ? '（負責人 ' + own.map(pname).join('、') + '）' : '')); renderNow(); window.scrollTo(0, 0); });
       });
     });
+  },
+  stEditToggle: function () { S.ui.stEdit = !S.ui.stEdit; renderNow(); },
+  stRename: function (e) {
+    var id = e.getAttribute('data-id'), n = val('#st-name').trim();
+    if (!n) { toast('請輸入崗位名稱', true); return; }
+    if (find(S.D.stations, function (x) { return !x.archived && x.id !== id && x.name === n; })) { toast('已經有「' + n + '」這個崗位', true); return; }
+    call('evt_station_save', { p: { id: id, name: n } }, ['stations'], '已更新崗位名稱：' + n);
+  },
+  stDelete: function (e) {
+    var id = e.getAttribute('data-id'), st = station(id), n = S.D.ck.filter(function (c) { return c.station_id === id && !c.archived; }).length;
+    if (!confirm('刪除崗位「' + st.name + '」？' + (n ? '\n這個崗位的 ' + n + ' 項清單會一起隱藏，' : '\n') + '勾選紀錄保留，之後可以在「活動」分頁的崗位卡片還原。')) return;
+    call('evt_station_save', { p: { id: id, archived: true } }, ['stations'], '已刪除崗位：' + st.name).then(function (r) { if (r.ok) { S.ui.st = ''; S.ui.stEdit = false; renderNow(); } });
   },
   addStation: function () {
     var n = val('#newst').trim();
