@@ -405,7 +405,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 32;
+var APP_VERSION = 33;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -497,7 +497,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, nst: null, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1501,7 +1501,7 @@ function vCheck() {
       h += '</section>';
     }
   }
-  if (mgr) h += vPrepImport();
+  if (mgr) h += vNewStation() + vPrepImport();
   return h;
 }
 /* 匯入前置作業：崗位｜內容｜負責人｜對點日期（可多加 階段、數量、備註），支援合併儲存格與一格多行 */
@@ -1641,6 +1641,17 @@ function prepParse(text) {
   });
   res.old = old;
   return res;
+}
+function vNewStation() {
+  var sel = S.ui.nst || (S.ui.nst = {}), mem = membersOf(S.ev);
+  var none = !S.D.stations.some(function (x) { return !x.archived; });
+  return '<section class="panel">' + pHead('新增崗位與指派', (none ? '這場活動還沒有崗位。' : '') + '建立崗位並指定負責人，負責人可以勾選這個崗位的清單；建立後在上方選這個崗位，用「新增項目」加入要確認的品項，也可以把單一項目指派給特定的人。') +
+    '<div class="grid2 form"><div class="field"><label for="nst-name">崗位名稱</label><input type="text" id="nst-name" placeholder="例：櫃檯區"></div>' +
+    '<div class="field"><label for="nst-date">與負責人對點日期</label><input type="date" id="nst-date"></div></div>' +
+    '<div class="field" style="margin-top:16px"><label>負責人（可多人，點選切換）</label><div class="chips">' + S.G.people.filter(function (p) { return p.active && mem.indexOf(p.id) >= 0; }).map(function (p) {
+      return '<button class="chip" data-act="nstOwner" data-v="' + p.id + '" aria-pressed="' + !!sel[p.id] + '">' + esc(p.name) + '</button>';
+    }).join('') + '</div></div>' +
+    '<div class="foot"><button class="btn" data-act="addStationCk">新增崗位</button></div></section>';
 }
 function vPrepImport() {
   var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
@@ -3102,6 +3113,24 @@ var A = {
     if (!p.name.trim() || !p.start_date || !p.end_date) { toast('名稱與起訖日期必填', true); return; }
     if (p.end_date < p.start_date) { toast('結束日期不能早於開始日期', true); return; }
     call('evt_event_save', { p: p }, ['events'], '已儲存');
+  },
+  nstOwner: function (e) {
+    var id = e.getAttribute('data-v'), keep = { n: val('#nst-name'), d: val('#nst-date') };
+    S.ui.nst[id] = !S.ui.nst[id]; renderNow();
+    if ($('#nst-name')) $('#nst-name').value = keep.n;
+    if ($('#nst-date')) $('#nst-date').value = keep.d;
+  },
+  addStationCk: function () {
+    var n = val('#nst-name').trim(), d = val('#nst-date'), own = Object.keys(S.ui.nst || {}).filter(function (k) { return S.ui.nst[k]; });
+    if (!n) { toast('請輸入崗位名稱', true); return; }
+    if (find(S.D.stations, function (x) { return !x.archived && x.name === n; })) { toast('已經有「' + n + '」這個崗位', true); return; }
+    call('evt_station_save', { p: { event_id: S.ev, name: n, check_date: d } }, []).then(function (r) {
+      if (!r.ok) return;
+      var id = r.data, next = own.length ? call('evt_station_set_owners', { p_station_id: id, p_people: own }, []) : Promise.resolve({ ok: true });
+      next.then(function () {
+        reload(['stations', 'owners']).then(function () { S.ui.nst = {}; S.ui.st = id; toast('已新增崗位：' + n + (own.length ? '（負責人 ' + own.map(pname).join('、') + '）' : '')); renderNow(); window.scrollTo(0, 0); });
+      });
+    });
   },
   addStation: function () {
     var n = val('#newst').trim();
