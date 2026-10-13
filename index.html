@@ -418,7 +418,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 41;
+var APP_VERSION = 42;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -460,7 +460,7 @@ var LS = {
 var K_TOKEN = 'phase_evt_token';
 /* 卡片收合：每張卡片標題右邊有「收合／展開」，狀態記在這台裝置；工具類卡片預設收合 */
 var K_FOLD = 'phase_evt_fold';
-var FOLD_DEFAULT = /^(新增|匯入|已刪除|已封存|複製與列印|套用清單|將本次清單|共用密碼|人員$|帳號)/;
+var FOLD_DEFAULT = /^(新增|匯入|已刪除|已封存|套用清單|將本次清單|共用密碼|人員$|帳號)/;
 var foldState = (function () { try { return JSON.parse(LS.get(K_FOLD) || '{}') || {}; } catch (e) { return {}; } })();
 function foldKey(panel) {
   var h = panel.querySelector('h2');
@@ -1127,6 +1127,13 @@ function pHead(title, sub, aside, meta) {
   return '<div class="phead"><div class="ptitle"><h2>' + title + '</h2>' + (sub ? '<p class="sub">' + sub + '</p>' : '') + (meta ? '<div class="pmeta">' + meta + '</div>' : '') + '</div>' +
     (aside ? '<div class="paside">' + aside + '</div>' : '') + '</div>';
 }
+/* 列印與分享操作區（各頁統一）：左側標題與說明，右側依序「列印／存成 PDF」「複製文字（LINE）」「複製表格（Excel）」，再接該頁的編輯功能 */
+function shareBtns(printAct, copyAct) {
+  return '<button class="btn" data-act="' + printAct + '">列印／存成 PDF</button><button class="btn" data-act="' + copyAct + '" data-v="text">複製文字（LINE）</button><button class="btn" data-act="' + copyAct + '" data-v="tsv">複製表格（Excel）</button>';
+}
+function pageBar(title, sub, btns) {
+  return '<div class="pagebar"><div><h2>' + title + '</h2><p class="sub">' + sub + '</p></div>' + (btns ? '<span class="row btns">' + btns + '</span>' : '') + '</div>';
+}
 function vBody() {
   if (!S.loaded) return '<div class="panels"><section class="panel"><div class="empty">載入中…</div></section></div>';
   var ev = curEvent();
@@ -1181,9 +1188,10 @@ function vCount() {
   var recent = S.D.moves.slice().reverse().slice(0, 10);
   h += '<section class="panel">' + pHead('最近紀錄', '最近 10 筆補貨、上架與出杯紀錄。填錯時按「沖銷」，原紀錄會保留；完整紀錄在「紀錄」分頁。') +
     (recent.length ? recent.map(moveRow).join('') : '<div class="empty">還沒有快速紀錄。</div>') + '</section>';
-  h += '<section class="panel">' + pHead('品項現況', '各品項的帶出、補貨、最新盤點與帶回數量。列印會依目前選的展台輸出。', '<div class="chips" role="group" aria-label="展台">' +
-    ['全部'].concat(BOOTHS).concat(['濾掛']).map(function (b) { return '<button class="chip" data-act="bt" data-v="' + b + '" aria-pressed="' + (S.ui.bt === b) + '">' + b + '</button>'; }).join('') + '</div>') +
-    vItemCards() + '<div class="foot"><button class="btn ghost" data-act="printStatus">列印／存成 PDF</button></div></section>';
+  h += '<section class="panel">' + pHead('品項現況', '各品項的帶出、補貨、最新盤點與帶回數量。列印與複製會依目前選的展台輸出。', shareBtns('printStatus', 'copyStatus')) +
+    '<div class="chips" role="group" aria-label="展台" style="margin-bottom:16px">' +
+    ['全部'].concat(BOOTHS).concat(['濾掛']).map(function (b) { return '<button class="chip" data-act="bt" data-v="' + b + '" aria-pressed="' + (S.ui.bt === b) + '">' + b + '</button>'; }).join('') + '</div>' +
+    vItemCards() + '</section>';
   h += '<section class="panel">' + pHead('已簽署的盤點單', '簽署後鎖定不能修改；點開可以看明細與簽名。同一天同類型有多張時，以最後簽署的為準。') + vSheets() + '</section>';
   return h;
 }
@@ -1948,8 +1956,8 @@ function vTimeline() {
   var supBy = {};
   memberRows(ev.id).forEach(function (m) { if (m.is_support) (m.support_dates || []).forEach(function (d) { (supBy[d] = supBy[d] || []).push(pname(m.person_id)); }); });
   var dates = uniq(rows.map(function (t) { return t.date; }).concat(Object.keys(checks))).sort();
-  var h = '<div class="pagebar"><div><h2>時程</h2><p class="sub">佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。') + '</p></div>' + '<span class="row btns">' + (rows.length ? '<button class="btn" data-act="printTl">列印／存成 PDF</button><button class="btn" data-act="copyTl" data-v="text">複製文字（LINE）</button><button class="btn" data-act="copyTl" data-v="tsv">複製表格（Excel）</button>' : '') +
-    (m ? '<button class="btn" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '') + '</span></div><div class="panels">';
+  var h = pageBar('時程', '佈場、活動期間與撤場每天的行程與分工' + (m && S.ui.tlEdit ? '。編輯中：按每一列的「編輯」修改，每天都有的同一列可以一起改。' : '。'),
+    (rows.length ? shareBtns('printTl', 'copyTl') : '') + (m ? '<button class="btn" data-act="tlEdit">' + (S.ui.tlEdit ? '完成編輯' : '編輯時程') + '</button>' : '')) + '<div class="panels">';
   var crew = crewGroups(ev.id).filter(function (g) { return g.role; });
   if (crew.length || m) {
     h += '<section class="panel">' + pHead('現場分工', '活動期間固定的位置；請假以各日標示為準。', m ? '<button class="btn ' + (S.ui.crewEdit ? '' : 'ghost ') + 'sm" data-act="crewEdit">' + (S.ui.crewEdit ? '完成' : (crew.length ? '編輯分工' : '新增分配')) + '</button>' : '');
@@ -2024,8 +2032,6 @@ function vItems() {
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
-  var shareCard = '<section class="panel">' + pHead('複製與列印', '把目前的咖啡豆與濾掛清單複製下來，可以直接貼到 LINE、Excel 或 Google 試算表；也可以列印或存成 PDF（列印視窗的目的地選「另存為 PDF」）。PDF 以白底深棕為主，只有需要注意的項目（待確認、資料缺漏）用磚紅標示「注意」。已刪除的品項不包含在內。') +
-    '<div class="foot" style="margin-top:0;padding-top:0;border-top:0"><button class="btn" data-act="printItems">列印／存成 PDF</button><button class="btn ghost" data-act="copyItems" data-v="text">複製文字（LINE）</button><button class="btn ghost" data-act="copyItems" data-v="tsv">複製表格（Excel）</button></div></section>';
   h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。要改所屬豆款或刪除，請按每列右側的「⋯」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
@@ -2034,7 +2040,6 @@ function vItems() {
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
         (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
-  h += shareCard;
 
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
@@ -2049,7 +2054,8 @@ function vItems() {
       h += '</section>';
     }
   }
-  return h;
+  return pageBar('品項', '本次活動帶的咖啡豆與濾掛，以及第一批、總預計的數量。列印與複製不含已刪除的品項；列印以白底深棕為主，需要注意的項目（待確認、資料缺漏）用磚紅標示。',
+    R.beans.length || R.drips.length ? shareBtns('printItems', 'copyItems') : '') + '<div class="panels">' + h + '</div>';
 }
 /* 咖啡豆資料庫豆款清單 */
 /* 分類順序同咖啡豆資料庫：蜜處理・日曬、水洗、自然發酵、特殊發酵、堅果奶油、台灣競標、配方豆、其他 */
@@ -2248,6 +2254,54 @@ function statusPrintHtml() {
   }
   h += '<div class="ft">最新盤點為最近一張已簽署的盤點單（同一天同類型以最後簽署的為準）；數字不含沖銷的紀錄。' + (nw ? '有 ' + nw + ' 個品項標示「注意」。' : '') + '</div>';
   return h;
+}
+/* 品項現況的複製內容：與列印相同的展台範圍與數字 */
+function statusText(kind) {
+  var R = S.R, bt = S.ui.bt, ev = curEvent(), L = [];
+  var head = ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + (ev.booth ? ' ' + ev.booth : '') + '）品項現況・展台：' + bt;
+  var stamp = '複製時間 ' + tm(new Date().toISOString());
+  function cl(v) { return String(v == null ? '' : v).replace(/[\t\n]/g, ' '); }
+  function nb(v) { return isNum(v) ? I(v) : ''; }
+  var list = bt === '濾掛' ? [] : R.beans.filter(function (it) { return bt === '全部' || it.booth === bt; });
+  var drips = (bt === '全部' || bt === '濾掛') ? R.drips : [];
+  if (kind === 'tsv') {
+    L.push(head, stamp);
+    if (list.length) {
+      L.push('', '咖啡豆');
+      L.push(['展台', '咖啡豆', '帶出', '補貨', '倉庫', '檯面', '最新盤點', '帶回', '最新盤點單', '試喝已用g', '試喝預計g', '試喝剩g'].join('\t'));
+      list.forEach(function (it) {
+        var x = R.item[it.id], la = x.latest;
+        L.push([it.booth || '', it.name, nb(x.out), nb(x.rep), la ? nb(la.wh) : '', la ? nb(la.tb) : '', la ? nb(la.total) : '', nb(x.back), la ? la.sheet.type + ' ' + md(la.sheet.biz_date) : '', nb(x.used), nb(x.tasting), nb(x.tastingLeft)].map(cl).join('\t'));
+      });
+    }
+    if (drips.length) {
+      L.push('', '濾掛');
+      L.push(['濾掛', '所屬豆款', '第一批', '總預計', '補貨累計', '備註'].join('\t'));
+      drips.forEach(function (it) {
+        var y = R.drip[it.id], par = item(it.parent_item_id);
+        L.push([it.name, par ? par.name : '只帶濾掛', nb(y.plan1), nb(y.planT), nb(y.rep), it.note || ''].map(cl).join('\t'));
+      });
+    }
+    return L.join('\n');
+  }
+  L.push('【' + head + '】', stamp);
+  if (list.length) {
+    L.push('', '■ 咖啡豆 ' + list.length + ' 款');
+    var g = null;
+    list.forEach(function (it) {
+      var x = R.item[it.id], la = x.latest;
+      if (it.booth !== g) { g = it.booth; L.push('', '〔' + (g || '未分展台') + '〕'); }
+      L.push('・' + it.name + '｜帶出 ' + (nb(x.out) || '—') + '｜補貨 ' + (nb(x.rep) || '0') + '｜最新盤點 ' + (la ? I(la.total) + '（' + la.sheet.type + ' ' + md(la.sheet.biz_date) + '）' : '尚無') + '｜帶回 ' + (nb(x.back) || '—'));
+    });
+  }
+  if (drips.length) {
+    L.push('', '■ 濾掛 ' + drips.length + ' 款');
+    drips.forEach(function (it) {
+      var y = R.drip[it.id];
+      L.push('・' + it.name + (it.parent_item_id ? '' : '（只帶濾掛）') + '｜第一批 ' + (nb(y.plan1) || '—') + '｜總預計 ' + (nb(y.planT) || '—') + '｜補貨 ' + (nb(y.rep) || '0'));
+    });
+  }
+  return L.join('\n');
 }
 function itemOps(it) {
   var open = itemMenu.id === it.id;
@@ -3119,6 +3173,10 @@ var A = {
   },
   printItems: function () { printHtml(itemsPrintHtml()); },
   printStatus: function () { printHtml(statusPrintHtml()); },
+  copyStatus: function (e) {
+    var k = e.getAttribute('data-v');
+    copyText(statusText(k)).then(function () { toast(k === 'tsv' ? '已複製品項現況表格，可以貼到 Excel 或 Google 試算表' : '已複製品項現況文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
+  },
   beanDbRetry: function () { loadBeanDb(true); renderNow(); },
   niManual: function () { var n = niState(); n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); },
   niBackDb: function () { var n = niState(); n.mode = 'db'; n.name = ''; n.bean = ''; renderNow(); },
