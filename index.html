@@ -111,6 +111,8 @@ th{font-size:12px;line-height:1.5;color:var(--mut);font-weight:500;white-space:n
 td.n,th.n{text-align:right}
 td.ops,th.ops{text-align:right;white-space:nowrap;width:1%}
 td .btn{min-height:40px}
+.nmlink{display:inline;padding:4px 0;margin:0;background:none;border:0;font:inherit;font-weight:600;color:var(--ink);text-align:left;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px}
+.nmlink:hover,.nmlink:focus-visible{text-decoration-style:solid}
 table.top td{vertical-align:top;line-height:40px}
 table.top td>*{line-height:1.5}
 table.top td .btn{line-height:1.2}
@@ -412,7 +414,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 43;
+var APP_VERSION = 44;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2001,33 +2003,33 @@ function vTimeline() {
 function vItems() {
   var m = isMgr(), dis = m ? '' : ' disabled', R = S.R, eb = m && S.ui.secEdit.bean, ed = m && S.ui.secEdit.drip;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? (eb ? '編輯中：按每一列的「編輯」修改名稱、展台、分類、備註，沒有要帶的品項按「刪除」，刪除的品項可以再還原。完成後按「完成編輯」。' : '數字欄位可以直接修改，離開欄位即儲存。要改名稱、展台、分類、備註，或刪除沒有要帶的品項，請按右上角「編輯」。修改都會留在紀錄裡。') : '只有管理員可以修改，你目前可以查看。', m ? secEditBtn('bean') : '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
+  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? (eb ? '編輯中：點品項名稱就可以修改名稱、展台、分類、備註；沒有要帶的品項，點開後按「刪除這個品項」，刪除的品項可以再還原。完成後按「完成編輯」。' : '數字欄位可以直接修改，離開欄位即儲存。要改名稱、展台、分類、備註，或刪除沒有要帶的品項，請按右上角「編輯」。修改都會留在紀錄裡。') : '只有管理員可以修改，你目前可以查看。', m ? secEditBtn('bean') : '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
   if (flagged.length) h += '<div class="banner hold" style="margin:0 0 16px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
-  h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (eb ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
+  h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th></tr></thead><tbody>';
   var tp1 = 0, tpT = 0;
   h += beansByBooth(function (it, booth) {
-    if (!it) return '<tr class="grp"><td colspan="' + (eb ? 8 : 7) + '">' + esc(booth) + '</td></tr>';
+    if (!it) return '<tr class="grp"><td colspan="7">' + esc(booth) + '</td></tr>';
     var x = R.item[it.id];
     tp1 += num(x.plan1); tpT += num(x.planT);
-    if (eb && S.ui.itemEdit === it.id) return '<tr><td colspan="8">' + itemForm(it) + '</td></tr>';
+    if (eb && S.ui.itemEdit === it.id) return '<tr><td colspan="7">' + itemForm(it) + '</td></tr>';
     var drip = find(R.drips, function (d) { return d.parent_item_id === it.id; });
-    return '<tr><td style="min-width:150px"><b style="font-weight:600">' + esc(it.name) + '</b>' + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
+    return '<tr><td style="min-width:150px">' + itemNameCell(it, eb) + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
       '<td class="small mut" style="min-width:140px">' + esc(it.category || '—') + '</td>' +
       '<td class="n"><input type="number" min="1" data-it="' + it.id + '|spec_g" value="' + I(it.spec_g) + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(x.plan1) ? x.plan1 : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(x.planT) ? x.planT : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|tasting_g" value="' + (isNum(x.tasting) ? x.tasting : '') + '"' + dis + '></td>' +
-      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td>' + (eb ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
+      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td></tr>';
   });
-  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (eb ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
+  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td></tr></tbody></table></div></section>';
 
-  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：按每一列的「編輯」修改所屬豆款與備註，或按「刪除」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (ed ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：點濾掛名稱就可以修改所屬豆款與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th></tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
-      if (ed && S.ui.itemEdit === it.id) return '<tr><td colspan="5">' + itemForm(it) + '</td></tr>';
-      return '<tr><td style="min-width:130px"><b style="font-weight:600">' + esc(it.name) + '</b>' + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
+      if (ed && S.ui.itemEdit === it.id) return '<tr><td colspan="4">' + itemForm(it) + '</td></tr>';
+      return '<tr><td style="min-width:130px">' + itemNameCell(it, ed) + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
-        (ed ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
+        '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
 
   if (m) {
@@ -2292,11 +2294,12 @@ function statusText(kind) {
   }
   return L.join('\n');
 }
-function itemOps(it) {
-  var n = esc(itemName(it.id));
-  return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '" aria-label="編輯 ' + n + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '" aria-label="刪除 ' + n + '">刪除</button></span>';
+/* 品項名稱：編輯模式下可以點名稱打開這個品項的編輯表單 */
+function itemNameCell(it, editing) {
+  if (!editing) return '<b style="font-weight:600">' + esc(it.name) + '</b>';
+  return '<button type="button" class="nmlink" data-act="editItem" data-id="' + it.id + '" aria-label="編輯 ' + esc(itemName(it.id)) + '">' + esc(it.name) + '</button>';
 }
-/* 咖啡豆、濾掛各一個「編輯」切換：平常列上不放按鈕，進入編輯後才顯示每列的編輯／刪除 */
+/* 咖啡豆、濾掛各一個「編輯」切換：進入編輯後點品項名稱即可編輯 */
 function secEditBtn(k) {
   var on = !!S.ui.secEdit[k];
   return '<button class="btn ' + (on ? '' : 'ghost ') + 'sm" data-act="secEdit" data-v="' + k + '" aria-pressed="' + on + '">' + (on ? '完成編輯' : '編輯') + '</button>';
