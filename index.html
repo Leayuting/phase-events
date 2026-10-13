@@ -412,7 +412,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 39;
+var APP_VERSION = 40;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -942,6 +942,9 @@ function modeLabel(m) { return m === 'admin' ? '管理員' : (m === 'partner' ? 
 function modeTag(m) { return '<span class="tag' + (m === 'admin' ? ' ok' : '') + '">' + modeLabel(m) + '</span>'; }
 function whoHtml(id, m) { return '<span class="mut small nowrap">' + esc(pname(id)) + '</span> ' + modeTag(m); }
 function isMgr() { return !!(S.me && S.me.is_manager); }
+/* 最高管理員：管理員登入，且名單上標為最高管理員（伺服器另外檢查） */
+function isOwner() { var p = isMgr() && person(S.me.id); return !!(p && p.is_owner); }
+function mgrLabel(p) { return p.is_owner ? '最高管理員' : '管理員'; }
 function station(id) { return byId(S.D.stations, id); }
 function stationLive(id) { var s = station(id); return !!(s && !s.archived); }
 function ownersOf(stId) { return S.D.owners.filter(function (o) { return o.station_id === stId; }).map(function (o) { return o.person_id; }); }
@@ -955,7 +958,7 @@ function canEditSt(stId) {
   return !!(S.me && s && !s.archived && ev && ev.status !== '已結束' && ownersOf(stId).indexOf(S.me.id) >= 0);
 }
 function roleText() {
-  if (isMgr()) return '管理員';
+  if (isMgr()) return isOwner() ? '最高管理員' : '管理員';
   var ev = curEvent();
   var o = (ev && ev.status !== '已結束') ? myStations().map(function (s) { return s.name; }) : [];
   return o.length ? '崗位負責人・' + o.join('、') : '夥伴';
@@ -1037,7 +1040,7 @@ function vLogin() {
       h += '<p class="sub" style="margin-top:16px">' + esc(p ? p.name : '') + '，請輸入你的管理員 PIN</p>' +
         '<form data-form="admin"><input type="password" id="pin" inputmode="numeric" autocomplete="current-password" pattern="[0-9]*" maxlength="6" aria-label="管理員 PIN">' +
         loginMsgHtml() + '<div class="row btns" style="margin-top:16px"><button class="btn" type="submit" style="flex:1">登入</button><button class="btn ghost" type="button" data-act="pickLogin" data-id="">換一位</button></div></form>' +
-        '<p class="hint" style="margin-top:16px">忘記 PIN 請其他管理員幫你重設。</p>';
+        '<p class="hint" style="margin-top:16px">忘記 PIN 請最高管理員幫你重設。</p>';
     }
     h += '<div style="margin-top:24px"><button class="btn ghost sm" data-act="screen" data-v="' + (S.me ? '' : 'partner') + '">' + (S.me ? '取消，回到系統' : '回到一般登入') + '</button></div>';
   }
@@ -2545,7 +2548,7 @@ function vEvent() {
 function vAccount() {
   var h = '<section class="panel"><h2>我的帳號</h2>';
   if (isMgr()) {
-    h += '<p class="sub">' + esc(S.me.name) + '（管理員登入）。這台裝置會記住登入，直到登出或你的 PIN 被更換。手機借給別人前，請先「切換為一般夥伴」或登出。</p>' +
+    h += '<p class="sub">' + esc(S.me.name) + '（' + (isOwner() ? '最高管理員' : '管理員') + '登入）。這台裝置會記住登入，直到登出或你的 PIN 被更換。手機借給別人前，請先「切換為一般夥伴」或登出。</p>' +
       '<div class="grid2 form"><div class="field"><label for="pin-old">目前 PIN</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pin-old" autocomplete="current-password"></div>' +
       '<div class="field"><label for="pin-new">新 PIN（4 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-new" autocomplete="new-password"></div>' +
       '<div class="field"><label for="pin-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pin-new2" autocomplete="new-password"></div></div>' +
@@ -2560,7 +2563,7 @@ function vAccount() {
 }
 function memChips(sel, act) {
   return '<div class="chips">' + S.G.people.filter(function (p) { return p.active || sel[p.id]; }).map(function (p) {
-    return '<button class="chip" data-act="' + act + '" data-v="' + p.id + '" aria-pressed="' + !!sel[p.id] + '">' + esc(p.name) + (p.is_manager ? '<span class="mut small">・管理員</span>' : '') + '</button>';
+    return '<button class="chip" data-act="' + act + '" data-v="' + p.id + '" aria-pressed="' + !!sel[p.id] + '">' + esc(p.name) + (p.is_manager ? '<span class="mut small">・' + mgrLabel(p) + '</span>' : '') + '</button>';
   }).join('') + '</div>';
 }
 function selCount(sel) { return Object.keys(sel).filter(function (k) { return sel[k]; }).length; }
@@ -2572,7 +2575,7 @@ function vMembersCard(ev) {
   h += '<div class="row small" style="margin-bottom:16px"><span>共 <b>' + rows.length + '</b> 人</span>' + (others.length ? '<button class="btn ghost sm" data-act="memAddAll">全部加入（' + others.length + ' 人）</button>' : '') + '</div>';
   h += rows.length ? '<div class="chips">' + rows.map(function (m) {
     var p = person(m.person_id) || {};
-    return '<span class="chip" style="display:inline-flex;align-items:center;gap:8px;cursor:default;padding-right:6px">' + esc(p.name || '') + (p.is_manager ? '<span class="mut small">管理員</span>' : '') + (m.role ? '<span class="mut small">' + esc(m.role) + '</span>' : '') +
+    return '<span class="chip" style="display:inline-flex;align-items:center;gap:8px;cursor:default;padding-right:6px">' + esc(p.name || '') + (p.is_manager ? '<span class="mut small">' + mgrLabel(p) + '</span>' : '') + (m.role ? '<span class="mut small">' + esc(m.role) + '</span>' : '') +
       '<button class="btn warn sm" data-act="memRemove" data-id="' + m.person_id + '" style="min-height:28px;padding:0 8px" aria-label="移除 ' + esc(p.name || '') + '">移除</button></span>';
   }).join('') + '</div>' : '<div class="empty">還沒有人員。</div>';
   h += '<datalist id="mem-names">' + others.map(function (p) { return '<option value="' + esc(p.name) + '"></option>'; }).join('') + '</datalist>' +
@@ -2638,22 +2641,26 @@ function vPeople() {
   var st = {};
   (S.pinStatus || []).forEach(function (x) { st[x.person_id] = x; });
   if (!S.pinStatus) loadPinStatus();
-  var sh = S.sharedStatus;
+  var sh = S.sharedStatus, own = isOwner();
   var h = '<section class="panel"><h2>共用密碼</h2><p class="sub">一般夥伴用共用密碼登入，再輸入自己的名字。更換後，所有一般登入立即失效，大家需要用新密碼重新登入；管理員登入不受影響。</p>' +
     '<p class="small" style="margin:0 0 16px">' + (!sh ? '讀取中…' : (sh.is_set ? '目前狀態：<span class="tag ok">已設定</span> <span class="mut">' + tm(sh.updated_at) + (sh.updated_by ? '・' + esc(sh.updated_by) : '') + '</span>' : '目前狀態：<span class="tag warn">尚未設定</span> <span class="mut">設定前，一般夥伴無法登入</span>')) + '</p>' +
+    (!own ? '<p class="hint" style="margin:0">只有最高管理員可以更換共用密碼。</p></section>' :
     '<div class="grid2 form"><div class="field"><label for="sp-new">新的共用密碼（8 位數字，可用 0 開頭）</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new" autocomplete="new-password"></div>' +
     '<div class="field"><label for="sp-new2">再輸入一次</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="sp-new2" autocomplete="new-password"></div>' +
-    '</div><div class="foot"><button class="btn" data-act="setShared">' + (sh && sh.is_set ? '更換共用密碼' : '設定共用密碼') + '</button></div></section>';
-  h += '<section class="panel"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯或不需要的名字可以停用或刪除。刪除後過去紀錄上的名字仍會保留。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 4 位數 PIN。</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th><th class="ops"></th></tr></thead><tbody>';
+    '</div><div class="foot"><button class="btn" data-act="setShared">' + (sh && sh.is_set ? '更換共用密碼' : '設定共用密碼') + '</button></div></section>');
+  h += '<section class="panel"><h2>人員</h2><p class="sub">一般夥伴登入時自己輸入名字，新名字會自動加進名單；打錯或不需要的名字可以停用或刪除。刪除後過去紀錄上的名字仍會保留。只有管理員需要個人 PIN；把人設為管理員後，請幫他設定 4 位數 PIN。</p><p class="sub">' + (own ? '你是最高管理員：可以設定誰是管理員、設定其他管理員的 PIN、停用或刪除管理員、更換共用密碼。' : '管理員的設定、PIN、停用與刪除，以及共用密碼，只有最高管理員可以操作；你可以停用或刪除一般夥伴，並更改自己的 PIN。') + '</p><div class="tw"><table><thead><tr><th>姓名</th><th>管理員</th><th>最高管理員</th><th>啟用</th><th>管理員 PIN</th><th>設定新 PIN</th><th class="ops"></th></tr></thead><tbody>';
   S.G.people.forEach(function (p) {
-    var s = st[p.id] || {};
+    var s = st[p.id] || {}, me = p.id === S.me.id, lockMgr = !own && (p.is_manager || p.is_owner);
     var pinTxt = '<span class="mut small">一般登入</span>', setTxt = '';
     if (p.is_manager) {
       pinTxt = !S.pinStatus ? '…' : (s.has_pin ? '<span class="tag ok">已設定</span>' : '<span class="tag warn">未設定，無法登入</span>');
-      setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-newpin="' + p.id + '" placeholder="4 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
+      if (own || me) setTxt = '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" data-newpin="' + p.id + '" placeholder="4 位數字" style="width:120px;display:inline-block" autocomplete="new-password"> <button class="btn ghost sm" data-act="setPin" data-id="' + p.id + '">設定</button>';
+      else setTxt = '<span class="mut small">由最高管理員設定</span>';
     }
-    h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 管理員"></td>' +
-      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td><td class="ops">' + (p.id === S.me.id ? '' : '<button class="btn warn sm" data-act="personDel" data-id="' + p.id + '">刪除</button>') + '</td></tr>';
+    var dis = function (on) { return on ? ' disabled' : ''; };
+    h += '<tr><td>' + esc(p.name) + '</td><td><input type="checkbox" data-act="pMgr" data-id="' + p.id + '"' + (p.is_manager ? ' checked' : '') + dis(!own) + ' aria-label="' + esc(p.name) + ' 管理員"></td>' +
+      '<td><input type="checkbox" data-act="pOwner" data-id="' + p.id + '"' + (p.is_owner ? ' checked' : '') + dis(!own) + ' aria-label="' + esc(p.name) + ' 最高管理員"></td>' +
+      '<td><input type="checkbox" data-act="pActive" data-id="' + p.id + '"' + (p.active ? ' checked' : '') + dis(lockMgr) + ' aria-label="' + esc(p.name) + ' 啟用"></td><td>' + pinTxt + '</td><td class="nowrap">' + setTxt + '</td><td class="ops">' + (me || lockMgr ? '' : '<button class="btn warn sm" data-act="personDel" data-id="' + p.id + '">刪除</button>') + '</td></tr>';
   });
   h += '</tbody></table></div><div class="inline-add"><input type="text" id="newperson" placeholder="新增人員姓名" aria-label="新增人員姓名" maxlength="30"><button class="btn ghost" data-act="addPerson">新增人員</button></div></section>';
   return h;
@@ -3276,6 +3283,11 @@ var A = {
     if (!n) { toast('請輸入姓名', true); return; }
     call('evt_person_save', { p: { name: n } }, ['people'], '已新增：' + n).then(function (r) { if (r.ok) { S.pinStatus = null; renderNow(); } });
   },
+  pOwner: function (e) {
+    var id = e.getAttribute('data-id');
+    if (e.checked && !confirm('把 ' + pname(id) + ' 設為最高管理員？\n最高管理員可以設定誰是管理員、重設其他管理員的 PIN、停用或刪除管理員、更換共用密碼。')) { e.checked = false; return; }
+    call('evt_person_save', { p: { id: id, is_owner: e.checked } }, ['people'], '已更新').then(function (r) { if (!r.ok) renderNow(); else { S.pinStatus = null; renderNow(); } });
+  },
   pMgr: function (e) { call('evt_person_save', { p: { id: e.getAttribute('data-id'), is_manager: e.checked } }, ['people'], '已更新').then(function (r) { if (!r.ok) renderNow(); }); },
   pActive: function (e) {
     if (!e.checked && !confirm('停用 ' + pname(e.getAttribute('data-id')) + '？這個人會立刻被登出，且無法再登入。')) { e.checked = true; return; }
@@ -3289,7 +3301,7 @@ var A = {
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
-var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
+var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pOwner', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
 
 document.addEventListener('keydown', function (ev) {
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
@@ -3358,7 +3370,7 @@ document.addEventListener('submit', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var t = ev.target, a = t.getAttribute('data-act');
-  if (a === 'tick' || a === 'showCalc' || a === 'pMgr' || a === 'pActive') { A[a](t); return; }
+  if (a === 'tick' || a === 'showCalc' || a === 'pMgr' || a === 'pOwner' || a === 'pActive') { A[a](t); return; }
   if (a === 'pickEvent') { switchEvent(t.value); return; }
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
   if (a === 'buyRec') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { received_qty: t.value === '' ? null : t.value } }, ['buys'], '已更新實收數量'); return; }
