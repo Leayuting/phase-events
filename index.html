@@ -111,12 +111,6 @@ th{font-size:12px;line-height:1.5;color:var(--mut);font-weight:500;white-space:n
 td.n,th.n{text-align:right}
 td.ops,th.ops{text-align:right;white-space:nowrap;width:1%}
 td .btn{min-height:40px}
-.btn.kebab{min-width:44px;padding:0 10px;font-size:18px;font-weight:700;letter-spacing:1px}
-#popmenu{position:fixed;z-index:9000;display:none;min-width:148px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(54,29,11,.16)}
-#popmenu.open{display:block}
-#popmenu button{display:flex;align-items:center;width:100%;min-height:44px;padding:0 14px;background:transparent;border:0;border-radius:6px;color:var(--fg);font:inherit;font-size:14px;text-align:left;cursor:pointer;white-space:nowrap}
-#popmenu button:hover,#popmenu button:focus-visible{background:var(--soft);outline:none}
-#popmenu button.danger{color:var(--warn)}
 table.top td{vertical-align:top;line-height:40px}
 table.top td>*{line-height:1.5}
 table.top td .btn{line-height:1.2}
@@ -418,7 +412,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 42;
+var APP_VERSION = 43;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -537,7 +531,7 @@ var S = {
     draftId: null, dv: {}, signing: false, ctype: '收店盤點', cdate: '',
     q: { kind: '補貨', item: '', qty: '', note: '', date: '', from: '倉庫', to: '檯面' },
     loginPid: null, loginMsg: '', screen: null, csv: null, tlEdit: false, buyEdit: null, itemArch: false,
-    showCalc: false, logMore: 0, itemEdit: null, prep: null, tlimp: null, crewEdit: false, tlRow: null, nst: null, stEdit: false, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
+    showCalc: false, logMore: 0, itemEdit: null, secEdit: {}, prep: null, tlimp: null, crewEdit: false, tlRow: null, nst: null, stEdit: false, ni: null, newEv: '', picker: '', mem: null, memEv: null, nevMem: null
   }
 };
 function emptyD() {
@@ -1001,7 +995,6 @@ function renderNow() {
   $('#ver').textContent = 'v' + APP_VERSION;
   var app = $('#app');
   if (!S.me || S.ui.screen) {
-    closeItemMenu(false);
     app.innerHTML = vLogin();
     var fo = $('#pin') || $('#pw') || $('#nm');
     if (fo) fo.focus();
@@ -1011,13 +1004,9 @@ function renderNow() {
   app.innerHTML = (S.ui.picker || (S.loaded && !curEvent()) ? vListPage() : vHeader() + '<main id="view">' + vBody() + '</main>') + (S.ui.newEv && isMgr() ? vNewEvent() : '');
   window.scrollTo(0, y);
   applyFolds();
-  if (itemMenu.id) placeItemMenu();
   if (S.ui.tab === 'count' && S.ui.signing) initPad();
   writeUrl();
 }
-
-window.addEventListener('resize', function () { closeItemMenu(false); });
-document.addEventListener('scroll', function () { if (itemMenu.id) placeItemMenu(); }, true);
 
 function namesDatalist() {
   return '<datalist id="names">' + S.G.people.filter(function (p) { return p.active; }).map(function (p) { return '<option value="' + esc(p.name) + '"></option>'; }).join('') + '</datalist>';
@@ -2010,17 +1999,17 @@ function vTimeline() {
    品項與預計量
    --------------------------------------------------------------------------- */
 function vItems() {
-  var m = isMgr(), dis = m ? '' : ' disabled', R = S.R;
+  var m = isMgr(), dis = m ? '' : ' disabled', R = S.R, eb = m && S.ui.secEdit.bean, ed = m && S.ui.secEdit.drip;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? '數字欄位可以直接修改，離開欄位即儲存。要改名稱、展台、分類、備註，或刪除沒有要帶的品項，請按每列右側的「⋯」；刪除的品項可以再還原。修改都會留在紀錄裡。' : '只有管理員可以修改，你目前可以查看。', '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
+  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? (eb ? '編輯中：按每一列的「編輯」修改名稱、展台、分類、備註，沒有要帶的品項按「刪除」，刪除的品項可以再還原。完成後按「完成編輯」。' : '數字欄位可以直接修改，離開欄位即儲存。要改名稱、展台、分類、備註，或刪除沒有要帶的品項，請按右上角「編輯」。修改都會留在紀錄裡。') : '只有管理員可以修改，你目前可以查看。', m ? secEditBtn('bean') : '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
   if (flagged.length) h += '<div class="banner hold" style="margin:0 0 16px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
-  h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
+  h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th>' + (eb ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>';
   var tp1 = 0, tpT = 0;
   h += beansByBooth(function (it, booth) {
-    if (!it) return '<tr class="grp"><td colspan="' + (m ? 8 : 7) + '">' + esc(booth) + '</td></tr>';
+    if (!it) return '<tr class="grp"><td colspan="' + (eb ? 8 : 7) + '">' + esc(booth) + '</td></tr>';
     var x = R.item[it.id];
     tp1 += num(x.plan1); tpT += num(x.planT);
-    if (m && S.ui.itemEdit === it.id) return '<tr><td colspan="8">' + itemForm(it) + '</td></tr>';
+    if (eb && S.ui.itemEdit === it.id) return '<tr><td colspan="8">' + itemForm(it) + '</td></tr>';
     var drip = find(R.drips, function (d) { return d.parent_item_id === it.id; });
     return '<tr><td style="min-width:150px"><b style="font-weight:600">' + esc(it.name) + '</b>' + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
       '<td class="small mut" style="min-width:140px">' + esc(it.category || '—') + '</td>' +
@@ -2028,17 +2017,17 @@ function vItems() {
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(x.plan1) ? x.plan1 : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(x.planT) ? x.planT : '') + '"' + dis + '></td>' +
       '<td class="n"><input type="number" min="0" data-it="' + it.id + '|tasting_g" value="' + (isNum(x.tasting) ? x.tasting : '') + '"' + dis + '></td>' +
-      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td>' + (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
+      '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td>' + (eb ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
   });
-  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (m ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
+  h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td>' + (eb ? '<td></td>' : '') + '</tr></tbody></table></div></section>';
 
-  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。要改所屬豆款或刪除，請按每列右側的「⋯」。', '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (m ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：按每一列的「編輯」修改所屬豆款與備註，或按「刪除」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th>' + (ed ? '<th class="ops"></th>' : '') + '</tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
-      if (m && S.ui.itemEdit === it.id) return '<tr><td colspan="5">' + itemForm(it) + '</td></tr>';
+      if (ed && S.ui.itemEdit === it.id) return '<tr><td colspan="5">' + itemForm(it) + '</td></tr>';
       return '<tr><td style="min-width:130px"><b style="font-weight:600">' + esc(it.name) + '</b>' + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
-        (m ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
+        (ed ? '<td class="ops">' + itemOps(it) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
 
   if (m) {
@@ -2304,32 +2293,13 @@ function statusText(kind) {
   return L.join('\n');
 }
 function itemOps(it) {
-  var open = itemMenu.id === it.id;
-  return '<button class="btn ghost sm kebab" data-act="itemMenu" data-id="' + it.id + '" aria-haspopup="menu" aria-expanded="' + open + '" aria-label="' + esc(itemName(it.id)) + ' 的操作（編輯、刪除）" title="編輯或刪除">⋯</button>';
+  var n = esc(itemName(it.id));
+  return '<span class="row btns" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-act="editItem" data-id="' + it.id + '" aria-label="編輯 ' + n + '">編輯</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '" aria-label="刪除 ' + n + '">刪除</button></span>';
 }
-/* 品項列的「⋯」選單：放在 body 上的單一浮動選單，不會被表格的捲動範圍裁切；同時只開一個 */
-var itemMenu = { id: null };
-function popMenuEl() {
-  var d = $('#popmenu');
-  if (!d) { d = document.createElement('div'); d.id = 'popmenu'; d.setAttribute('role', 'menu'); document.body.appendChild(d); }
-  return d;
-}
-function itemMenuTrig() { return itemMenu.id ? document.querySelector('[data-act="itemMenu"][data-id="' + itemMenu.id + '"]') : null; }
-function closeItemMenu(focusTrig) {
-  if (!itemMenu.id) return;
-  var t = itemMenuTrig(), d = popMenuEl();
-  itemMenu.id = null;
-  d.className = ''; d.innerHTML = '';
-  if (t) { t.setAttribute('aria-expanded', 'false'); if (focusTrig) t.focus(); }
-}
-function placeItemMenu() {
-  var t = itemMenuTrig(), d = popMenuEl();
-  if (!t) { itemMenu.id = null; d.className = ''; d.innerHTML = ''; return; }
-  t.setAttribute('aria-expanded', 'true');
-  var r = t.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight, w = d.offsetWidth, h = d.offsetHeight;
-  var left = Math.max(8, Math.min(r.right - w, vw - w - 8)), top = r.bottom + 4;
-  if (top + h > vh - 8 && r.top - h - 4 >= 8) top = r.top - h - 4;
-  d.style.left = left + 'px'; d.style.top = top + 'px';
+/* 咖啡豆、濾掛各一個「編輯」切換：平常列上不放按鈕，進入編輯後才顯示每列的編輯／刪除 */
+function secEditBtn(k) {
+  var on = !!S.ui.secEdit[k];
+  return '<button class="btn ' + (on ? '' : 'ghost ') + 'sm" data-act="secEdit" data-v="' + k + '" aria-pressed="' + on + '">' + (on ? '完成編輯' : '編輯') + '</button>';
 }
 function beanLinkField(it) {
   var B = S.beanDb;
@@ -2836,7 +2806,7 @@ var A = {
     /* supabase-js 的呼叫要接上 then 才會真正送出 */
     sb.rpc('evt_logout', { p_token: tok }).then(function () {}, function () {});
   },
-  tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; S.ui.itemEdit = null; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
+  tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; S.ui.itemEdit = null; S.ui.secEdit = {}; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
   go: function (e) { S.ui.tab = e.getAttribute('data-v'); renderNow(); window.scrollTo(0, 0); },
 
   /* 盤點單 */
@@ -3020,20 +2990,13 @@ var A = {
       sb.rpc('evt_item_confirm', { p_token: S.token, p_item_id: list[i++].id }).then(function (r) { if (r.error) { handleErr(r.error); reload(['items']); return; } next(); });
     })();
   },
-  itemMenu: function (e) {
-    var id = e.getAttribute('data-id');
-    if (itemMenu.id === id) { closeItemMenu(true); return; }
-    closeItemMenu(false);
-    itemMenu.id = id;
-    var d = popMenuEl();
-    d.setAttribute('aria-label', itemName(id) + ' 的操作');
-    d.innerHTML = '<button type="button" role="menuitem" data-act="menuEditItem" data-id="' + id + '">編輯</button><button type="button" role="menuitem" class="danger" data-act="menuArchItem" data-id="' + id + '">刪除</button>';
-    d.className = 'open';
-    placeItemMenu();
-    d.querySelector('button').focus();
+  secEdit: function (e) {
+    var k = e.getAttribute('data-v');
+    S.ui.secEdit[k] = !S.ui.secEdit[k];
+    var it = S.ui.itemEdit && item(S.ui.itemEdit);
+    if (!S.ui.secEdit[k] && it && (it.kind === 'bean') === (k === 'bean')) S.ui.itemEdit = null;
+    renderNow();
   },
-  menuEditItem: function (e) { closeItemMenu(false); A.editItem(e); },
-  menuArchItem: function (e) { closeItemMenu(true); A.archItem(e); },
   editItem: function (e) { S.ui.itemEdit = e.getAttribute('data-id'); renderNow(); },
   cancelItemEdit: function () { S.ui.itemEdit = null; renderNow(); },
   saveItemEdit: function (e) {
@@ -3412,18 +3375,10 @@ var A = {
 var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pOwner', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
 
 document.addEventListener('keydown', function (ev) {
-  if (itemMenu.id) {
-    var pm = popMenuEl(), bs = pm.querySelectorAll('button'), i = Array.prototype.indexOf.call(bs, document.activeElement);
-    if (ev.key === 'Escape' || ev.key === 'Esc') { ev.preventDefault(); closeItemMenu(true); return; }
-    if (i >= 0 && (ev.key === 'ArrowDown' || ev.key === 'Down')) { ev.preventDefault(); bs[(i + 1) % bs.length].focus(); return; }
-    if (i >= 0 && (ev.key === 'ArrowUp' || ev.key === 'Up')) { ev.preventDefault(); bs[(i + bs.length - 1) % bs.length].focus(); return; }
-    if (i >= 0 && ev.key === 'Tab') { closeItemMenu(true); ev.preventDefault(); return; }
-  }
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
 });
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest ? ev.target.closest('[data-act]') : null;
-  if (itemMenu.id && !popMenuEl().contains(ev.target) && !(t && t.getAttribute('data-act') === 'itemMenu')) closeItemMenu(false);
   if (!t) return;
   var a = t.getAttribute('data-act');
   if (CHANGE_ACTS.indexOf(a) >= 0) return;
