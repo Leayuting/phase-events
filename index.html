@@ -258,7 +258,13 @@ details[open]>summary::before{transform:rotate(90deg)}
   .row>.field{flex:1 1 100%;width:auto!important}
   .who{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:12px;border-top:1px solid var(--line)}
   .who .row.btns{width:100%}
-  .who .row.btns .btn{flex:1 1 auto}
+  /* 手機按鈕縮小：能按到即可，不撐滿整行 */
+  .btn{min-height:36px;padding:0 12px;font-size:14px}
+  .btn.sm{min-height:30px;padding:0 10px;font-size:13px}
+  td .btn{min-height:32px}
+  .chip{min-height:34px;padding:0 12px;font-size:13px}
+  .seg button{min-height:36px;padding:0 12px}
+  .row.btns{gap:6px}
   .phead .paside{width:100%}
   table.tlt thead{display:none}
   table.tlt tr{display:grid;grid-template-columns:104px 1fr;column-gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -272,7 +278,6 @@ details[open]>summary::before{transform:rotate(90deg)}
   table.tlt td.ops .row{justify-content:flex-start!important}
   table.tlt tr.tlform{display:block}
   table.tlt tr.tlform td{display:block}
-  .foot .btn{flex:1 1 auto}
   .inline-add input{max-width:none}
   .evlist select{max-width:100%}
 }
@@ -414,7 +419,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 44;
+var APP_VERSION = 45;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
