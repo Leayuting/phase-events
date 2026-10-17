@@ -419,7 +419,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 48;
+var APP_VERSION = 49;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2052,11 +2052,11 @@ function vItems() {
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td></tr></tbody></table></div></section>';
 
-  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：點濾掛名稱就可以修改所屬豆款與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th></tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：點濾掛名稱就可以修改資料庫連結、所屬豆款與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th></tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
       if (ed && S.ui.itemEdit === it.id) return '<tr><td colspan="4">' + itemForm(it) + '</td></tr>';
-      return '<tr><td style="min-width:130px">' + itemNameCell(it, ed) + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
+      return '<tr><td style="min-width:130px">' + itemNameCell(it, ed) + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
         '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
         '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
@@ -2104,21 +2104,30 @@ function loadBeanDb(force) {
 /* 連結咖啡豆資料庫的品項，名稱一律跟資料庫一樣 */
 function beanDbEntry(id) { return id == null || S.beanDb.state !== 'ok' ? null : find(S.beanDb.list, function (b) { return String(b.id) === String(id); }); }
 function beanNameDiffs() {
-  var out = [];
+  var out = [], want = {};
   S.D.items.forEach(function (it) {
-    if (it.archived || it.kind !== 'bean' || it.bean_ref_id == null) return;
-    var b = beanDbEntry(it.bean_ref_id);
-    if (!b || b.itemName === it.name) return;
-    var clash = find(S.D.items, function (x) { return !x.archived && x.kind === 'bean' && x.id !== it.id && x.name === b.itemName; });
-    var drips = S.D.items.filter(function (d) { return !d.archived && d.kind === 'drip' && d.parent_item_id === it.id && d.name === it.name; });
-    out.push({ it: it, to: b.itemName, clash: clash, drips: drips });
+    if (it.archived) return;
+    var ref = it.bean_ref_id, link = false;
+    if (ref == null && it.kind === 'drip') {
+      /* 還沒連結的濾掛：所屬豆款有連結，就連到同一款 */
+      var par = item(it.parent_item_id);
+      if (!par || par.archived || par.bean_ref_id == null) return;
+      ref = par.bean_ref_id; link = true;
+      if (find(S.D.items, function (x) { return !x.archived && x.kind === 'drip' && x.id !== it.id && String(x.bean_ref_id) === String(ref); })) return;
+    }
+    if (ref == null) return;
+    var b = beanDbEntry(ref);
+    if (!b || (!link && b.itemName === it.name)) return;
+    var clash = !!find(S.D.items, function (x) { return !x.archived && x.kind === it.kind && x.id !== it.id && x.name === b.itemName; }) || !!want[it.kind + '|' + b.itemName];
+    want[it.kind + '|' + b.itemName] = 1;
+    out.push({ it: it, to: b.itemName, clash: clash, link: link ? b : null });
   });
   return out;
 }
 /* 改咖啡豆名稱時，同名的濾掛一起改 */
 function renameJobs(it, to) {
   var jobs = [{ id: it.id, name: to }];
-  S.D.items.forEach(function (d) { if (!d.archived && d.kind === 'drip' && d.parent_item_id === it.id && d.name === it.name && !find(S.D.items, function (x) { return !x.archived && x.kind === 'drip' && x.id !== d.id && x.name === to; })) jobs.push({ id: d.id, name: to }); });
+  S.D.items.forEach(function (d) { if (!d.archived && d.kind === 'drip' && d.bean_ref_id == null && d.parent_item_id === it.id && d.name === it.name && !find(S.D.items, function (x) { return !x.archived && x.kind === 'drip' && x.id !== d.id && x.name === to; })) jobs.push({ id: d.id, name: to }); });
   return jobs;
 }
 function runJobs(jobs, done) {
@@ -2134,12 +2143,12 @@ function vBeanNameSync() {
   var d = beanNameDiffs();
   if (!d.length) return '';
   var ok = d.filter(function (x) { return !x.clash; }).length;
-  return '<div class="banner hold" style="margin:0 0 16px;line-height:1.7"><b>' + d.length + ' 個連結咖啡豆資料庫的品項，名稱和資料庫不同</b>' +
+  return '<div class="banner hold" style="margin:0 0 16px;line-height:1.7"><b>' + d.length + ' 個品項的名稱或連結和咖啡豆資料庫不一致</b>' +
     '<div class="small" style="margin:4px 0 8px">' + d.map(function (x) {
-      return esc(x.it.name) + ' → ' + esc(x.to) + (x.drips.length ? '（濾掛一起改）' : '') + (x.clash ? '　<span style="color:var(--warn)">已經有同名品項，請先處理</span>' : '');
+      return (x.it.kind === 'drip' ? '濾掛 ' : '咖啡豆 ') + esc(x.it.name) + ' → ' + esc(x.to) + (x.link ? '（照所屬豆款連結資料庫）' : '') + (x.clash ? '　<span style="color:var(--warn)">已經有同名品項，請先處理</span>' : '');
     }).join('<br>') + '</div>' +
     '<span class="small">連結錯了的話，先點品項名稱改連結。數量與盤點紀錄不受影響。</span> ' +
-    (ok ? '<button class="btn sm" data-act="syncBeanNames">全部改成資料庫名稱</button>' : '') + '</div>';
+    (ok ? '<button class="btn sm" data-act="syncBeanNames">全部跟資料庫一致</button>' : '') + '</div>';
 }
 function niState() {
   if (!S.ui.ni) S.ui.ni = { kind: 'bean', mode: 'db', bean: '', name: '', booth: '', category: '', spec_g: '227', plan_batch1: '0', plan_total: '', tasting_g: '1800', parent_name: '' };
@@ -2147,16 +2156,16 @@ function niState() {
 }
 function vNewItem(beanOpts) {
   var n = niState(), B = S.beanDb, bean = n.kind === 'bean';
-  if (bean && n.mode === 'db') loadBeanDb();
+  if (n.mode === 'db') loadBeanDb();
   function inp(k, label, type, extra) { return '<div class="field"><label for="ni-' + k + '">' + label + '</label><input type="' + (type || 'text') + '" id="ni-' + k + '" data-ni="' + k + '" value="' + esc(n[k] || '') + '"' + (extra || '') + '></div>'; }
   var nameField;
-  if (bean && n.mode === 'db') {
+  if (n.mode === 'db') {
     var st = '';
     if (B.state === 'loading' || B.state === 'idle') st = '<span class="hint">正在讀取咖啡豆資料庫…</span>';
     else if (B.state === 'error') st = '<span class="hint" style="color:var(--warn)">讀取咖啡豆資料庫失敗：' + esc(B.error) + '</span><span class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="beanDbRetry" style="width:auto">重試</button><button class="btn ghost sm" data-act="niManual" style="width:auto">改用手動輸入</button></span>';
     else if (!B.list.length) st = '<span class="hint">咖啡豆資料庫沒有可選的豆款。</span><span class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="niManual" style="width:auto">改用手動輸入</button></span>';
     var used = {};
-    S.D.items.forEach(function (it) { if (!it.archived && it.kind === 'bean' && it.bean_ref_id != null) used[it.bean_ref_id] = 1; });
+    S.D.items.forEach(function (it) { if (!it.archived && it.kind === n.kind && it.bean_ref_id != null) used[it.bean_ref_id] = 1; });
     var groups = {}, order = [];
     B.list.forEach(function (b) { var g = b.cat; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(b); });
     nameField = '<div class="field wide2"><label for="ni-bean">名稱（咖啡豆資料庫）</label><select id="ni-bean" data-ni="bean"' + (B.state === 'ok' ? '' : ' disabled') + '>' +
@@ -2165,12 +2174,12 @@ function vNewItem(beanOpts) {
         return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (b) {
           return '<option value="' + b.id + '"' + (String(n.bean) === String(b.id) ? ' selected' : '') + '>' + esc(b.label) + (used[b.id] ? '（本場已有）' : '') + '</option>';
         }).join('') + '</optgroup>';
-      }).join('') + '<option value="__manual">＋ 手動輸入（臨時豆款）</option></select>' + (st ? '<div>' + st + '</div>' : '') + '</div>';
+      }).join('') + '<option value="__manual">' + (bean ? '＋ 手動輸入（臨時豆款）' : '＋ 手動輸入（資料庫沒有的濾掛）') + '</option></select>' + (st ? '<div>' + st + '</div>' : '') + '</div>';
   } else {
-    nameField = '<div class="field wide2"><label for="ni-name">名稱' + (bean ? '（手動輸入）' : '') + '</label><input type="text" id="ni-name" data-ni="name" value="' + esc(n.name) + '" placeholder="' + (bean ? '臨時豆款名稱' : '濾掛名稱') + '">' +
-      (bean ? '<div><button class="btn ghost sm" data-act="niBackDb" style="margin-top:8px">改從咖啡豆資料庫選擇</button></div>' : '') + '</div>';
+    nameField = '<div class="field wide2"><label for="ni-name">名稱（手動輸入）</label><input type="text" id="ni-name" data-ni="name" value="' + esc(n.name) + '" placeholder="' + (bean ? '臨時豆款名稱' : '濾掛名稱') + '">' +
+      '<div><button class="btn ghost sm" data-act="niBackDb" style="margin-top:8px">改從咖啡豆資料庫選擇</button></div></div>';
   }
-  var h = '<section class="panel">' + pHead('新增品項', bean ? '咖啡豆請從咖啡豆資料庫選擇；資料庫沒有的臨時豆款可以選「手動輸入」。' + esc(boothLabel()) + '、規格、包數與試喝量是本次活動自己的設定，不會改到咖啡豆資料庫。' : '濾掛可以選所屬豆款，或選「只帶濾掛」。') +
+  var h = '<section class="panel">' + pHead('新增品項', bean ? '咖啡豆請從咖啡豆資料庫選擇；資料庫沒有的臨時豆款可以選「手動輸入」。' + esc(boothLabel()) + '、規格、包數與試喝量是本次活動自己的設定，不會改到咖啡豆資料庫。' : '濾掛名稱從咖啡豆資料庫選擇，資料庫沒有的可以選「手動輸入」；所屬豆款可以選本場的咖啡豆，或選「只帶濾掛」。') +
     '<div class="grid2 form" id="newitem"><div class="field"><label for="ni-kind">類型</label><select id="ni-kind" data-ni="kind"><option value="bean"' + (bean ? ' selected' : '') + '>咖啡豆</option><option value="drip"' + (bean ? '' : ' selected') + '>濾掛</option></select></div>' +
     nameField +
     '<div class="field"><label for="ni-booth">' + esc(boothLabel()) + '</label>' + boothSelect('id="ni-booth" data-ni="booth"', n.booth) + '</div>' +
@@ -2378,7 +2387,7 @@ function beanLinkField(it) {
   loadBeanDb();
   var cur = it.bean_ref_id != null ? String(it.bean_ref_id) : '';
   var taken = {};
-  S.D.items.forEach(function (x) { if (!x.archived && x.kind === 'bean' && x.id !== it.id && x.bean_ref_id != null) taken[x.bean_ref_id] = x.name; });
+  S.D.items.forEach(function (x) { if (!x.archived && x.kind === it.kind && x.id !== it.id && x.bean_ref_id != null) taken[x.bean_ref_id] = x.name; });
   var groups = {}, order = [], inList = false;
   B.list.forEach(function (b) { if (String(b.id) === cur) inList = true; if (!groups[b.cat]) { groups[b.cat] = []; order.push(b.cat); } groups[b.cat].push(b); });
   var opts = '<option value="">不連結（手動輸入的豆款）</option>' +
@@ -2391,7 +2400,7 @@ function beanLinkField(it) {
   var st = B.state === 'error' ? '<span class="hint" style="color:var(--warn)">讀取咖啡豆資料庫失敗：' + esc(B.error) + '</span> <button class="btn ghost sm" data-act="beanDbRetry" style="width:auto">重試</button>'
     : (B.state !== 'ok' ? '<span class="hint">正在讀取咖啡豆資料庫…</span>' : '<span class="hint">連結後名稱自動跟資料庫一樣；不會改到咖啡豆資料庫，數量照下方設定。</span>');
   if (!cur && B.state === 'ok') {
-    var same = find(B.list, function (b) { return b.name === it.name && !taken[b.id]; });
+    var same = find(B.list, function (b) { return (b.name === it.name || b.itemName === it.name) && !taken[b.id]; });
     if (same) st = '<span class="hint">咖啡豆資料庫有同名豆款「' + esc(same.label) + '」，可以直接選它連結。</span>';
   }
   return '<div class="field" style="grid-column:1 / -1;max-width:560px"><label for="ie-bean">連結咖啡豆資料庫</label><select id="ie-bean" data-ie="bean_ref_id"' + (B.state === 'ok' || cur ? '' : ' disabled') + '>' + opts + '</select>' + st + '</div>';
@@ -2402,9 +2411,9 @@ function itemForm(it) {
     return '<div class="field"><label>' + label + '</label><input type="' + (type || 'text') + '" data-ie="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '></div>';
   }
   var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3>' +
-    '<div class="grid2 form">' + (bean ? beanLinkField(it) : '') +
+    '<div class="grid2 form">' + beanLinkField(it) +
     (function () {
-      var b = bean ? beanDbEntry(it.bean_ref_id) : null;
+      var b = beanDbEntry(it.bean_ref_id);
       if (!b) return f('name', '名稱', it.name);
       return '<div class="field"><label>名稱</label><input type="text" data-ie="name" id="ie-name" value="' + esc(b.itemName) + '" data-own="' + esc(it.name) + '" readonly>' +
         '<span class="hint">' + (b.itemName === it.name ? '跟咖啡豆資料庫一樣' : '原本是「' + esc(it.name) + '」，儲存後改成資料庫名稱') + '</span></div>';
@@ -3137,7 +3146,7 @@ var A = {
       if (p.bean_ref_id === (it.bean_ref_id != null ? String(it.bean_ref_id) : '')) delete p.bean_ref_id;
       else if (p.bean_ref_id) { var b = find(S.beanDb.list, function (x) { return String(x.id) === p.bean_ref_id; }); if (!b) { toast('找不到這個豆款，請重新選擇', true); return; } p.bean_ref_name = b.name; }
     }
-    var lk = it.kind === 'bean' ? beanDbEntry('bean_ref_id' in p ? p.bean_ref_id : it.bean_ref_id) : null;
+    var lk = beanDbEntry('bean_ref_id' in p ? p.bean_ref_id : it.bean_ref_id);
     if (lk) p.name = lk.itemName;
     var dj = it.kind === 'bean' && p.name !== it.name ? renameJobs(it, p.name).slice(1) : [];
     call('evt_item_save', { p: p }, dj.length ? [] : ['items', 'plan'], dj.length ? '' : '已儲存：' + p.name).then(function (r) {
@@ -3150,9 +3159,8 @@ var A = {
   syncBeanNames: function () {
     var d = beanNameDiffs().filter(function (x) { return !x.clash; });
     if (!d.length) return;
-    if (!confirm('把 ' + d.length + ' 個品項的名稱改成跟咖啡豆資料庫一樣？\n' + d.map(function (x) { return x.it.name + ' → ' + x.to; }).join('\n') + '\n\n數量與盤點紀錄不受影響，修改會留在紀錄裡。')) return;
-    var jobs = [];
-    d.forEach(function (x) { jobs = jobs.concat(renameJobs(x.it, x.to)); });
+    if (!confirm('把 ' + d.length + ' 個品項改成跟咖啡豆資料庫一致？\n' + d.map(function (x) { return (x.it.kind === 'drip' ? '濾掛 ' : '') + x.it.name + ' → ' + x.to + (x.link ? '（連結）' : ''); }).join('\n') + '\n\n數量與盤點紀錄不受影響，修改會留在紀錄裡。')) return;
+    var jobs = d.map(function (x) { var j = { id: x.it.id, name: x.to }; if (x.link) { j.bean_ref_id = String(x.link.id); j.bean_ref_name = x.link.name; } return j; });
     S.busy = true;
     runJobs(jobs, function (fail) {
       S.busy = false;
@@ -3299,7 +3307,7 @@ var A = {
     var n = niState(), bean = n.kind === 'bean';
     Array.prototype.forEach.call(document.querySelectorAll('#newitem [data-ni]'), function (x) { var k = x.getAttribute('data-ni'); if (k !== 'kind' && !(k === 'bean' && x.value === '__manual')) n[k] = x.value; });
     var p = { kind: n.kind, booth: n.booth, plan_batch1: n.plan_batch1, plan_total: n.plan_total };
-    if (bean && n.mode === 'db') {
+    if (n.mode === 'db') {
       var b = find(S.beanDb.list, function (x) { return String(x.id) === String(n.bean); });
       if (!b) { toast('請選擇豆款，或改用手動輸入', true); return; }
       p.name = b.itemName; p.bean_ref_id = String(b.id); p.bean_ref_name = b.name;
@@ -3658,7 +3666,12 @@ document.addEventListener('change', function (ev) {
       if (t.value === '__manual') { n.mode = 'manual'; n.bean = ''; n.name = ''; renderNow(); var f = $('#ni-name'); if (f) f.focus(); return; }
       n.bean = t.value; return;
     }
-    n[nk] = t.value; return;
+    n[nk] = t.value;
+    if (nk === 'parent_name' && n.kind === 'drip' && n.mode === 'db' && !n.bean) {
+      var pb = find(S.D.items, function (x) { return !x.archived && x.kind === 'bean' && x.name === t.value; });
+      if (pb && pb.bean_ref_id != null && beanDbEntry(pb.bean_ref_id)) { n.bean = String(pb.bean_ref_id); renderNow(); }
+    }
+    return;
   }
   var it = t.getAttribute('data-it');
   if (it && isMgr()) {
