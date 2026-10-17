@@ -419,7 +419,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 46;
+var APP_VERSION = 47;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1740,7 +1740,7 @@ function vNewStation() {
 function vPrepImport() {
   var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
     '<div class="field"><label for="prep-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="prep-file" style="max-width:320px"></div>' +
-    '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)"></textarea></div>';
+    '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)">' + esc(impText('prep')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.stations) {
     var nItems = 0;
@@ -1763,7 +1763,7 @@ function vPrepImport() {
     }
     h += '<p class="hint" style="margin-top:16px">名稱相近的崗位會自動合併（例如「櫃檯（不封箱）」併入「櫃檯區」），負責人取兩邊的聯集；同一崗位已有的同名清單項目只更新數量與備註，不會重複新增。表上的「確認」欄不會匯入，這場活動的清單一律從未勾選開始，由負責人自己勾。</p></div>';
   }
-  h += '<div class="foot"><button class="btn ghost" data-act="prepPreview">預覽</button>' + (P && P.stations ? '<button class="btn" data-act="prepImport">匯入 ' + P.stations.filter(function (x) { return !x.skip; }).length + ' 個崗位</button><button class="btn ghost" data-act="prepClear">清除</button>' : '') + '</div></section>';
+  h += '<div class="foot"><button class="btn ghost" data-act="prepPreview">預覽</button>' + (P && P.stations ? '<button class="btn" data-act="prepImport">匯入 ' + P.stations.filter(function (x) { return !x.skip; }).length + ' 個崗位</button>' : '') + impClearBtn('prep') + '</div></section>';
   return h;
 }
 
@@ -1874,7 +1874,7 @@ function tlParse(text) {
 function vTlImport(nExisting) {
   var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上或上傳 CSV：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。') +
     '<div class="field"><label for="tl-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="tl-file" style="max-width:320px"></div>' +
-    '<div class="field" style="margin-top:16px"><label for="tl-text">或貼上表格</label><textarea id="tl-text" rows="6" placeholder="時間&#9;活動項目&#9;時間&#9;內容&#9;人員&#9;地點&#10;10/29&#9;佈場&#9;9:00-9:30&#9;佈展人員集合 上貨車&#9;凱.鍵.Hedy&#9;中山店"></textarea></div>';
+    '<div class="field" style="margin-top:16px"><label for="tl-text">或貼上表格</label><textarea id="tl-text" rows="6" placeholder="時間&#9;活動項目&#9;時間&#9;內容&#9;人員&#9;地點&#10;10/29&#9;佈場&#9;9:00-9:30&#9;佈展人員集合 上貨車&#9;凱.鍵.Hedy&#9;中山店">' + esc(impText('tl')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.blocks) {
     var total = 0;
@@ -1889,7 +1889,7 @@ function vTlImport(nExisting) {
       (nExisting ? '<label class="row small" style="margin-top:16px;gap:8px;cursor:pointer"><input type="checkbox" data-act="tlReplace"' + (P.replace ? ' checked' : '') + '> 取代目前的 ' + nExisting + ' 列時程（舊的會刪除，紀錄裡查得到）</label>' : '') +
       '<p class="hint" style="margin-top:16px">同一天的時程會依開始時間排序。最後一天如果有自己的撤場區塊，每天的「撤場」預設不套用到那一天；其他需要調整的，點日期切換。</p></div>';
   }
-  h += '<div class="foot"><button class="btn ghost" data-act="tlPreview">預覽</button>' + (P && P.blocks ? '<button class="btn" data-act="tlImport">匯入時程</button><button class="btn ghost" data-act="tlClear">清除</button>' : '') + '</div></section>';
+  h += '<div class="foot"><button class="btn ghost" data-act="tlPreview">預覽</button>' + (P && P.blocks ? '<button class="btn" data-act="tlImport">匯入時程</button>' : '') + impClearBtn('tl') + '</div></section>';
   return h;
 }
 function tlData() {
@@ -2065,8 +2065,8 @@ function vItems() {
     h += vNewItem(beanOpts);
     h += '<section class="panel">' + pHead('匯入 CSV', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以從 Excel 另存 CSV，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
       '<div class="field"><label for="csvfile">選擇檔案</label><input type="file" accept=".csv,text/csv" id="csvfile" style="max-width:320px"></div>' +
-      '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext"></textarea></div>' + vCsvPreview() +
-      '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button></div></section>';
+      '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext">' + esc(impText('csv')) + '</textarea></div>' + vCsvPreview() +
+      '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button>' + impClearBtn('csv') + '</div></section>';
     if (R.archived.length) {
       h += '<section class="panel">' + pHead('已刪除的品項（' + R.archived.length + '）', '刪除的品項不會出現在盤點、結算與快速紀錄；已有的盤點與異動紀錄保留，可以隨時還原。', '<button class="btn ghost sm" data-act="toggleItemArch">' + (S.ui.itemArch ? '收起' : '展開') + '</button>');
       if (S.ui.itemArch) h += R.archived.map(function (it) { return '<div class="log"><span class="tx strike">' + esc(itemName(it.id)) + '</span><button class="btn ghost sm" data-act="restoreItem" data-id="' + it.id + '">還原</button></div>'; }).join('');
@@ -2644,6 +2644,11 @@ function newBoothFromSelect(t, prev) {
     if (t.getAttribute('data-ni')) niState().booth = n;
   });
 }
+/* 匯入暫存：貼上的內容與預覽，按「清除」一起清掉 */
+var IMP = { prep: { ui: 'prep', text: 'prep-text', file: 'prep-file' }, tl: { ui: 'tlimp', text: 'tl-text', file: 'tl-file' }, csv: { ui: 'csv', text: 'csvtext', file: 'csvfile' } };
+function impText(k) { return (S.ui.impText && S.ui.impText[k]) || ''; }
+function impClearBtn(k) { return '<button class="btn ghost" data-act="impClear" data-v="' + k + '"' + (impText(k) || S.ui[IMP[k].ui] ? '' : ' disabled') + '>清除</button>'; }
+function impReset(k) { S.ui[IMP[k].ui] = null; if (S.ui.impText) S.ui.impText[k] = ''; }
 function vEvent() {
   var ev = curEvent(), m = isMgr();
   var h = '<div class="panels">';
@@ -3112,7 +3117,12 @@ var A = {
     else if (t.trim()) go(t);
     else toast('請選擇檔案或貼上表格', true);
   },
-  prepClear: function () { S.ui.prep = null; renderNow(); },
+  impClear: function (e) {
+    var k = e.getAttribute('data-v'), f = $('#' + IMP[k].file);
+    impReset(k);
+    if (f) f.value = '';
+    renderNow(); toast('已清除匯入的暫存資料');
+  },
   prepImport: function () {
     var P = S.ui.prep, rows = [], old = [], inc = P.stations.filter(function (x) { return !x.skip; });
     if (!inc.length) { toast('沒有勾選要匯入的崗位', true); return; }
@@ -3127,7 +3137,7 @@ var A = {
     call('evt_prep_import', { p_event_id: S.ev, p_rows: rows, p_old: old }, ['stations', 'owners', 'ck', 'people', 'members']).then(function (r) {
       if (!r.ok) return;
       var d = r.data || {};
-      S.ui.prep = null; S.ui.st = '';
+      impReset('prep'); S.ui.st = '';
       toast('已匯入：新增 ' + d.stations_new + ' 個崗位、' + d.items_new + ' 項清單' + (d.items_updated ? '，更新 ' + d.items_updated + ' 項' : '') + (d.items_moved ? '，搬移 ' + d.items_moved + ' 項' : '') + (d.stations_archived ? '，封存 ' + d.stations_archived + ' 個舊崗位' : ''));
       renderNow();
     });
@@ -3183,7 +3193,6 @@ var A = {
     else if (t.trim()) go(t);
     else toast('請選擇檔案或貼上表格', true);
   },
-  tlClear: function () { S.ui.tlimp = null; renderNow(); },
   tlDay: function (e) { var v = e.getAttribute('data-v').split('|'), b = S.ui.tlimp.blocks[+v[0]]; b.days[v[1]] = !b.days[v[1]]; renderNow(); },
   tlImport: function () {
     var P = S.ui.tlimp, out = [];
@@ -3194,7 +3203,7 @@ var A = {
     if (!confirm('匯入 ' + out.length + ' 列時程？' + (rep ? '目前的 ' + n + ' 列會先刪除。' : ''))) return;
     call('evt_timeline_import', { p_event_id: S.ev, p_rows: out.map(function (x) { return x.row; }), p_replace: rep }, ['tl']).then(function (r) {
       if (!r.ok) return;
-      S.ui.tlimp = null; toast('已匯入 ' + r.data.added + ' 列時程' + (r.data.archived ? '，刪除舊的 ' + r.data.archived + ' 列' : '')); renderNow();
+      impReset('tl'); toast('已匯入 ' + r.data.added + ' 列時程' + (r.data.archived ? '，刪除舊的 ' + r.data.archived + ' 列' : '')); renderNow();
     });
   },
   copyTl: function (e) {
@@ -3257,7 +3266,7 @@ var A = {
   csvImport: function () {
     var c = S.ui.csv, rows = c.rows.map(function (r) { return r.data; });
     if (c.over && !confirm('有 ' + c.over + ' 個品項名稱和目前的重複，會用 CSV 的內容覆蓋（空白欄位保留原值）。確定匯入？')) return;
-    call('evt_items_import', { p_event_id: S.ev, p_rows: rows }, ['items', 'plan']).then(function (r) { if (r.ok) { S.ui.csv = null; toast('已匯入：新增 ' + c.add + '、覆蓋 ' + c.over + ' 個品項'); renderNow(); } });
+    call('evt_items_import', { p_event_id: S.ev, p_rows: rows }, ['items', 'plan']).then(function (r) { if (r.ok) { impReset('csv'); toast('已匯入：新增 ' + c.add + '、覆蓋 ' + c.over + ' 個品項'); renderNow(); } });
   },
 
   /* 紀錄 */
@@ -3543,6 +3552,7 @@ document.addEventListener('change', function (ev) {
   var t = ev.target, a = t.getAttribute('data-act');
   if (t.value === '__newbooth') { newBoothFromSelect(t, t.getAttribute('data-prev') || ''); return; }
   if (t.tagName === 'SELECT' && t.hasAttribute('data-prev')) t.setAttribute('data-prev', t.value);
+  if (t.type === 'file') { Object.keys(IMP).forEach(function (k) { if (IMP[k].file === t.id) { var cb = document.querySelector('[data-act=impClear][data-v=' + k + ']'); if (cb) cb.disabled = false; } }); }
   if (a === 'tick' || a === 'showCalc' || a === 'pMgr' || a === 'pOwner' || a === 'pActive') { A[a](t); return; }
   if (a === 'pickEvent') { switchEvent(t.value); return; }
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
@@ -3608,6 +3618,13 @@ document.addEventListener('change', function (ev) {
 });
 document.addEventListener('input', function (ev) {
   var t = ev.target, d = t.getAttribute('data-line');
+  if (t.id === 'prep-text' || t.id === 'tl-text' || t.id === 'csvtext') {
+    var ik = t.id === 'prep-text' ? 'prep' : (t.id === 'tl-text' ? 'tl' : 'csv'), had = !!impText(ik);
+    S.ui.impText = S.ui.impText || {}; S.ui.impText[ik] = t.value;
+    var cb = document.querySelector('[data-act=impClear][data-v=' + ik + ']');
+    if (cb && had !== !!t.value) cb.disabled = !t.value && !S.ui[IMP[ik].ui];
+    return;
+  }
   if (d && S.ui.draftId) {
     var pr = d.split('|'), v = t.value === '' ? null : Math.max(0, Math.round(num(t.value)));
     S.ui.dv[pr[0]] = S.ui.dv[pr[0]] || {};
