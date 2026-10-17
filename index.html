@@ -419,7 +419,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 51;
+var APP_VERSION = 52;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1225,6 +1225,7 @@ function drinkDate() {
 function drinkName(id) { var d = byId(S.D.drinks, id); return d ? d.name : '（已刪除的飲品）'; }
 function vDrink() {
   var m = isMgr(), K = S.R.dk, de = m && S.ui.secEdit.dk, days = S.R.days, dd = drinkDate(), h = '';
+  h += pageBar('特調', '本場飲品的出杯紀錄、每日杯數、配方與原料需求。列印與複製包含每日備貨／實際杯數、原料需求與配方。', K.drinks.length ? shareBtns('printDrink', 'copyDrink') : '') + '<div class="panels">';
   h += '<section class="panel">' + pHead('出杯紀錄', '每出一批就記一次杯數；記錯按「沖銷」，原紀錄會保留。所有參加夥伴都可以記錄，不需要簽名。');
   if (!K.drinks.length) h += '<div class="empty">還沒有飲品。' + (m ? '請在下方「新增飲品」建立。' : '請管理員先建立。') + '</div>';
   else {
@@ -1304,7 +1305,72 @@ function vDrink() {
     '<div class="grid2 form"><div class="field"><label for="dk-name">名稱</label><input type="text" id="dk-name"></div><div class="field"><label for="dk-bean">特調用咖啡豆（選填）</label><input type="text" id="dk-bean" placeholder="手動輸入，不連動盤點"></div>' +
     '<div class="field"><label for="dk-beang">咖啡豆總用量 g（選填）</label><input type="number" min="0" id="dk-beang"></div><div class="field" style="grid-column:1 / -1"><label for="dk-steps">出杯步驟（選填）</label><textarea id="dk-steps" rows="3"></textarea></div></div>' +
     '<div class="foot"><button class="btn" data-act="dkAdd">新增飲品</button></div></section>';
+  return h + '</div>';
+}
+/* 特調的列印與複製：每日備貨／實際、原料需求、配方 */
+function drinkHead() {
+  var ev = curEvent();
+  return ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + (ev.booth ? ' ' + ev.booth : '') + '）特調';
+}
+function drinkPrintHtml() {
+  var K = S.R.dk, days = S.R.days, h = printHead('特調'), tp = 0, ta = 0;
+  h += '<div class="sec"><h2>每日杯數<small>實際／備貨</small></h2><table><thead><tr><th>飲品</th>' + days.map(function (d) { return '<th class="n">' + mdw(d) + '</th>'; }).join('') + '<th class="n">合計</th></tr></thead><tbody>' +
+    K.drinks.map(function (d) {
+      var x = K.d[d.id]; tp += x.prepT; ta += x.actualT;
+      return '<tr><td>' + esc(d.name) + '</td>' + days.map(function (dy) { var p = x.plan[dy]; return '<td class="n">' + I(x.actual[dy] || 0) + '／' + (p ? I(p.prep) : '—') + '</td>'; }).join('') + '<td class="n">' + I(x.actualT) + '／' + I(x.prepT) + '</td></tr>';
+    }).join('') + '<tr class="tot"><td>合計 ' + K.drinks.length + ' 款</td>' + days.map(function (dy) {
+      var a = 0, p = 0; K.drinks.forEach(function (d) { var x = K.d[d.id]; a += x.actual[dy] || 0; p += x.plan[dy] ? x.plan[dy].prep : 0; });
+      return '<td class="n">' + I(a) + '／' + I(p) + '</td>';
+    }).join('') + '<td class="n">' + I(ta) + '／' + I(tp) + '</td></tr></tbody></table></div>';
+  h += '<div class="sec"><h2>原料需求<small>' + K.ing.length + ' 項</small></h2><table><thead><tr><th>原料</th><th class="n">需求量 g</th><th>供應商</th><th>每杯用量</th></tr></thead><tbody>' +
+    (K.ing.length ? K.ing.map(function (g) { return '<tr><td>' + esc(g.name) + (g.coffee ? '（含咖啡）' : '') + '</td><td class="n">' + I(Math.round(g.g)) + '</td><td>' + esc(g.sup.join('、')) + '</td><td>' + esc(g.uses.join('、')) + '</td></tr>'; }).join('') : '<tr><td colspan="4">還沒有配方原料</td></tr>') + '</tbody></table></div>';
+  K.drinks.forEach(function (d) {
+    var x = K.d[d.id];
+    h += '<div class="sec"><h2>' + esc(d.name) + '<small>備貨 ' + I(x.prepT) + ' 杯・實際 ' + I(x.actualT) + ' 杯</small></h2>' +
+      (d.coffee_bean_name ? '<p>特調用咖啡豆：' + esc(d.coffee_bean_name) + (d.coffee_bean_total_g != null ? ' 共 ' + I(d.coffee_bean_total_g) + ' g' : '') + '</p>' : '') +
+      (d.steps ? '<p style="white-space:pre-wrap">' + esc(d.steps) + '</p>' : '') +
+      '<table><thead><tr><th>配方原料</th><th class="n">每杯 g</th><th>供應商</th><th>含咖啡</th><th class="n">需求量 g</th></tr></thead><tbody>' +
+      (x.ings.length ? x.ings.map(function (i) { return '<tr><td>' + esc(i.name) + '</td><td class="n">' + num(i.grams_per_cup) + '</td><td>' + esc(i.supplier || '') + '</td><td>' + (i.has_coffee ? '是' : '') + '</td><td class="n">' + I(Math.round(x.prepT * num(i.grams_per_cup))) + '</td></tr>'; }).join('') : '<tr><td colspan="5">還沒有配方原料</td></tr>') +
+      '</tbody></table></div>';
+  });
+  h += '<div class="ft">備貨杯數＝手動調整值，沒有就是 預計＋可再加；實際杯數不含沖銷的紀錄；原料需求量＝備貨杯數 × 每杯用量，同名原料合併。特調用咖啡豆為手動記錄，不與盤點連動。</div>';
   return h;
+}
+function drinkText(kind) {
+  var K = S.R.dk, days = S.R.days, L = [], stamp = '複製時間 ' + tm(new Date().toISOString());
+  function cl(v) { return String(v == null ? '' : v).replace(/[\t\n]/g, ' '); }
+  if (kind === 'tsv') {
+    L.push(drinkHead(), stamp, '', '每日杯數（實際／備貨）');
+    var hd = ['飲品']; days.forEach(function (d) { hd.push(md(d) + ' 實際', md(d) + ' 備貨'); }); hd.push('合計實際', '合計備貨');
+    L.push(hd.join('\t'));
+    K.drinks.forEach(function (d) {
+      var x = K.d[d.id], r = [cl(d.name)];
+      days.forEach(function (dy) { r.push(x.actual[dy] || 0, x.plan[dy] ? x.plan[dy].prep : ''); });
+      r.push(x.actualT, x.prepT); L.push(r.join('\t'));
+    });
+    L.push('', '原料需求', ['原料', '需求量g', '供應商', '含咖啡', '每杯用量'].join('\t'));
+    K.ing.forEach(function (g) { L.push([cl(g.name), Math.round(g.g), cl(g.sup.join('、')), g.coffee ? '是' : '', cl(g.uses.join('、'))].join('\t')); });
+    L.push('', '配方', ['飲品', '原料', '每杯g', '供應商', '含咖啡', '需求量g'].join('\t'));
+    K.drinks.forEach(function (d) {
+      var x = K.d[d.id];
+      x.ings.forEach(function (i) { L.push([cl(d.name), cl(i.name), num(i.grams_per_cup), cl(i.supplier || ''), i.has_coffee ? '是' : '', Math.round(x.prepT * num(i.grams_per_cup))].join('\t')); });
+    });
+    return L.join('\n');
+  }
+  L.push('【' + drinkHead() + '】', stamp);
+  K.drinks.forEach(function (d) {
+    var x = K.d[d.id];
+    L.push('', '■ ' + d.name + '（備貨 ' + x.prepT + ' 杯／實際 ' + x.actualT + ' 杯）');
+    days.forEach(function (dy) { var p = x.plan[dy]; if (p || x.actual[dy]) L.push('・' + mdw(dy) + ' 備貨 ' + (p ? p.prep : '—') + '｜實際 ' + (x.actual[dy] || 0)); });
+    if (x.ings.length) L.push('配方：' + x.ings.map(function (i) { return i.name + ' ' + num(i.grams_per_cup) + 'g'; }).join('、'));
+    if (d.coffee_bean_name) L.push('咖啡豆：' + d.coffee_bean_name + (d.coffee_bean_total_g != null ? ' 共 ' + d.coffee_bean_total_g + ' g' : ''));
+    if (d.steps) L.push('步驟：' + d.steps.replace(/\n+/g, '／'));
+  });
+  if (K.ing.length) {
+    L.push('', '■ 原料需求');
+    K.ing.forEach(function (g) { L.push('・' + g.name + ' ' + Math.round(g.g) + ' g' + (g.sup.length ? '（' + g.sup.join('、') + '）' : '')); });
+  }
+  return L.join('\n');
 }
 
 /* ---------------------------------------------------------------------------
@@ -3487,6 +3553,11 @@ var A = {
   },
   printItems: function () { printHtml(itemsPrintHtml()); },
   printStatus: function () { printHtml(statusPrintHtml()); },
+  printDrink: function () { printHtml(drinkPrintHtml()); },
+  copyDrink: function (e) {
+    var k = e.getAttribute('data-v');
+    copyText(drinkText(k)).then(function () { toast(k === 'tsv' ? '已複製特調表格，可以貼到 Excel 或 Google 試算表' : '已複製特調文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
+  },
   copyStatus: function (e) {
     var k = e.getAttribute('data-v');
     copyText(statusText(k)).then(function () { toast(k === 'tsv' ? '已複製品項現況表格，可以貼到 Excel 或 Google 試算表' : '已複製品項現況文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
