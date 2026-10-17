@@ -419,7 +419,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 49;
+var APP_VERSION = 50;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2029,9 +2029,9 @@ function vTimeline() {
    品項與預計量
    --------------------------------------------------------------------------- */
 function vItems() {
-  var m = isMgr(), dis = m ? '' : ' disabled', R = S.R, eb = m && S.ui.secEdit.bean, ed = m && S.ui.secEdit.drip;
+  var m = isMgr(), R = S.R, eb = m && S.ui.secEdit.bean, ed = m && S.ui.secEdit.drip;
   var flagged = S.D.items.filter(function (it) { return !it.archived && it.needs_confirm; });
-  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? (eb ? '編輯中：點品項名稱就可以修改名稱、' + esc(boothLabel()) + '、分類、備註；沒有要帶的品項，點開後按「刪除這個品項」，刪除的品項可以再還原。完成後按「完成編輯」。' : '數字欄位可以直接修改，離開欄位即儲存。要改名稱、' + esc(boothLabel()) + '、分類、備註，或刪除沒有要帶的品項，請按右上角「編輯」。修改都會留在紀錄裡。') : '只有管理員可以修改，你目前可以查看。', m ? secEditBtn('bean') : '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
+  var h = '<section class="panel">' + pHead('咖啡豆與預計量', m ? (eb ? '編輯中：數字欄位直接修改，離開欄位即儲存；點品項名稱可以修改名稱、' + esc(boothLabel()) + '、分類、備註；沒有要帶的品項，點開後按「刪除這個品項」，刪除的品項可以再還原。完成後按「完成編輯」。' : '要改數量、名稱、' + esc(boothLabel()) + '、分類、備註，或刪除沒有要帶的品項，請按右上角「編輯」。修改都會留在紀錄裡。') : '只有管理員可以修改，你目前可以查看。', m ? secEditBtn('bean') : '', '<span>' + R.beans.length + ' 款咖啡豆</span>');
   if (m) h += vBeanNameSync();
   if (flagged.length) h += '<div class="banner hold" style="margin:0 0 16px">有 ' + flagged.length + ' 個品項標示「待確認」，管理員確認後按「已確認」即可取消提示。' + (m ? ' <button class="btn ghost sm" data-act="confirmAll">全部標為已確認</button>' : '') + '</div>';
   h += '<div class="tw"><table class="top" style="min-width:760px"><thead><tr><th>咖啡豆</th><th>分類</th><th class="n">規格 g</th><th class="n">第一批</th><th class="n">總預計</th><th class="n">試喝量 g</th><th>濾掛</th></tr></thead><tbody>';
@@ -2044,20 +2044,18 @@ function vItems() {
     var drip = find(R.drips, function (d) { return d.parent_item_id === it.id; });
     return '<tr><td style="min-width:150px">' + itemNameCell(it, eb) + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
       '<td class="small mut" style="min-width:140px">' + esc(it.category || '—') + '</td>' +
-      '<td class="n"><input type="number" min="1" data-it="' + it.id + '|spec_g" value="' + I(it.spec_g) + '"' + dis + '></td>' +
-      '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(x.plan1) ? x.plan1 : '') + '"' + dis + '></td>' +
-      '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(x.planT) ? x.planT : '') + '"' + dis + '></td>' +
-      '<td class="n"><input type="number" min="0" data-it="' + it.id + '|tasting_g" value="' + (isNum(x.tasting) ? x.tasting : '') + '"' + dis + '></td>' +
+      numCell(it.id, 'spec_g', it.spec_g, 1, eb) + numCell(it.id, 'plan_batch1', x.plan1, 0, eb) +
+      numCell(it.id, 'plan_total', x.planT, 0, eb) + numCell(it.id, 'tasting_g', x.tasting, 0, eb) +
       '<td class="small">' + (drip ? '有' : '<span class="mut">—</span>') + '</td></tr>';
   });
   h += '<tr class="tot"><td>合計</td><td></td><td></td><td class="n">' + I(tp1) + '</td><td class="n">' + I(tpT) + '</td><td></td><td></td></tr></tbody></table></div></section>';
 
-  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：點濾掛名稱就可以修改資料庫連結、所屬豆款與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th></tr></thead><tbody>' +
+  h += '<section class="panel">' + pHead('濾掛', '濾掛的第一批與總預計包數。沒有所屬豆款的是「只帶濾掛」。' + (!m ? '' : ed ? '編輯中：數字欄位直接修改，離開欄位即儲存；點濾掛名稱可以修改資料庫連結、所屬豆款與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改數量、所屬豆款或刪除，請按右上角「編輯」。'), m ? secEditBtn('drip') : '', '<span>' + R.drips.length + ' 款濾掛</span>') + '<div class="tw"><table class="top"><thead><tr><th>濾掛</th><th>所屬豆款</th><th class="n">第一批</th><th class="n">總預計</th></tr></thead><tbody>' +
     (R.drips.length ? R.drips.map(function (it) {
       var y = R.drip[it.id], par = item(it.parent_item_id);
       if (ed && S.ui.itemEdit === it.id) return '<tr><td colspan="4">' + itemForm(it) + '</td></tr>';
       return '<tr><td style="min-width:130px">' + itemNameCell(it, ed) + (it.bean_ref_id != null ? ' <span class="tag" title="咖啡豆資料庫 #' + it.bean_ref_id + '">資料庫</span>' : '') + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td><td class="small">' + (par ? esc(par.name) : '<span class="tag">只帶濾掛</span>') + '</td>' +
-        '<td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_batch1" value="' + (isNum(y.plan1) ? y.plan1 : '') + '"' + dis + '></td><td class="n"><input type="number" min="0" data-it="' + it.id + '|plan_total" value="' + (isNum(y.planT) ? y.planT : '') + '"' + dis + '></td>' +
+        numCell(it.id, 'plan_batch1', y.plan1, 0, ed) + numCell(it.id, 'plan_total', y.planT, 0, ed) +
         '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
 
@@ -2373,6 +2371,11 @@ function statusText(kind) {
   return L.join('\n');
 }
 /* 品項名稱：編輯模式下可以點名稱打開這個品項的編輯表單 */
+/* 品項的數量：平常只顯示，按「編輯」後才能改，避免誤觸 */
+function numCell(id, k, v, min, on) {
+  if (on) return '<td class="n"><input type="number" min="' + min + '" data-it="' + id + '|' + k + '" value="' + (isNum(v) ? v : '') + '" aria-label="' + esc(itemName(id)) + ' ' + ({ spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g' })[k] + '"></td>';
+  return '<td class="n">' + (isNum(v) ? I(v) : '<span class="mut">—</span>') + '</td>';
+}
 function itemNameCell(it, editing) {
   if (!editing) return '<b style="font-weight:600">' + esc(it.name) + '</b>';
   return '<button type="button" class="nmlink" data-act="editItem" data-id="' + it.id + '" aria-label="編輯 ' + esc(itemName(it.id)) + '">' + esc(it.name) + '</button>';
