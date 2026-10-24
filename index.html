@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 59;
+var APP_VERSION = 60;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1713,7 +1713,8 @@ function vSettle() {
    行前 Checklist
    --------------------------------------------------------------------------- */
 function assignees(c) { if (c.assignee_id) return [c.assignee_id]; return ownersOf(c.station_id); }
-function isMine(c) { return !!S.me && assignees(c).indexOf(S.me.id) >= 0; }
+/* 我的待辦：只看崗位的負責人欄位（多位負責人時，包含我就算） */
+function isMine(c) { return !!S.me && ownersOf(c.station_id).indexOf(S.me.id) >= 0; }
 function selOpts(arr, cur) { return arr.map(function (a) { return '<option value="' + esc(a[0]) + '"' + (a[0] === cur ? ' selected' : '') + '>' + esc(a[1]) + '</option>'; }).join(''); }
 function whoOpts(cur) {
   var mem = membersOf(S.ev);
@@ -1758,8 +1759,8 @@ function vCheck() {
   var v = S.ui.st, real = v !== 'me' && v !== 'none', st = real ? station(v) : null, can = real && canEditSt(v), mgr = isMgr();
   var live = S.D.ck.filter(function (c) { return !c.archived && stationLive(c.station_id); });
   var mine = live.filter(isMine), none = live.filter(function (c) { return !assignees(c).length; });
-  var pool = v === 'me' ? mine : (v === 'none' ? none : live.filter(function (c) { return c.station_id === v; }));
-  var list = pool.filter(function (c) { return S.ui.ph === '全部' || c.phase === S.ui.ph; });
+  var pool = v === 'me' ? mine.filter(function (c) { return !R.ck[c.id]; }) : (v === 'none' ? none : live.filter(function (c) { return c.station_id === v; }));
+  var inPh = function (c) { return S.ui.ph === '全部' || c.phase === S.ui.ph; }, list = pool.filter(inPh);
   list.sort(function (a, b) { return a.sort - b.sort; });
   var open = list.filter(function (c) { return !R.ck[c.id]; }), dn = list.filter(function (c) { return R.ck[c.id]; });
   var pct = R.ckLive ? Math.round(R.ckDone / R.ckLive * 100) : 0;
@@ -1770,7 +1771,7 @@ function vCheck() {
     var a = live.filter(function (c) { return c.station_id === s.id; }), d = a.filter(function (c) { return R.ck[c.id]; }).length;
     return '<button class="chip" data-act="station" data-v="' + s.id + '" aria-pressed="' + (v === s.id) + '">' + esc(s.name) + ' <span style="opacity:.7">' + d + '/' + a.length + '</span></button>';
   }).join('') +
-    '<button class="chip" data-act="station" data-v="me" aria-pressed="' + (v === 'me') + '">我的待辦 <span style="opacity:.7">' + mine.filter(function (c) { return !R.ck[c.id]; }).length + '</span></button>' +
+    '<button class="chip" data-act="station" data-v="me" aria-pressed="' + (v === 'me') + '">我的待辦 <span style="opacity:.7">' + mine.filter(function (c) { return !R.ck[c.id] && inPh(c); }).length + '</span></button>' +
     '<button class="chip" data-act="station" data-v="none" aria-pressed="' + (v === 'none') + '">未分配 <span style="opacity:.7">' + none.length + '</span></button></div>';
   h += '<span class="lbl">階段</span><div class="chips" role="group" aria-label="階段">' + ['全部'].concat(PHASES).map(function (p) {
     return '<button class="chip" data-act="phase" data-v="' + p + '" aria-pressed="' + (S.ui.ph === p) + '">' + p + '</button>';
@@ -1790,10 +1791,10 @@ function vCheck() {
       }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div></details>';
     }
   } else {
-    h += '<section class="panel">' + pHead(v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配', v === 'me' ? '指派給我，或我是該崗位負責人的項目。' : '沒有指派人，而且崗位也沒有負責人的項目。');
+    h += '<section class="panel">' + pHead(v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配', v === 'me' ? '我是負責人的崗位中，還沒完成的項目' + (S.ui.ph === '全部' ? '' : '（目前只顯示「' + esc(S.ui.ph) + '」階段）') + '。勾選完成後就會從這裡移除。' : '沒有指派人，而且崗位也沒有負責人的項目。');
   }
   h += '<h3>待完成（' + open.length + '）</h3>';
-  if (!open.length) h += '<div class="empty">' + (list.length ? '這一組都完成了。' : (can ? '這個崗位在這個階段還沒有項目，可以在下方新增或套用範本。' : '沒有符合的項目。')) + '</div>';
+  if (!open.length) h += '<div class="empty">' + (v === 'me' ? (mine.length ? '你負責的崗位' + (S.ui.ph === '全部' ? '' : '在這個階段') + '都完成了。' : '你目前不是任何崗位的負責人。') : list.length ? '這一組都完成了。' : (can ? '這個崗位在這個階段還沒有項目，可以在下方新增或套用範本。' : '沒有符合的項目。')) + '</div>';
   open.forEach(function (c) { h += ckRow(c, !real); });
   if (dn.length) {
     h += '<div class="sect"><div class="row" style="justify-content:space-between"><h3 style="margin:0">已完成（' + dn.length + '）</h3><button class="btn ghost sm" data-act="toggleDone">' + (S.ui.showDone ? '收起' : '展開') + '</button></div>';
