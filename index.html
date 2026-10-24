@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 57;
+var APP_VERSION = 58;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1980,8 +1980,8 @@ function vNewStation() {
     '<div class="foot"><button class="btn" data-act="addStationCk">新增崗位</button></div></section>';
 }
 function vPrepImport() {
-  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
-    '<div class="field"><label for="prep-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="prep-file" style="max-width:320px"></div>' +
+  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV 或 Excel 檔，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
+    '<div class="field"><label for="prep-file">上傳 CSV 或 Excel</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="prep-file" style="max-width:320px"></div>' + xlsSheetSel('prep') +
     '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)">' + esc(impText('prep')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.stations) {
@@ -2115,8 +2115,8 @@ function tlParse(text) {
   return { blocks: blocks, days: days, replace: true };
 }
 function vTlImport(nExisting) {
-  var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上或上傳 CSV：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。') +
-    '<div class="field"><label for="tl-file">上傳 CSV</label><input type="file" accept=".csv,.tsv,.txt,text/csv" id="tl-file" style="max-width:320px"></div>' +
+  var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上，或上傳 CSV、Excel 檔：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。') +
+    '<div class="field"><label for="tl-file">上傳 CSV 或 Excel</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="tl-file" style="max-width:320px"></div>' + xlsSheetSel('tl') +
     '<div class="field" style="margin-top:16px"><label for="tl-text">或貼上表格</label><textarea id="tl-text" rows="6" placeholder="時間&#9;活動項目&#9;時間&#9;內容&#9;人員&#9;地點&#10;10/29&#9;佈場&#9;9:00-9:30&#9;佈展人員集合 上貨車&#9;凱.鍵.Hedy&#9;中山店">' + esc(impText('tl')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.blocks) {
@@ -2305,8 +2305,8 @@ function vItems() {
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
     h += vNewItem(beanOpts);
-    h += '<section class="panel">' + pHead('匯入 CSV', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以從 Excel 另存 CSV，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
-      '<div class="field"><label for="csvfile">選擇檔案</label><input type="file" accept=".csv,text/csv" id="csvfile" style="max-width:320px"></div>' +
+    h += '<section class="panel">' + pHead('匯入品項（CSV／Excel）', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以上傳 CSV 或 Excel 檔，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
+      '<div class="field"><label for="csvfile">選擇檔案（CSV 或 Excel）</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="csvfile" style="max-width:320px"></div>' + xlsSheetSel('csv') +
       '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext">' + esc(impText('csv')) + '</textarea></div>' + vCsvPreview() +
       '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button>' + impClearBtn('csv') + '</div></section>';
     if (R.archived.length) {
@@ -2949,10 +2949,83 @@ function newBoothFromSelect(t, prev) {
   });
 }
 /* 匯入暫存：貼上的內容與預覽，按「清除」一起清掉 */
-var IMP = { prep: { ui: 'prep', text: 'prep-text', file: 'prep-file' }, tl: { ui: 'tlimp', text: 'tl-text', file: 'tl-file' }, csv: { ui: 'csv', text: 'csvtext', file: 'csvfile' } };
+var IMP = { prep: { ui: 'prep', text: 'prep-text', file: 'prep-file', parse: function (t) { return prepParse(t); } }, tl: { ui: 'tlimp', text: 'tl-text', file: 'tl-file', parse: function (t) { return tlParse(t); } }, csv: { ui: 'csv', text: 'csvtext', file: 'csvfile', parse: function (t) { return csvToItems(t); } } };
 function impText(k) { return (S.ui.impText && S.ui.impText[k]) || ''; }
 function impClearBtn(k) { return '<button class="btn ghost" data-act="impClear" data-v="' + k + '"' + (impText(k) || S.ui[IMP[k].ui] ? '' : ' disabled') + '>清除</button>'; }
-function impReset(k) { S.ui[IMP[k].ui] = null; if (S.ui.impText) S.ui.impText[k] = ''; }
+function impReset(k) { S.ui[IMP[k].ui] = null; if (S.ui.impText) S.ui.impText[k] = ''; if (S.ui.xls) S.ui.xls[k] = null; }
+/* 上傳檔案：CSV 直接讀文字；Excel 用 SheetJS（第一次用到才載入）轉成 Tab 分隔文字，再交給原本的 CSV／貼上解析 */
+var XLSX_SRC = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', xlsxLoading = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!xlsxLoading) xlsxLoading = new Promise(function (ok, no) {
+    var sc = document.createElement('script');
+    sc.src = XLSX_SRC;
+    sc.onload = function () { window.XLSX ? ok(window.XLSX) : no(new Error('load')); };
+    sc.onerror = function () { xlsxLoading = null; no(new Error('load')); };
+    document.head.appendChild(sc);
+  });
+  return xlsxLoading;
+}
+function isExcelFile(f) { return /\.(xlsx|xlsm|xls)$/i.test(f.name || ''); }
+function readImportFile(k, f) {
+  if (!isExcelFile(f)) {
+    var rd = new FileReader();
+    rd.onload = function () { if (S.ui.xls) S.ui.xls[k] = null; S.ui[IMP[k].ui] = IMP[k].parse(rd.result); renderNow(); };
+    rd.readAsText(f, 'utf-8');
+    return;
+  }
+  toast('讀取 Excel 中…');
+  loadXlsx().then(function (X) {
+    return new Promise(function (ok, no) {
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var wb = X.read(new Uint8Array(rd.result), { type: 'array', cellNF: true }), sheets = [];
+          wb.SheetNames.forEach(function (n) {
+            xlsDates(X, wb.Sheets[n]);
+            var t = X.utils.sheet_to_csv(wb.Sheets[n], { FS: '\t', blankrows: false });
+            if (t.replace(/[\t\s]/g, '')) sheets.push({ name: n, text: t });
+          });
+          ok(sheets);
+        } catch (e) { no(e); }
+      };
+      rd.onerror = function () { no(rd.error); };
+      rd.readAsArrayBuffer(f);
+    });
+  }).then(function (sheets) {
+    if (!sheets.length) { toast('這個 Excel 檔沒有內容', true); return; }
+    S.ui.xls = S.ui.xls || {};
+    /* 預設選第一張讀得出資料的工作表（略過說明頁等） */
+    var idx = 0, r = null, i, x;
+    for (i = 0; i < sheets.length; i++) {
+      x = IMP[k].parse(sheets[i].text);
+      if (i === 0) r = x;
+      if (x && !x.error && !(x.errors && x.errors.length && !(x.rows && x.rows.length))) { idx = i; r = x; break; }
+    }
+    S.ui.xls[k] = { file: f.name, sheets: sheets, idx: idx };
+    S.ui[IMP[k].ui] = r; renderNow();
+  }, function (e) {
+    toast(e && e.message === 'load' ? '無法載入 Excel 讀取工具，請確認網路後再試，或改用 CSV／貼上' : '無法讀取這個 Excel 檔，請另存成 .xlsx 或 CSV 再試', true);
+  });
+}
+/* Excel 的日期、時間格不論顯示格式，一律轉成貼上時的寫法：日期 10/28、時間 9:00、日期加時間 10/28 9:00 */
+function xlsDates(X, ws) {
+  Object.keys(ws).forEach(function (ad) {
+    var c = ws[ad];
+    if (ad.charAt(0) === '!' || !c || c.t !== 'n' || !c.z || !X.SSF.is_date(c.z)) return;
+    var d = X.SSF.parse_date_code(c.v);
+    if (!d) return;
+    var tm = d.H + ':' + (d.M < 10 ? '0' : '') + d.M;
+    c.w = c.v < 1 ? tm : d.m + '/' + d.d + (d.H || d.M ? ' ' + tm : '');
+  });
+}
+function xlsSheetSel(k) {
+  var x = S.ui.xls && S.ui.xls[k];
+  if (!x) return '';
+  if (x.sheets.length < 2) return '<p class="hint">已讀取 ' + esc(x.file) + '（工作表「' + esc(x.sheets[0].name) + '」）</p>';
+  return '<div class="field" style="margin-top:12px"><label for="xls-' + k + '">' + esc(x.file) + ' 有 ' + x.sheets.length + ' 個工作表，選擇要匯入的</label><select id="xls-' + k + '" data-xls="' + k + '" style="max-width:320px">' +
+    x.sheets.map(function (sh, i) { return '<option value="' + i + '"' + (i === x.idx ? ' selected' : '') + '>' + esc(sh.name) + '</option>'; }).join('') + '</select></div>';
+}
 function vEvent() {
   var ev = curEvent(), m = isMgr();
   var h = '<div class="panels">';
@@ -3476,9 +3549,9 @@ var A = {
       ['全部品項總對點', '全部品項總對點＋封箱', '怡蓁', '10/28', '', '', '']]);
   },
   prepPreview: function () {
-    var f = $('#prep-file'), t = val('#prep-text');
-    function go(text) { S.ui.prep = prepParse(text); renderNow(); }
-    if (f && f.files && f.files[0]) { var rd = new FileReader(); rd.onload = function () { go(rd.result); }; rd.readAsText(f.files[0], 'utf-8'); }
+    var f = $('#prep-file'), t = val('#prep-text'), K = 'prep';
+    function go(text) { if (S.ui.xls) S.ui.xls[K] = null; S.ui.prep = prepParse(text); renderNow(); }
+    if (f && f.files && f.files[0]) readImportFile(K, f.files[0]);
     else if (t.trim()) go(t);
     else toast('請選擇檔案或貼上表格', true);
   },
@@ -3552,9 +3625,9 @@ var A = {
     })();
   },
   tlPreview: function () {
-    var f = $('#tl-file'), t = val('#tl-text');
-    function go(text) { S.ui.tlimp = tlParse(text); renderNow(); }
-    if (f && f.files && f.files[0]) { var rd = new FileReader(); rd.onload = function () { go(rd.result); }; rd.readAsText(f.files[0], 'utf-8'); }
+    var f = $('#tl-file'), t = val('#tl-text'), K = 'tl';
+    function go(text) { if (S.ui.xls) S.ui.xls[K] = null; S.ui.tlimp = tlParse(text); renderNow(); }
+    if (f && f.files && f.files[0]) readImportFile(K, f.files[0]);
     else if (t.trim()) go(t);
     else toast('請選擇檔案或貼上表格', true);
   },
@@ -3626,11 +3699,8 @@ var A = {
   },
   csvPreview: function () {
     var f = $('#csvfile'), t = val('#csvtext');
-    if (f && f.files && f.files[0]) {
-      var rd = new FileReader();
-      rd.onload = function () { S.ui.csv = csvToItems(rd.result); renderNow(); };
-      rd.readAsText(f.files[0], 'utf-8');
-    } else if (t.trim()) { S.ui.csv = csvToItems(t); renderNow(); }
+    if (f && f.files && f.files[0]) readImportFile('csv', f.files[0]);
+    else if (t.trim()) { if (S.ui.xls) S.ui.xls.csv = null; S.ui.csv = csvToItems(t); renderNow(); }
     else toast('請選擇檔案或貼上內容', true);
   },
   csvImport: function () {
@@ -3931,6 +4001,11 @@ document.addEventListener('submit', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var t = ev.target, a = t.getAttribute('data-act');
+  if (t.hasAttribute('data-xls')) {
+    var xk = t.getAttribute('data-xls'), xx = S.ui.xls && S.ui.xls[xk];
+    if (xx) { xx.idx = +t.value; S.ui[IMP[xk].ui] = IMP[xk].parse(xx.sheets[xx.idx].text); renderNow(); }
+    return;
+  }
   if (t.value === '__newbooth') { newBoothFromSelect(t, t.getAttribute('data-prev') || ''); return; }
   if (t.tagName === 'SELECT' && t.hasAttribute('data-prev')) t.setAttribute('data-prev', t.value);
   if (t.id === 'ie-bean') {
