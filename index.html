@@ -50,7 +50,7 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .banner{margin-top:16px;padding:12px 16px;border:1px solid var(--line);background:var(--surface);font-size:13px;border-radius:6px}
 .banner.warn{border-color:var(--warn);color:var(--warn)}
 .banner.hold{border-color:var(--hold);color:var(--hold)}
-.ann{margin-top:16px;padding:14px 16px;background:#B42318;color:#fff;border-radius:6px;display:flex;gap:12px;align-items:flex-start}
+.ann{margin-top:16px;padding:14px 16px;background:rgba(173,60,35,.7);color:#fff;border-radius:6px;display:flex;gap:12px;align-items:flex-start}
 .ann .lbl{flex:none;font-weight:700;font-size:13px;letter-spacing:.12em;padding:2px 8px;border:1px solid rgba(255,255,255,.7);border-radius:4px;line-height:1.5}
 .ann .tx{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;font-size:15px;line-height:1.6;font-weight:500}
 .ann .btn.ghost{color:#fff;border-color:rgba(255,255,255,.7);flex:none}
@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 56;
+var APP_VERSION = 57;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1175,9 +1175,9 @@ function vHeader() {
   return h;
 }
 
-/* 重要公告：頁首與分頁列中間的紅色區塊；所有人看得到，管理員可編輯，空白就不顯示 */
+/* 重要公告：頁首與分頁列中間的紅色區塊；所有人看得到，管理員與參加夥伴（活動未結束）可編輯，空白就不顯示 */
 function vAnnounce(ev) {
-  var m = isMgr(), t = ev.announcement || '';
+  var m = canEditStations(), t = ev.announcement || '';
   if (m && S.ui.annEdit) {
     return '<div class="ann edit"><label class="lbl" for="ann-text" style="align-self:flex-start">重要公告</label>' +
       '<textarea id="ann-text" maxlength="1000" placeholder="例如：11/13 早上 8:00 前完成佈場，貨車停 B1 卸貨區">' + esc(t) + '</textarea>' +
@@ -3706,11 +3706,11 @@ var A = {
   annSave: function () {
     var t = val('#ann-text').replace(/\s+$/, '');
     if (t.length > 1000) { toast('公告最多 1000 字', true); return; }
-    call('evt_event_save', { p: { id: S.ev, announcement: t } }, ['events'], t.trim() ? '公告已更新' : '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
+    call('evt_announcement_save', { p_event_id: S.ev, p_text: t }, ['events'], t.trim() ? '公告已更新' : '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
   },
   annClear: function () {
     if (!confirm('確定要移除這則公告？')) return;
-    call('evt_event_save', { p: { id: S.ev, announcement: '' } }, ['events'], '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
+    call('evt_announcement_save', { p_event_id: S.ev, p_text: '' }, ['events'], '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
   },
   saveEvent: function () {
     var p = { id: S.ev };
