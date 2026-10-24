@@ -50,6 +50,14 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .banner{margin-top:16px;padding:12px 16px;border:1px solid var(--line);background:var(--surface);font-size:13px;border-radius:6px}
 .banner.warn{border-color:var(--warn);color:var(--warn)}
 .banner.hold{border-color:var(--hold);color:var(--hold)}
+.ann{margin-top:16px;padding:14px 16px;background:#B42318;color:#fff;border-radius:6px;display:flex;gap:12px;align-items:flex-start}
+.ann .lbl{flex:none;font-weight:700;font-size:13px;letter-spacing:.12em;padding:2px 8px;border:1px solid rgba(255,255,255,.7);border-radius:4px;line-height:1.5}
+.ann .tx{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;font-size:15px;line-height:1.6;font-weight:500}
+.ann .btn.ghost{color:#fff;border-color:rgba(255,255,255,.7);flex:none}
+.ann .btn.ghost:hover{background:rgba(255,255,255,.12);border-color:#fff}
+.ann textarea{color:var(--fg)}
+.ann.edit{flex-direction:column;align-items:stretch}
+.ann-add{margin-top:12px}
 nav.tabs{display:flex;gap:24px;overflow-x:auto;margin:16px calc(-1 * var(--gutter)) 0;padding:0 var(--gutter);border-bottom:1px solid var(--line);scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs button{flex:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 0 10px;font-size:15px;color:var(--mut);cursor:pointer;min-height:48px}
@@ -424,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 55;
+var APP_VERSION = 56;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1159,6 +1167,7 @@ function vHeader() {
   h += '<div class="evlist"><button class="btn ghost sm" data-act="openList">切換活動</button></div>';
   h += '</div>' + vWho() + '</div>';
   if (S.offline) h += offlineBanner();
+  if (ev) h += vAnnounce(ev);
   if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「活動」分頁或「切換活動」頁的「我的帳號」更改。</div>';
   h += '<nav class="tabs" role="tablist">' + TABS.filter(function (t) { return t[0] !== 'drink' || drinksOn(); }).map(function (t) {
     return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (S.ui.tab === t[0]) + '">' + t[1] + '</button>';
@@ -1166,6 +1175,18 @@ function vHeader() {
   return h;
 }
 
+/* 重要公告：頁首與分頁列中間的紅色區塊；所有人看得到，管理員可編輯，空白就不顯示 */
+function vAnnounce(ev) {
+  var m = isMgr(), t = ev.announcement || '';
+  if (m && S.ui.annEdit) {
+    return '<div class="ann edit"><label class="lbl" for="ann-text" style="align-self:flex-start">重要公告</label>' +
+      '<textarea id="ann-text" maxlength="1000" placeholder="例如：11/13 早上 8:00 前完成佈場，貨車停 B1 卸貨區">' + esc(t) + '</textarea>' +
+      '<div class="row btns"><button class="btn ghost sm" data-act="annSave">儲存公告</button><button class="btn ghost sm" data-act="annCancel">取消</button>' +
+      (t ? '<button class="btn ghost sm" data-act="annClear" style="margin-left:auto">移除公告</button>' : '') + '</div></div>';
+  }
+  if (t) return '<div class="ann" role="note"><span class="lbl">重要公告</span><div class="tx">' + esc(t) + '</div>' + (m ? '<button class="btn ghost sm" data-act="annEdit">編輯</button>' : '') + '</div>';
+  return m ? '<div class="ann-add"><button class="btn ghost sm" data-act="annEdit">＋ 新增重要公告</button></div>' : '';
+}
 function pHead(title, sub, aside, meta) {
   return '<div class="phead"><div class="ptitle"><h2>' + title + '</h2>' + (sub ? '<p class="sub">' + sub + '</p>' : '') + (meta ? '<div class="pmeta">' + meta + '</div>' : '') + '</div>' +
     (aside ? '<div class="paside">' + aside + '</div>' : '') + '</div>';
@@ -2732,7 +2753,7 @@ var FIELD_LABEL = {
   order_qty: '訂購數量', received_qty: '實收數量', supplier: '供應商', eta: '預計到貨', total_need: '需求量', unit: '單位', item_name: '品項', buyer_id: '採購人',
   start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
   content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調',
-  steps: '出杯步驟', coffee_bean_name: '特調用咖啡豆', coffee_bean_total_g: '咖啡豆總用量 g', planned_cups: '預計杯數', extra_cups: '可再加杯數', prep_cups_override: '備貨杯數（手動）', grams_per_cup: '每杯 g', has_coffee: '含咖啡', booths: '展台清單', booth_label: '展台稱呼'
+  steps: '出杯步驟', coffee_bean_name: '特調用咖啡豆', coffee_bean_total_g: '咖啡豆總用量 g', planned_cups: '預計杯數', extra_cups: '可再加杯數', prep_cups_override: '備貨杯數（手動）', grams_per_cup: '每杯 g', has_coffee: '含咖啡', booths: '展台清單', booth_label: '展台稱呼', announcement: '重要公告'
 };
 var SKIP_FIELDS = ['deleted_at', 'deleted_by', 'updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
 function fmtVal(k, v) {
@@ -3142,7 +3163,7 @@ function switchEvent(id) {
   S.ev = id || null;
   LS.set('phase_evt_last_event', S.ev || '');
   S.D = emptyD(); S.R = CALC.build();
-  S.ui.newEv = ''; S.ui.picker = ''; S.ui.draftId = null; S.ui.signing = false; S.ui.st = ''; S.ui.editId = null; S.ui.cdate = ''; S.ui.q.item = ''; S.ui.q.date = '';
+  S.ui.newEv = ''; S.ui.picker = ''; S.ui.annEdit = false; S.ui.draftId = null; S.ui.signing = false; S.ui.st = ''; S.ui.editId = null; S.ui.cdate = ''; S.ui.q.item = ''; S.ui.q.date = '';
   S.sig = {};
   renderNow();
   return reload(EVENT_KEYS);
@@ -3679,6 +3700,17 @@ var A = {
   restoreEvent: function (e) {
     var ev = byId(S.G.events, e.getAttribute('data-id'));
     call('evt_event_delete', { p_event_id: ev.id, p_deleted: false }, ['events'], '已還原活動：' + ev.name);
+  },
+  annEdit: function () { S.ui.annEdit = true; renderNow(); var t = $('#ann-text'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
+  annCancel: function () { S.ui.annEdit = false; renderNow(); },
+  annSave: function () {
+    var t = val('#ann-text').replace(/\s+$/, '');
+    if (t.length > 1000) { toast('公告最多 1000 字', true); return; }
+    call('evt_event_save', { p: { id: S.ev, announcement: t } }, ['events'], t.trim() ? '公告已更新' : '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
+  },
+  annClear: function () {
+    if (!confirm('確定要移除這則公告？')) return;
+    call('evt_event_save', { p: { id: S.ev, announcement: '' } }, ['events'], '公告已移除').then(function (r) { if (r.ok) { S.ui.annEdit = false; renderNow(); } });
   },
   saveEvent: function () {
     var p = { id: S.ev };
