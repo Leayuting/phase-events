@@ -424,7 +424,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 54;
+var APP_VERSION = 55;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -999,6 +999,12 @@ function ownersOf(stId) { return S.D.owners.filter(function (o) { return o.stati
 function myStations() {
   if (!S.me) return [];
   return S.D.stations.filter(function (s) { return !s.archived && ownersOf(s.id).indexOf(S.me.id) >= 0; });
+}
+/* 新增崗位、指派負責人與對點日期、匯入崗位與清單：管理員，或有參加這場且活動未結束的夥伴 */
+function canEditStations() {
+  if (isMgr()) return true;
+  var ev = curEvent();
+  return !!(S.me && ev && ev.status !== '已結束' && membersOf(S.ev).indexOf(S.me.id) >= 0);
 }
 function canEditSt(stId) {
   if (isMgr()) return true;
@@ -1754,10 +1760,10 @@ function vCheck() {
     h += '<section class="panel">' + pHead(esc(st.name) + ' 清單', (S.ui.ph === '全部' ? '' : '目前只顯示「' + esc(S.ui.ph) + '」階段。') + (can ? '你可以勾選、編輯、排序這個崗位的項目。' : '勾選、新增與編輯由這個崗位的負責人或管理員處理，你可以查看進度。'),
       mgr ? '<span class="row btns"><button class="btn ghost sm" data-act="stEditToggle">' + (S.ui.stEdit ? '收起崗位設定' : '編輯崗位') + '</button><button class="btn warn sm" data-act="stDelete" data-id="' + st.id + '">刪除崗位</button></span>' : (can ? '' : '<span class="tag">僅可查看</span>'),
       '<span class="ownline">負責人 ' + (owners.length ? esc(owners.map(pname).join('、')) : '尚未指定') + '</span><span class="ownline">對點 ' + (st.check_date ? mdw(st.check_date) : '未定') + '</span><span class="ownline">已完成 ' + d2 + ' / ' + a2.length + '</span>');
-    if (mgr) {
+    if (canEditStations()) {
       var mem = membersOf(S.ev);
-      h += '<details class="ownerbox"' + (owners.length && !S.ui.stEdit ? '' : ' open') + '><summary class="small"><b>崗位設定：名稱、負責人、對點日期</b><span class="mut">（管理員）</span></summary><div style="padding:8px 0 0">' +
-        '<div class="field" style="margin-bottom:16px"><label for="st-name">崗位名稱</label><div class="inline-add" style="margin-top:0"><input type="text" id="st-name" value="' + esc(st.name) + '"><button class="btn sm" data-act="stRename" data-id="' + st.id + '">儲存名稱</button></div></div>' +
+      h += '<details class="ownerbox"' + (owners.length && !S.ui.stEdit ? '' : ' open') + '><summary class="small"><b>崗位設定：' + (mgr ? '名稱、' : '') + '負責人、對點日期</b></summary><div style="padding:8px 0 0">' +
+        (mgr ? '<div class="field" style="margin-bottom:16px"><label for="st-name">崗位名稱</label><div class="inline-add" style="margin-top:0"><input type="text" id="st-name" value="' + esc(st.name) + '"><button class="btn sm" data-act="stRename" data-id="' + st.id + '">儲存名稱</button></div></div>' : '') +
         '<div class="hint" style="margin-bottom:8px">本場負責人（可多人，點選切換；只列出參加這場的夥伴）</div><div class="chips">' + S.G.people.filter(function (p) { return (p.active && mem.indexOf(p.id) >= 0) || owners.indexOf(p.id) >= 0; }).map(function (p) {
         return '<button class="chip" data-act="owner" data-v="' + p.id + '" aria-pressed="' + (owners.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>';
       }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div></details>';
@@ -1800,7 +1806,7 @@ function vCheck() {
       h += '</section>';
     }
   }
-  if (mgr) h += vNewStation() + vPrepImport();
+  if (canEditStations()) h += vNewStation() + vPrepImport();
   return h;
 }
 /* 匯入前置作業：崗位｜內容｜負責人｜對點日期（可多加 階段、數量、備註），支援合併儲存格與一格多行 */
@@ -1967,7 +1973,8 @@ function vPrepImport() {
           '<td style="line-height:1.5" class="nowrap">' + (st.date ? mdw(st.date) : '<span class="mut">未填</span>') + '</td><td style="line-height:1.5">' + st.items.map(function (it) { return '・' + esc(it.title) + (it.phase !== '事前' ? ' <span class="tag">' + esc(it.phase) + '</span>' : ''); }).join('<br>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     var oldIds = Object.keys(P.old);
-    if (oldIds.length) {
+    if (oldIds.length && !isMgr()) h += '<p class="hint" style="margin-top:16px">不在表上的 ' + oldIds.length + ' 個既有崗位會保留；要併入或封存舊崗位，請管理員處理。</p>';
+    if (oldIds.length && isMgr()) {
       h += '<h3 style="margin-top:24px">不在表上的既有崗位</h3><p class="hint" style="margin:0 0 8px">「併入」會把清單項目（含勾選紀錄）搬到新崗位後封存舊崗位；「封存」會連同清單一起隱藏，可以再還原。</p>' + oldIds.map(function (id) {
         var o = P.old[id], st = station(id);
         return '<div class="log"><span class="tx"><b style="font-weight:600">' + esc(st ? st.name : '') + '</b> <span class="mut small">' + o.n + ' 項清單</span></span>' +
@@ -3468,7 +3475,7 @@ var A = {
       st.owners.forEach(function (n) { if (own.indexOf(n) < 0) own.push(n); });
       st.items.forEach(function (it) { rows.push({ station: name, owners: own, check_date: st.date, title: it.title, phase: it.phase, qty: it.qty, note: it.note }); });
     });
-    Object.keys(P.old).forEach(function (id) { var o = P.old[id]; old.push({ station_id: id, action: o.action, to: o.to }); });
+    if (isMgr()) Object.keys(P.old).forEach(function (id) { var o = P.old[id]; old.push({ station_id: id, action: o.action, to: o.to }); });
     var nm = old.filter(function (o) { return o.action !== 'keep'; }).length;
     if (!confirm('匯入 ' + inc.length + ' 個崗位、' + rows.length + ' 項清單？' + (nm ? nm + ' 個舊崗位會併入或封存。' : ''))) return;
     call('evt_prep_import', { p_event_id: S.ev, p_rows: rows, p_old: old }, ['stations', 'owners', 'ck', 'people', 'members']).then(function (r) {
