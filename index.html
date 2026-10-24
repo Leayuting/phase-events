@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 58;
+var APP_VERSION = 59;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1980,7 +1980,7 @@ function vNewStation() {
     '<div class="foot"><button class="btn" data-act="addStationCk">新增崗位</button></div></section>';
 }
 function vPrepImport() {
-  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV 或 Excel 檔，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate">下載範本</button>') +
+  var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV 或 Excel 檔，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="prepTemplate" data-v="csv">下載範本（CSV）</button>') +
     '<div class="field"><label for="prep-file">上傳 CSV 或 Excel</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="prep-file" style="max-width:320px"></div>' + xlsSheetSel('prep') +
     '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)">' + esc(impText('prep')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
@@ -2305,7 +2305,7 @@ function vItems() {
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
     h += vNewItem(beanOpts);
-    h += '<section class="panel">' + pHead('匯入品項（CSV／Excel）', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以上傳 CSV 或 Excel 檔，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate">下載 CSV 範本</button>') +
+    h += '<section class="panel">' + pHead('匯入品項（CSV／Excel）', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以上傳 CSV 或 Excel 檔，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="csvTemplate" data-v="csv">下載範本（CSV）</button>') +
       '<div class="field"><label for="csvfile">選擇檔案（CSV 或 Excel）</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="csvfile" style="max-width:320px"></div>' + xlsSheetSel('csv') +
       '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext">' + esc(impText('csv')) + '</textarea></div>' + vCsvPreview() +
       '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button>' + impClearBtn('csv') + '</div></section>';
@@ -2853,6 +2853,22 @@ function download(name, text, type) {
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+/* 匯入範本：CSV 或 Excel；Excel 的純數字欄存成數字，其他（例如 10/28）存成文字，避免被 Excel 改成別的日期 */
+function tplDownload(base, fmt, rows) {
+  if (fmt !== 'xlsx') { csvDownload(base + '.csv', rows); return; }
+  loadXlsx().then(function (X) {
+    var ws = X.utils.aoa_to_sheet(rows.map(function (r) { return r.map(function (v) { return /^\d+$/.test(v) ? +v : v; }); }));
+    ws['!cols'] = rows[0].map(function (h, j) {
+      var w = 6;
+      rows.forEach(function (r) { var v = String(r[j] == null ? '' : r[j]); w = Math.max(w, v.length * (/[^\x00-\xff]/.test(v) ? 2 : 1) + 2); });
+      return { wch: Math.min(w, 40) };
+    });
+    var wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, ws, '範本');
+    var out = X.write(wb, { bookType: 'xlsx', type: 'array' });
+    download(base + '.xlsx', out, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }, function () { toast('無法載入 Excel 工具，請確認網路後再試，或改下載 CSV 範本', true); });
 }
 function csvDownload(name, rows) { download(name, '﻿' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n')); }
 function exportData(kind) {
@@ -3540,8 +3556,8 @@ var A = {
   },
   restoreItem: function (e) { call('evt_item_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['items'], '已還原'); },
   toggleItemArch: function () { S.ui.itemArch = !S.ui.itemArch; renderNow(); },
-  prepTemplate: function () {
-    csvDownload('前置作業匯入範本.csv', [['崗位', '內容', '負責人', '對點日期', '階段', '數量', '備註'],
+  prepTemplate: function (e) {
+    tplDownload('前置作業匯入範本', e.getAttribute('data-v'), [['崗位', '內容', '負責人', '對點日期', '階段', '數量', '備註'],
       ['櫃檯（不封箱）', '櫃檯區所需物品攜帶', '怡蓁', '10/28', '', '', ''], ['', '確認並裝箱', '', '', '', '', ''], ['', '錢／POS 自行攜帶', '', '', '', '', ''],
       ['沖煮（不封箱）', '沖煮區器具／水準備', '凱', '10/28', '', '', ''], ['', '試喝沖煮豆包裝', '坤良、建勳', '', '', '', ''],
       ['商品-咖啡豆', '烘豆／包豆', '坤良、建勳', '10/28', '', '', ''], ['', '裝箱確認（封箱）', '', '', '', '', ''], ['', '外箱標記種類／數量', '', '', '', '', ''],
@@ -3691,8 +3707,8 @@ var A = {
       if (r.ok) { var k = n.kind; S.ui.ni = null; niState().kind = k; renderNow(); }
     });
   },
-  csvTemplate: function () {
-    csvDownload('品項匯入範本.csv', [['類型', '名稱', boothLabel(), '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註'],
+  csvTemplate: function (e) {
+    tplDownload('品項匯入範本', e.getAttribute('data-v'), [['類型', '名稱', boothLabel(), '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註'],
       ['咖啡豆', '範例豆款', boothList()[0] || '', '01｜分類名稱', '227', '72', '144', '1800', '', ''],
       ['濾掛', '範例豆款', boothList()[0] || '', '', '', '150', '300', '', '範例豆款', ''],
       ['濾掛', '只帶濾掛範例', '', '', '', '150', '150', '', '', '']]);
