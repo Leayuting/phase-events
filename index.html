@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 60;
+var APP_VERSION = 61;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2116,7 +2116,7 @@ function tlParse(text) {
   return { blocks: blocks, days: days, replace: true };
 }
 function vTlImport(nExisting) {
-  var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上，或上傳 CSV、Excel 檔：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。') +
+  var P = S.ui.tlimp, h = '<section class="panel">' + pHead('匯入時程細流', '把活動細流表整張貼上，或上傳 CSV、Excel 檔：欄位「時間｜活動項目｜時間｜內容｜人員｜地點」。第一欄寫日期（例如 10/29、11/2 17:00-18:00）的區塊只放在那一天；只寫時段（例如 9:00-10:00）的區塊是每天的流程，會套用到活動期間每一天，可以在預覽調整。合併儲存格沒關係。', '<button class="btn ghost sm" data-act="tlTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="tlTemplate" data-v="csv">下載範本（CSV）</button>') +
     '<div class="field"><label for="tl-file">上傳 CSV 或 Excel</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="tl-file" style="max-width:320px"></div>' + xlsSheetSel('tl') +
     '<div class="field" style="margin-top:16px"><label for="tl-text">或貼上表格</label><textarea id="tl-text" rows="6" placeholder="時間&#9;活動項目&#9;時間&#9;內容&#9;人員&#9;地點&#10;10/29&#9;佈場&#9;9:00-9:30&#9;佈展人員集合 上貨車&#9;凱.鍵.Hedy&#9;中山店">' + esc(impText('tl')) + '</textarea></div>';
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
@@ -3707,6 +3707,15 @@ var A = {
     call('evt_items_import', { p_event_id: S.ev, p_rows: [p] }, ['items', 'plan'], '已新增：' + p.name).then(function (r) {
       if (r.ok) { var k = n.kind; S.ui.ni = null; niState().kind = k; renderNow(); }
     });
+  },
+  /* 時程範本：日期依本場活動（佈場、最後一天撤場），中間是每天都有的流程 */
+  tlTemplate: function (e) {
+    var ev = curEvent(), su = md(ev.setup_date || addDays(ev.start_date, -1)), en = md(ev.end_date);
+    tplDownload('時程細流匯入範本', e.getAttribute('data-v'), [['時間', '活動項目', '時間', '內容', '人員', '地點'],
+      [su, '佈場', '9:00-9:30', '佈展人員集合 上貨車', '凱.鍵.Hedy', '中山店'], ['', '', '10:00-12:00', '抵達會場 卸貨', '凱.鍵', '會場'], ['', '', '13:00-17:00', '商品上架、定位', '全員', '會場'],
+      ['9:00-10:00', '開店準備', '9:00-9:30', '開機、試沖', '全員', '會場'], ['', '', '9:30-10:00', '晨會、確認當日分工', '全員', '會場'],
+      ['10:00-18:00', '營業中', '12:00-14:00', '輪流用餐', '依排班', '會場'], ['', '', '17:30-18:00', '收店盤點', '全員', '會場'],
+      [en + ' 18:00-20:00', '撤場', '18:00-19:00', '裝箱、拆攤', '全員', '會場'], ['', '', '19:00-20:00', '上貨車 回店', '凱.鍵', '會場']]);
   },
   csvTemplate: function (e) {
     tplDownload('品項匯入範本', e.getAttribute('data-v'), [['類型', '名稱', boothLabel(), '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註'],
