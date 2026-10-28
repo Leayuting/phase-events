@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 61;
+var APP_VERSION = 62;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -798,7 +798,7 @@ var CALC = {
   build: function () {
     var D = S.D, ev = curEvent();
     var R = {
-      days: [], item: {}, drip: {}, beans: [], drips: [], archived: [],
+      days: [], item: {}, drip: {}, gift: {}, beans: [], drips: [], gifts: [], archived: [],
       outSheet: null, backSheet: null, closeSheet: {}, superseded: {}, reversedBy: {},
       tot: {}, ck: {}, ckDone: 0, ckLive: 0, buy: {}
     };
@@ -917,6 +917,10 @@ var CALC = {
         if (x.sold != null) T.sold += x.sold; else T.soldMissing++;
         T.used += x.used; T.tasting += x.tasting;
         x.daily.forEach(function (dd) { if (dd.sold != null) T.day[dd.date] += dd.sold; else T.dayMissing[dd.date]++; });
+      } else if (it.kind === 'giftbox') {
+        /* 禮盒：只有組數（存在總預計）與內容物，不算包數、克數與銷售 */
+        R.gift[it.id] = { sets: p.plan_total };
+        R.gifts.push(it);
       } else {
         var y = { plan1: p.plan_batch1, planT: p.plan_total, rep: 0 };
         net.forEach(function (m) { if (m.item_id === it.id && m.type === '補貨') y.rep += m.qty; });
@@ -1029,7 +1033,7 @@ function item(id) { return byId(S.D.items, id); }
 function itemName(id) {
   var it = item(id);
   if (!it) return '（已刪除品項）';
-  return it.kind === 'drip' ? it.name + '（濾掛）' : it.name;
+  return it.kind === 'drip' ? it.name + '（濾掛）' : it.kind === 'giftbox' ? it.name + '（禮盒）' : it.name;
 }
 
 /* ============================================================================
@@ -2302,11 +2306,12 @@ function vItems() {
         numCell(it.id, 'plan_batch1', y.plan1, 0, ed) + numCell(it.id, 'plan_total', y.planT, 0, ed) +
         '</tr>';
     }).join('') : '<tr><td colspan="5" class="mut">沒有濾掛品項</td></tr>') + '</tbody></table></div></section>';
+  h += vGifts(m);
 
   if (m) {
     var beanOpts = R.beans.map(function (it) { return '<option value="' + esc(it.name) + '">' + esc(it.name) + '</option>'; }).join('');
     h += vNewItem(beanOpts);
-    h += '<section class="panel">' + pHead('匯入品項（CSV／Excel）', '欄位：類型（咖啡豆／濾掛）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、備註。第一列為標題。可以上傳 CSV 或 Excel 檔，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="csvTemplate" data-v="csv">下載範本（CSV）</button>') +
+    h += '<section class="panel">' + pHead('匯入品項（CSV／Excel）', '欄位：類型（咖啡豆／濾掛／禮盒）、名稱、展台（或' + esc(boothLabel()) + '）、分類、規格g、第一批、總預計、試喝量g、所屬豆款、內容物、備註。第一列為標題。禮盒的組數填在「總預計」（或「數量」欄，可寫 250組），內容物填在「內容物」。可以上傳 CSV 或 Excel 檔，或直接貼上。', '<button class="btn ghost sm" data-act="csvTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="csvTemplate" data-v="csv">下載範本（CSV）</button>') +
       '<div class="field"><label for="csvfile">選擇檔案（CSV 或 Excel）</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="csvfile" style="max-width:320px"></div>' + xlsSheetSel('csv') +
       '<div class="field" style="margin-top:16px"><label for="csvtext">或貼上 CSV 內容</label><textarea id="csvtext">' + esc(impText('csv')) + '</textarea></div>' + vCsvPreview() +
       '<div class="foot"><button class="btn ghost" data-act="csvPreview">預覽</button>' + impClearBtn('csv') + '</div></section>';
@@ -2316,8 +2321,8 @@ function vItems() {
       h += '</section>';
     }
   }
-  return pageBar('品項', '本次活動帶的咖啡豆與濾掛，以及第一批、總預計的數量。列印與複製不含已刪除的品項；列印以白底深棕為主，需要注意的項目（待確認、資料缺漏）用磚紅標示。',
-    R.beans.length || R.drips.length ? shareBtns('printItems', 'copyItems') : '') + '<div class="panels">' + h + '</div>';
+  return pageBar('品項', '本次活動帶的咖啡豆、濾掛與禮盒，以及第一批、總預計的數量（禮盒以組計）。列印與複製不含已刪除的品項；列印以白底深棕為主，需要注意的項目（待確認、資料缺漏）用磚紅標示。',
+    R.beans.length || R.drips.length || R.gifts.length ? shareBtns('printItems', 'copyItems') : '') + '<div class="panels">' + h + '</div>';
 }
 /* 咖啡豆資料庫豆款清單 */
 /* 分類順序同咖啡豆資料庫：蜜處理・日曬、水洗、自然發酵、特殊發酵、堅果奶油、台灣競標、配方豆、其他 */
@@ -2396,8 +2401,47 @@ function niState() {
   if (!S.ui.ni) S.ui.ni = { kind: 'bean', mode: 'db', bean: '', name: '', booth: '', category: '', spec_g: '227', plan_batch1: '0', plan_total: '', tasting_g: '1800', parent_name: '' };
   return S.ui.ni;
 }
+/* 禮盒：品名、組數、內容物 */
+function vGifts(m) {
+  var R = S.R, eg = m && S.ui.secEdit.gift, tot = 0;
+  if (!R.gifts.length && !m) return '';
+  var h = '<section class="panel">' + pHead('禮盒', '數量以「組」計算。' + (!m ? '' : eg ? '編輯中：組數直接修改，離開欄位即儲存；點品名可以修改品名、內容物與備註，或點開後按「刪除這個品項」。完成後按「完成編輯」。' : '要改組數、內容物或刪除，請按右上角「編輯」。'), m && R.gifts.length ? secEditBtn('gift') : '', '<span>' + R.gifts.length + ' 款禮盒</span>') +
+    '<div class="tw"><table class="top"><thead><tr><th>品名</th><th class="n">數量（組）</th><th>內容物</th></tr></thead><tbody>';
+  h += R.gifts.length ? R.gifts.map(function (it) {
+    var g = R.gift[it.id];
+    tot += num(g.sets);
+    if (eg && S.ui.itemEdit === it.id) return '<tr><td colspan="3">' + itemForm(it) + '</td></tr>';
+    return '<tr><td style="min-width:130px">' + itemNameCell(it, eg) + flagHtml(it, m) + (it.note ? '<div class="hint">' + esc(it.note) + '</div>' : '') + '</td>' +
+      numCell(it.id, 'plan_total', g.sets, 0, eg) + '<td class="small" style="min-width:160px">' + (it.contents ? esc(it.contents) : '<span class="mut">—</span>') + '</td></tr>';
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + I(tot) + ' 組</td><td></td></tr>' : '<tr><td colspan="3" class="mut">沒有禮盒品項，可以在下方「新增品項」選擇類型「禮盒」。</td></tr>';
+  return h + '</tbody></table></div></section>';
+}
+/* 禮盒品名選項：本場與其他場用過的品名 */
+var giftNames = { state: 'idle', list: [] };
+function loadGiftNames() {
+  if (giftNames.state !== 'idle') return;
+  giftNames.state = 'loading';
+  sb.from('evt_items').select('name').eq('kind', 'giftbox').eq('archived', false).limit(500).then(function (r) {
+    giftNames.state = 'ok';
+    if (!r.error) giftNames.list = uniq((r.data || []).map(function (x) { return x.name; }));
+    render();
+  }, function () { giftNames.state = 'ok'; });
+}
+function giftNameList() {
+  return '<datalist id="giftnames">' + uniq(S.R.gifts.map(function (x) { return x.name; }).concat(giftNames.list)).map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('') + '</datalist>';
+}
 function vNewItem(beanOpts) {
-  var n = niState(), B = S.beanDb, bean = n.kind === 'bean';
+  var n = niState(), B = S.beanDb, bean = n.kind === 'bean', gift = n.kind === 'giftbox';
+  var kindSel = '<div class="field"><label for="ni-kind">類型</label><select id="ni-kind" data-ni="kind">' + [['bean', '咖啡豆'], ['drip', '濾掛'], ['giftbox', '禮盒']].map(function (k) { return '<option value="' + k[0] + '"' + (n.kind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select></div>';
+  if (gift) {
+    loadGiftNames();
+    return '<section class="panel">' + pHead('新增品項', '禮盒的數量以「組」計算，不使用規格 g、包數與試喝量。品名可以直接輸入，或從本場與其他場用過的品名選擇。') +
+      '<div class="grid2 form" id="newitem">' + kindSel +
+      '<div class="field"><label for="ni-gname">品名</label><input type="text" id="ni-gname" data-ni="gname" list="giftnames" value="' + esc(n.gname || '') + '" placeholder="例如：初戀、狂想曲" autocomplete="off">' + giftNameList() + '</div>' +
+      '<div class="field"><label for="ni-sets">數量（組）</label><input type="number" inputmode="numeric" min="0" step="1" id="ni-sets" data-ni="sets" value="' + esc(n.sets || '') + '" placeholder="例如：250"></div>' +
+      '<div class="field wide2"><label for="ni-contents">內容物</label><input type="text" id="ni-contents" data-ni="contents" maxlength="200" value="' + esc(n.contents || '') + '" placeholder="例如：每組 6 包 + 1 杯子"></div>' +
+      '</div><div class="foot"><button class="btn" data-act="addItem">新增品項</button></div></section>';
+  }
   if (n.mode === 'db') loadBeanDb();
   function inp(k, label, type, extra) { return '<div class="field"><label for="ni-' + k + '">' + label + '</label><input type="' + (type || 'text') + '" id="ni-' + k + '" data-ni="' + k + '" value="' + esc(n[k] || '') + '"' + (extra || '') + '></div>'; }
   var nameField;
@@ -2422,7 +2466,7 @@ function vNewItem(beanOpts) {
       '<div><button class="btn ghost sm" data-act="niBackDb" style="margin-top:8px">改從咖啡豆資料庫選擇</button></div></div>';
   }
   var h = '<section class="panel">' + pHead('新增品項', bean ? '咖啡豆請從咖啡豆資料庫選擇；資料庫沒有的臨時豆款可以選「手動輸入」。' + esc(boothLabel()) + '、規格、包數與試喝量是本次活動自己的設定，不會改到咖啡豆資料庫。' : '濾掛名稱從咖啡豆資料庫選擇，資料庫沒有的可以選「手動輸入」；所屬豆款可以選本場的咖啡豆，或選「只帶濾掛」。') +
-    '<div class="grid2 form" id="newitem"><div class="field"><label for="ni-kind">類型</label><select id="ni-kind" data-ni="kind"><option value="bean"' + (bean ? ' selected' : '') + '>咖啡豆</option><option value="drip"' + (bean ? '' : ' selected') + '>濾掛</option></select></div>' +
+    '<div class="grid2 form" id="newitem">' + kindSel +
     nameField +
     '<div class="field"><label for="ni-booth">' + esc(boothLabel()) + '</label>' + boothSelect('id="ni-booth" data-ni="booth"', n.booth) + '</div>' +
     (bean ? inp('category', '分類') + inp('spec_g', '規格 g', 'number', ' min="1"') : '') +
@@ -2443,7 +2487,8 @@ function itemRows() {
     var y = R.drip[it.id], par = item(it.parent_item_id);
     drips.push({ name: it.name, parent: par ? par.name : '只帶濾掛', p1: y.plan1, pt: y.planT, note: it.note || '', flag: it.needs_confirm || '' });
   });
-  return { beans: beans, drips: drips };
+  var gifts = R.gifts.map(function (it) { return { name: it.name, sets: R.gift[it.id].sets, contents: it.contents || '', note: it.note || '', flag: it.needs_confirm || '' }; });
+  return { beans: beans, drips: drips, gifts: gifts };
 }
 function nv(v) { return v == null || v === '' ? '' : String(v); }
 function itemsText(kind) {
@@ -2452,6 +2497,7 @@ function itemsText(kind) {
   var s1 = 0, sT = 0, d1 = 0, dT = 0;
   r.beans.forEach(function (b) { s1 += num(b.p1); sT += num(b.pt); });
   r.drips.forEach(function (b) { d1 += num(b.p1); dT += num(b.pt); });
+  var gT = 0; r.gifts.forEach(function (b) { gT += num(b.sets); });
   if (kind === 'tsv') {
     L.push(head, '', '咖啡豆');
     L.push([boothLabel(), '咖啡豆', '分類', '規格g', '第一批', '總預計', '試喝量g', '濾掛', '備註'].join('\t'));
@@ -2461,6 +2507,12 @@ function itemsText(kind) {
     L.push(['濾掛', '所屬豆款', '第一批', '總預計', '備註'].join('\t'));
     r.drips.forEach(function (b) { L.push([b.name, b.parent, nv(b.p1), nv(b.pt), b.note].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t')); });
     L.push(['合計', r.drips.length + ' 款', d1, dT, ''].join('\t'));
+    if (r.gifts.length) {
+      L.push('', '禮盒');
+      L.push(['禮盒', '數量（組）', '內容物', '備註'].join('\t'));
+      r.gifts.forEach(function (b) { L.push([b.name, nv(b.sets), b.contents, b.note].map(function (v) { return String(v).replace(/[\t\n]/g, ' '); }).join('\t')); });
+      L.push(['合計', gT, '', ''].join('\t'));
+    }
     return L.join('\n');
   }
   L.push('【' + head + '】');
@@ -2472,6 +2524,10 @@ function itemsText(kind) {
   });
   L.push('', '■ 濾掛 ' + r.drips.length + ' 款（第一批 ' + d1 + ' 包／總預計 ' + dT + ' 包）');
   r.drips.forEach(function (b) { L.push('・' + b.name + (b.parent === '只帶濾掛' ? '（只帶濾掛）' : '') + '｜第一批 ' + (nv(b.p1) || '—') + '｜總預計 ' + (nv(b.pt) || '—') + (b.note ? '｜' + b.note : '')); });
+  if (r.gifts.length) {
+    L.push('', '■ 禮盒 ' + r.gifts.length + ' 款（共 ' + gT + ' 組）');
+    r.gifts.forEach(function (b) { L.push('・' + b.name + '｜' + (nv(b.sets) ? b.sets + ' 組' : '組數未填') + (b.contents ? '｜' + b.contents : '') + (b.note ? '｜' + b.note : '')); });
+  }
   return L.join('\n');
 }
 function copyText(t) {
@@ -2514,6 +2570,17 @@ function itemsPrintHtml() {
     h += '<tr><td>濾掛</td><td>' + esc(b.name) + '</td><td>' + esc(b.parent) + '</td><td class="n">' + esc(nv(b.p1)) + '</td><td class="n">' + esc(nv(b.pt)) + '</td><td>' + note + '</td></tr>';
   });
   h += '<tr class="tot"><td colspan="3">濾掛合計 ' + r.drips.length + ' 款</td><td class="n">' + d1 + '</td><td class="n">' + dT + '</td><td></td></tr></tbody></table></div>';
+  if (r.gifts.length) {
+    var gT = 0;
+    h += '<div class="sec"><h2>禮盒<small>' + r.gifts.length + ' 款</small></h2><table><colgroup><col style="width:8%"><col style="width:26%"><col style="width:12%"><col style="width:30%"><col></colgroup>' +
+      '<thead><tr><th>類型</th><th>禮盒</th><th class="n">數量（組）</th><th>內容物</th><th>備註</th></tr></thead><tbody>';
+    r.gifts.forEach(function (b) {
+      gT += num(b.sets);
+      var w = []; if (b.flag) w.push('待確認：' + b.flag); if (!nv(b.sets)) w.push('組數未填'); if (w.length) nw++;
+      h += '<tr><td>禮盒</td><td>' + esc(b.name) + '</td><td class="n">' + esc(nv(b.sets)) + '</td><td>' + esc(b.contents) + '</td><td>' + warnHtml(w, b.note) + '</td></tr>';
+    });
+    h += '<tr class="tot"><td colspan="2">禮盒合計 ' + r.gifts.length + ' 款</td><td class="n">' + gT + '</td><td></td><td></td></tr></tbody></table></div>';
+  }
   h += '<div class="ft">已刪除的品項不列入。數字為本次活動的預計量。' + (nw ? '有 ' + nw + ' 個品項標示「注意」，請確認後再使用。' : '') + '</div>';
   return h;
 }
@@ -2617,7 +2684,7 @@ function statusText(kind) {
 /* 品項名稱：編輯模式下可以點名稱打開這個品項的編輯表單 */
 /* 品項的數量：平常只顯示，按「編輯」後才能改，避免誤觸 */
 function numCell(id, k, v, min, on) {
-  if (on) return '<td class="n"><input type="number" min="' + min + '" data-it="' + id + '|' + k + '" value="' + (isNum(v) ? v : '') + '" aria-label="' + esc(itemName(id)) + ' ' + ({ spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g' })[k] + '"></td>';
+  if (on) return '<td class="n"><input type="number" min="' + min + '" data-it="' + id + '|' + k + '" value="' + (isNum(v) ? v : '') + '" aria-label="' + esc(itemName(id)) + ' ' + ((item(id) || {}).kind === 'giftbox' && k === 'plan_total' ? '數量（組）' : ({ spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g' })[k]) + '"></td>';
   return '<td class="n">' + (isNum(v) ? I(v) : '<span class="mut">—</span>') + '</td>';
 }
 function itemNameCell(it, editing) {
@@ -2657,6 +2724,16 @@ function itemForm(it) {
   function f(k, label, v, type, extra) {
     return '<div class="field"><label>' + label + '</label><input type="' + (type || 'text') + '" data-ie="' + k + '" value="' + esc(v == null ? '' : v) + '"' + (extra || '') + '></div>';
   }
+  if (it.kind === 'giftbox') {
+    loadGiftNames();
+    var gs = R.gift[it.id] || {};
+    return '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯禮盒：' + esc(it.name) + '</h3><div class="grid2 form">' +
+      f('name', '品名', it.name, 'text', ' list="giftnames" autocomplete="off"') + giftNameList() +
+      f('plan_total', '數量（組）', isNum(gs.sets) ? gs.sets : '', 'number', ' min="0" step="1" inputmode="numeric"') +
+      '<div class="field wide2"><label>內容物</label><input type="text" data-ie="contents" maxlength="200" value="' + esc(it.contents || '') + '" placeholder="例如：每組 6 包 + 1 杯子"></div>' +
+      '<div class="field wide2"><label>備註</label><input type="text" data-ie="note" value="' + esc(it.note || '') + '"></div></div>' +
+      '<div class="row btns" style="margin-top:16px"><button class="btn sm" data-act="saveItemEdit" data-id="' + it.id + '">儲存</button><button class="btn ghost sm" data-act="cancelItemEdit">取消</button><button class="btn warn sm" data-act="archItem" data-id="' + it.id + '">刪除這個品項</button></div></div>';
+  }
   var h = '<div class="sect" style="margin:8px 0;padding-top:16px;line-height:1.6"><h3>編輯' + (bean ? '咖啡豆' : '濾掛') + '：' + esc(it.name) + '</h3>' +
     '<div class="grid2 form">' + beanLinkField(it) +
     (function () {
@@ -2694,7 +2771,7 @@ function parseCsv(text) {
   row.push(f); if (row.join('').trim()) rows.push(row);
   return rows;
 }
-var CSV_COLS = { '類型': 'kind', '名稱': 'name', '展台': 'booth', '分類': 'category', '規格g': 'spec_g', '規格': 'spec_g', '第一批': 'plan_batch1', '總預計': 'plan_total', '試喝量g': 'tasting_g', '試喝量': 'tasting_g', '所屬豆款': 'parent_name', '備註': 'note' };
+var CSV_COLS = { '類型': 'kind', '名稱': 'name', '品名': 'name', '數量': 'plan_total', '組數': 'plan_total', '內容物': 'contents', '展台': 'booth', '分類': 'category', '規格g': 'spec_g', '規格': 'spec_g', '第一批': 'plan_batch1', '總預計': 'plan_total', '試喝量g': 'tasting_g', '試喝量': 'tasting_g', '所屬豆款': 'parent_name', '備註': 'note' };
 function csvToItems(text) {
   var rows = parseCsv(text);
   if (rows.length < 2) return { rows: [], errors: ['沒有資料列'] };
@@ -2706,7 +2783,11 @@ function csvToItems(text) {
   rows.slice(1).forEach(function (r, i) {
     var o = {}, err = [];
     head.forEach(function (k, j) { if (k) o[k] = String(r[j] == null ? '' : r[j]).trim(); });
-    o.kind = /濾掛|drip/i.test(o.kind || '') ? 'drip' : 'bean';
+    o.kind = /禮盒|gift/i.test(o.kind || '') ? 'giftbox' : /濾掛|drip/i.test(o.kind || '') ? 'drip' : 'bean';
+    /* 數字後面的單位（250組、6包、227g）拿掉；禮盒不用咖啡豆的欄位 */
+    ['spec_g', 'plan_batch1', 'plan_total', 'tasting_g'].forEach(function (k) { if (o[k]) o[k] = o[k].replace(/^(\d+)\s*(組|包|g|公克)$/i, '$1'); });
+    if (o.kind === 'giftbox') { delete o.spec_g; delete o.plan_batch1; delete o.tasting_g; delete o.parent_name; delete o.category; }
+    if (o.contents && o.contents.length > 200) err.push('內容物最多 200 字');
     if (!o.name) err.push('缺名稱');
     if (o.booth && o.booth.length > 30) err.push(boothLabel() + '名稱最多 30 字');
     if (o.booth && BOOTH_RESERVED.indexOf(o.booth) >= 0) err.push(boothLabel() + '不能叫「' + o.booth + '」');
@@ -2729,9 +2810,9 @@ function vCsvPreview() {
   var bad = c.rows.filter(function (r) { return r.err.length; }).length;
   var h = '<div style="margin-top:16px">' + (c.errors.length ? '<div class="banner warn">' + esc(c.errors.join('；')) + '</div>' : '');
   if (c.rows.length) {
-    h += '<div class="tw"><table><thead><tr><th>列</th><th>類型</th><th>名稱</th><th>展台</th><th class="n">規格</th><th class="n">第一批</th><th class="n">總預計</th><th>所屬豆款</th><th>檢查</th></tr></thead><tbody>' + c.rows.map(function (r) {
+    h += '<div class="tw"><table><thead><tr><th>列</th><th>類型</th><th>名稱</th><th>展台</th><th class="n">規格</th><th class="n">第一批</th><th class="n">總預計</th><th>所屬豆款／內容物</th><th>檢查</th></tr></thead><tbody>' + c.rows.map(function (r) {
       var o = r.data;
-      return '<tr><td class="mut">' + r.line + '</td><td>' + (o.kind === 'drip' ? '濾掛' : '咖啡豆') + '</td><td>' + esc(o.name) + '</td><td>' + esc(o.booth || '') + '</td><td class="n">' + esc(o.spec_g || '') + '</td><td class="n">' + esc(o.plan_batch1 || '') + '</td><td class="n">' + esc(o.plan_total || '') + '</td><td>' + esc(o.parent_name || '') + '</td><td>' +
+      return '<tr><td class="mut">' + r.line + '</td><td>' + (o.kind === 'drip' ? '濾掛' : o.kind === 'giftbox' ? '禮盒' : '咖啡豆') + '</td><td>' + esc(o.name) + '</td><td>' + esc(o.booth || '') + '</td><td class="n">' + esc(o.spec_g || '') + '</td><td class="n">' + esc(o.plan_batch1 || '') + '</td><td class="n">' + esc(o.plan_total || '') + (o.kind === 'giftbox' && o.plan_total ? ' 組' : '') + '</td><td>' + esc(o.parent_name || o.contents || '') + '</td><td>' +
         (r.err.length ? '<span class="tag warn">' + esc(r.err.join('、')) + '</span>' : (r.by ? '<span class="tag">由第 ' + r.by + ' 列取代</span>' : (r.over ? '<span class="tag hold">覆蓋既有品項</span>' : '<span class="tag ok">新增</span>'))) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
     if (c.over) h += '<p class="hint" style="margin-top:16px">「覆蓋既有品項」：CSV 有填的欄位會取代目前的值，空白欄位保留原值；修改會留在「紀錄」。同一份 CSV 裡名稱重複時，以後面那一列為準。</p>';
@@ -2754,7 +2835,7 @@ var FIELD_LABEL = {
   order_qty: '訂購數量', received_qty: '實收數量', supplier: '供應商', eta: '預計到貨', total_need: '需求量', unit: '單位', item_name: '品項', buyer_id: '採購人',
   start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
   content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調',
-  steps: '出杯步驟', coffee_bean_name: '特調用咖啡豆', coffee_bean_total_g: '咖啡豆總用量 g', planned_cups: '預計杯數', extra_cups: '可再加杯數', prep_cups_override: '備貨杯數（手動）', grams_per_cup: '每杯 g', has_coffee: '含咖啡', booths: '展台清單', booth_label: '展台稱呼', announcement: '重要公告'
+  steps: '出杯步驟', coffee_bean_name: '特調用咖啡豆', coffee_bean_total_g: '咖啡豆總用量 g', planned_cups: '預計杯數', extra_cups: '可再加杯數', prep_cups_override: '備貨杯數（手動）', grams_per_cup: '每杯 g', has_coffee: '含咖啡', booths: '展台清單', booth_label: '展台稱呼', announcement: '重要公告', contents: '內容物'
 };
 var SKIP_FIELDS = ['deleted_at', 'deleted_by', 'updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
 function fmtVal(k, v) {
@@ -3471,7 +3552,7 @@ var A = {
     var k = e.getAttribute('data-v');
     S.ui.secEdit[k] = !S.ui.secEdit[k];
     var it = S.ui.itemEdit && item(S.ui.itemEdit);
-    if (!S.ui.secEdit[k] && it && (it.kind === 'bean') === (k === 'bean')) S.ui.itemEdit = null;
+    if (!S.ui.secEdit[k] && it && it.kind === ({ bean: 'bean', drip: 'drip', gift: 'giftbox' })[k]) S.ui.itemEdit = null;
     renderNow();
   },
   editItem: function (e) { S.ui.itemEdit = e.getAttribute('data-id'); renderNow(); },
@@ -3481,6 +3562,7 @@ var A = {
     Array.prototype.forEach.call(document.querySelectorAll('[data-ie]'), function (x) { p[x.getAttribute('data-ie')] = x.value.trim(); });
     if (!p.name) { toast('名稱不能空白', true); return; }
     if (it.kind === 'bean' && !(num(p.spec_g) > 0)) { toast('咖啡豆需要規格 g', true); return; }
+    if (it.kind === 'giftbox' && p.plan_total !== '' && !/^\d+$/.test(p.plan_total)) { toast('數量（組）請填整數', true); return; }
     if (p.plan_batch1 === '') p.plan_batch1 = '0';
     if ('bean_ref_id' in p) {
       if (p.bean_ref_id === (it.bean_ref_id != null ? String(it.bean_ref_id) : '')) delete p.bean_ref_id;
@@ -3692,6 +3774,16 @@ var A = {
   addItem: function () {
     var n = niState(), bean = n.kind === 'bean';
     Array.prototype.forEach.call(document.querySelectorAll('#newitem [data-ni]'), function (x) { var k = x.getAttribute('data-ni'); if (k !== 'kind' && !(k === 'bean' && x.value === '__manual')) n[k] = x.value; });
+    if (n.kind === 'giftbox') {
+      var g = { kind: 'giftbox', name: (n.gname || '').trim(), plan_total: String(n.sets || '').trim(), contents: (n.contents || '').trim() };
+      if (!g.name) { toast('請輸入禮盒品名', true); return; }
+      if (g.plan_total !== '' && !(/^\d+$/.test(g.plan_total))) { toast('數量（組）請填整數', true); return; }
+      if (find(S.D.items, function (x) { return !x.archived && x.kind === 'giftbox' && x.name === g.name; })) { toast('本場已有禮盒「' + g.name + '」，要修改請到「禮盒」按「編輯」', true); return; }
+      call('evt_items_import', { p_event_id: S.ev, p_rows: [g] }, ['items', 'plan'], '已新增禮盒：' + g.name).then(function (r) {
+        if (r.ok) { S.ui.ni = null; niState().kind = 'giftbox'; giftNames.state = 'idle'; renderNow(); }
+      });
+      return;
+    }
     var p = { kind: n.kind, booth: n.booth, plan_batch1: n.plan_batch1, plan_total: n.plan_total };
     if (n.mode === 'db') {
       var b = find(S.beanDb.list, function (x) { return String(x.id) === String(n.bean); });
@@ -3718,10 +3810,12 @@ var A = {
       [en + ' 18:00-20:00', '撤場', '18:00-19:00', '裝箱、拆攤', '全員', '會場'], ['', '', '19:00-20:00', '上貨車 回店', '凱.鍵', '會場']]);
   },
   csvTemplate: function (e) {
-    tplDownload('品項匯入範本', e.getAttribute('data-v'), [['類型', '名稱', boothLabel(), '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註'],
+    tplDownload('品項匯入範本', e.getAttribute('data-v'), [['類型', '名稱', boothLabel(), '分類', '規格g', '第一批', '總預計', '試喝量g', '所屬豆款', '備註', '內容物'],
       ['咖啡豆', '範例豆款', boothList()[0] || '', '01｜分類名稱', '227', '72', '144', '1800', '', ''],
       ['濾掛', '範例豆款', boothList()[0] || '', '', '', '150', '300', '', '範例豆款', ''],
-      ['濾掛', '只帶濾掛範例', '', '', '', '150', '150', '', '', '']]);
+      ['濾掛', '只帶濾掛範例', '', '', '', '150', '150', '', '', ''],
+      ['禮盒', '初戀', '', '', '', '', '250', '', '', '', '每組 6 包 + 1 杯子'],
+      ['禮盒', '狂想曲', '', '', '', '', '250', '', '', '', '每組 6 包 + 1 杯子']]);
   },
   csvPreview: function () {
     var f = $('#csvfile'), t = val('#csvtext');
