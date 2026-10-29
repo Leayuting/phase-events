@@ -432,7 +432,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 64;
+var APP_VERSION = 65;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1449,11 +1449,7 @@ function vCount() {
       return '<span class="row" style="gap:4px;display:inline-flex"><button class="btn ghost sm" data-act="openDraft" data-id="' + s.id + '">' + esc(s.type) + ' ' + md(s.biz_date) + ' 繼續</button>' +
         '<button class="btn warn sm" data-act="delDraft" data-id="' + s.id + '" aria-label="刪除草稿 ' + esc(s.type) + ' ' + md(s.biz_date) + '">刪除</button></span>';
     }).join('') + '</div></div>';
-    if (others.length && S.me.is_manager) h += '<div class="sect"><h3>其他人未完成的草稿</h3><div class="row btns">' + others.map(function (s) {
-      return '<span class="row" style="gap:4px;display:inline-flex"><span class="small">' + esc(pname(s.counter_id)) + '（' + esc(s.type) + ' ' + md(s.biz_date) + '）</span>' +
-        '<button class="btn warn sm" data-act="delDraft" data-id="' + s.id + '" aria-label="刪除 ' + esc(pname(s.counter_id)) + ' 的草稿 ' + esc(s.type) + ' ' + md(s.biz_date) + '">刪除</button></span>';
-    }).join('') + '</div><p class="hint" style="margin-top:8px">管理員可以刪除別人的草稿；對方如果正在填，填到一半的數字會一起刪除。</p></div>';
-    else if (others.length) h += '<p class="hint" style="margin-top:16px">其他人盤點中：' + others.map(function (s) { return esc(pname(s.counter_id)) + '（' + esc(s.type) + ' ' + md(s.biz_date) + '）'; }).join('、') + '</p>';
+    if (others.length) h += '<p class="hint" style="margin-top:16px">其他人盤點中：' + others.map(function (s) { return esc(pname(s.counter_id)) + '（' + esc(s.type) + ' ' + md(s.biz_date) + '）'; }).join('、') + '</p>';
     h += '<div class="foot"><button class="btn" data-act="startSheet">開始盤點</button></div>';
   }
   h += '</section>';
@@ -3443,9 +3439,9 @@ var A = {
   openDraft: function (e) { startDraft(e.getAttribute('data-id')); },
   delDraft: function (e) {
     var s = byId(S.D.sheets, e.getAttribute('data-id'));
-    if (!s || s.status !== '草稿') return;
+    if (!s || s.status !== '草稿' || s.counter_id !== S.me.id) return;
     var n = S.D.lines.filter(function (l) { return l.sheet_id === s.id; }).length;
-    if (!confirm('刪除' + (s.counter_id === S.me.id ? '' : ' ' + pname(s.counter_id) + ' 的') + '草稿「' + s.type + ' ' + md(s.biz_date) + '」？' + (n ? '\n已填的 ' + n + ' 款數字會一起刪除。' : '') + '\n已簽署的盤點單不受影響。')) return;
+    if (!confirm('刪除草稿「' + s.type + ' ' + md(s.biz_date) + '」？' + (n ? '\n已填的 ' + n + ' 款數字會一起刪除。' : '') + '\n已簽署的盤點單不受影響。')) return;
     call('evt_sheet_discard', { p_sheet_id: s.id }, ['sheets', 'lines'], '已刪除草稿');
   },
   closeDraft: function () { flushDraft().then(function () { S.ui.draftId = null; S.ui.signing = false; reload(['sheets', 'lines']); }); },
