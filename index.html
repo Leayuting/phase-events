@@ -58,6 +58,74 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .ann textarea{color:var(--fg)}
 .ann.edit{flex-direction:column;align-items:stretch}
 .ann-add{margin-top:12px}
+.posbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.posbar .seg button{min-width:72px;font-size:15px}
+.poscat{margin:24px 0 8px;font-size:13px;color:var(--mut);letter-spacing:.06em}
+.posmenu .poscat:first-child{margin-top:0}
+.posgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.posbtn{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;min-height:84px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);text-align:left;cursor:pointer;font:inherit;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.posbtn:hover{border-color:var(--ink)}
+.posbtn[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.posbtn[disabled]{cursor:not-allowed}
+.posbtn.out{opacity:.45;background:var(--soft)}
+.posbtn .nm{font-weight:600;line-height:1.35;word-break:break-word;padding-right:28px}
+.posbtn .pr{font-variant-numeric:tabular-nums;color:var(--mut);font-size:14px}
+.posbtn .left{font-size:12px;color:var(--mut)}
+.posbtn .left.low,.lowtx{color:var(--warn);font-weight:600}
+.posbtn .q{position:absolute;top:8px;right:8px;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--ink);color:var(--onink);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.poslines{border-top:1px solid var(--line)}
+.posline{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.posline .nm{font-weight:600;word-break:break-word}
+.posline .amt{min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
+.qty{display:inline-flex;align-items:center;gap:6px}
+.qty b{min-width:22px;text-align:center}
+.posseg button{min-width:72px}
+.postot{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline;margin-top:16px;padding:16px;background:var(--soft);border-radius:6px;font-variant-numeric:tabular-nums}
+.postot div{display:flex;flex-direction:column}
+.postot span{font-size:12px;color:var(--mut)}
+.postot b{font-size:18px;font-weight:600}
+.postot .big{margin-left:auto;text-align:right}
+.postot .big b{font-size:30px}
+.posgo{min-height:56px;font-size:18px;padding:0 24px;width:100%}
+.posnums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.posnums div{display:flex;flex-direction:column}
+.posnums span{font-size:12px;color:var(--mut)}
+.posnums b{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.pck{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:15px;cursor:pointer}
+.pck input{width:20px;height:20px}
+#pos-quick .btn{min-height:44px;min-width:72px}
+.poskq{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.poscard{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.poscard.late{border:3px solid var(--warn);padding:14px}
+.poscard .lbl{font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.poscard ul{list-style:none;margin:0;padding:0}
+.poscard li{display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:17px}
+.poscard li.kbar{color:var(--fg);font-weight:700}
+.poscard li.klite{color:var(--mut)}
+.poscard .pnote{padding:8px;background:var(--soft);border-radius:4px;font-weight:600}
+.poscard .btn{min-height:52px;font-size:17px;margin-top:auto}
+.posflash{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(20,20,20,.45);cursor:pointer}
+.posflash div{display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 48px;background:var(--surface);border-radius:8px;min-width:240px}
+.posflash span{font-size:14px;color:var(--mut)}
+.posflash b{font-size:72px;line-height:1;font-variant-numeric:tabular-nums}
+.posflash small{font-size:15px;color:var(--mut)}
+.posdrawerbar{display:none}
+.btn.posclose{display:none}
+@media (min-width:900px){
+  .possell{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+  .poscart{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+}
+@media (max-width:899px){
+  .possell .poscart{position:fixed;left:0;right:0;bottom:0;z-index:200;margin:0;max-height:88vh;overflow:auto;border-radius:12px 12px 0 0;transform:translateY(105%);transition:transform .2s;box-shadow:0 -8px 24px rgba(0,0,0,.15)}
+  .possell .poscart.open{transform:none}
+  .btn.posclose{display:inline-flex}
+  .posdrawerbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:150;align-items:center;gap:12px;min-height:60px;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border:0;background:var(--ink);color:var(--onink);font:inherit;font-size:16px;cursor:pointer}
+  .posdrawerbar b{font-size:20px;margin-left:auto}
+  .posdrawerbar.hide{display:none}
+  .possell{padding-bottom:72px}
+}
+@media (max-width:560px){.posgrid{grid-template-columns:repeat(2,1fr)}.posnums{grid-template-columns:repeat(2,1fr)}.poskq{grid-template-columns:1fr}}
+@media (max-width:560px){.posgrid{grid-template-columns:repeat(2,1fr)}.posnums{grid-template-columns:repeat(2,1fr)}.posgo{width:100%}}
 nav.tabs{display:flex;gap:24px;overflow-x:auto;margin:16px calc(-1 * var(--gutter)) 0;padding:0 var(--gutter);border-bottom:1px solid var(--line);scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs button{flex:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 0 10px;font-size:15px;color:var(--mut);cursor:pointer;min-height:48px}
@@ -432,7 +500,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 65;
+var APP_VERSION = 67;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -485,7 +553,7 @@ function isFolded(key, title) { return foldState[key] != null ? !!foldState[key]
 function applyFolds() {
   Array.prototype.forEach.call(document.querySelectorAll('#app section.panel'), function (p) {
     var key = foldKey(p);
-    if (!key || p.querySelector('[data-act=fold]')) return;
+    if (!key || p.classList.contains('nofold') || p.querySelector('[data-act=fold]')) return;
     var h2 = p.querySelector('h2'), title = h2.textContent.trim(), head = p.querySelector('.phead') || h2;
     var btn = document.createElement('button');
     btn.className = 'btn ghost sm foldbtn'; btn.setAttribute('data-act', 'fold'); btn.setAttribute('data-k', key);
@@ -556,7 +624,7 @@ var LINKS = [['', '無'], ['count', '盤點'], ['settle', '結算'], ['buy', '�
 /* 沒有開啟出杯特調的活動，不出現任何飲品相關的選項 */
 function drinksOn() { var ev = curEvent(); return !!(ev && ev.has_drinks); }
 function linkList() { return LINKS.filter(function (l) { return l[0] !== 'drink' || drinksOn(); }); }
-var TABS = [['count', '盤點'], ['settle', '結算'], ['check', '清單'], ['buy', '備料'], ['drink', '特調'], ['timeline', '時程'], ['items', '品項'], ['log', '紀錄'], ['event', '活動']];
+var TABS = [['count', '盤點'], ['pos', 'POS'], ['settle', '結算'], ['check', '清單'], ['buy', '備料'], ['drink', '特調'], ['timeline', '時程'], ['items', '品項'], ['log', '紀錄'], ['event', '活動']];
 var SHEET_TYPES = ['帶出對點', '收店盤點', '帶回'];
 var STATUS = ['待訂', '已訂', '已到'];
 
@@ -578,9 +646,9 @@ var S = {
   }
 };
 function emptyD() {
-  return { stations: [], owners: [], items: [], plan: [], sheets: [], lines: [], moves: [], ck: [], cklog: [], buys: [], tl: [], audit: [], drinks: [], dplan: [], ding: [], dlog: [] };
+  return { stations: [], owners: [], items: [], plan: [], sheets: [], lines: [], moves: [], ck: [], cklog: [], buys: [], tl: [], audit: [], drinks: [], dplan: [], ding: [], dlog: [], posp: [], posS: [], posL: [], posD: [], posDev: [] };
 }
-var URL_KEYS = { tab: 'tab', ev: 'ev', st: 'st', ph: 'ph', bt: 'bt', lk: 'lk', li: 'li', lw: 'lw', ld: 'ld', newEv: 'new', picker: 'list' };
+var URL_KEYS = { tab: 'tab', ev: 'ev', st: 'st', ph: 'ph', bt: 'bt', lk: 'lk', li: 'li', lw: 'lw', ld: 'ld', newEv: 'new', picker: 'list', pv: 'pv' };
 function readUrl() {
   var q = new URLSearchParams(location.search);
   Object.keys(URL_KEYS).forEach(function (k) {
@@ -588,6 +656,7 @@ function readUrl() {
     if (v === null) return;
     if (k === 'ev') S.ev = v; else S.ui[k] = v;
   });
+  if (location.hash === '#kitchen') { S.ui.tab = 'pos'; S.ui.pv = 'kitchen'; }
   if (!find(TABS, function (t) { return t[0] === S.ui.tab; })) S.ui.tab = 'count';
 }
 function writeUrl() {
@@ -596,6 +665,7 @@ function writeUrl() {
   if (S.ev) q.set('ev', S.ev);
   if (S.ui.tab === 'check') { if (S.ui.st) q.set('st', S.ui.st); if (S.ui.ph !== '全部') q.set('ph', S.ui.ph); }
   if (S.ui.tab === 'count' && S.ui.bt !== '全部') q.set('bt', S.ui.bt);
+  if (S.ui.tab === 'pos' && S.ui.pv) q.set('pv', S.ui.pv);
   if (S.ui.tab === 'log') {
     if (S.ui.lk !== '全部') q.set('lk', S.ui.lk);
     if (S.ui.li) q.set('li', S.ui.li);
@@ -689,6 +759,11 @@ var LOAD = {
       .then(function (r) { return strip(r, 'evt_drinks'); });
   },
   dlog: function (ev) { return pageAll(function (a, b) { return sb.from('evt_drink_log').select('*').eq('event_id', ev).order('created_at').range(a, b); }); },
+  posp: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_products').select('*').eq('event_id', ev).order('sort').range(a, b); }); },
+  posS: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_sales').select('*').eq('event_id', ev).order('created_at').order('id').range(a, b); }); },
+  posL: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_sale_lines').select('*').eq('event_id', ev).order('sale_id').order('line_no').range(a, b); }); },
+  posD: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_done').select('*').eq('event_id', ev).order('sale_id').range(a, b); }); },
+  posDev: function (ev) { return sb.from('evt_pos_devices').select('*').eq('event_id', ev).order('code').range(0, 199).then(function (r) { if (r.error) throw r.error; return r.data || []; }); },
   audit: function (ev) {
     /* 這場活動的修改＋全系統設定（人員、PIN、共用密碼）的修改 */
     return sb.from('evt_audit_log').select('*').or('event_id.eq.' + ev + ',event_id.is.null').order('id', { ascending: false }).range(0, 999)
@@ -696,13 +771,14 @@ var LOAD = {
   }
 };
 var GLOBAL_KEYS = ['people', 'events', 'members', 'templates', 'tplItems'];
-var EVENT_KEYS = ['stations', 'owners', 'items', 'plan', 'sheets', 'lines', 'moves', 'ck', 'cklog', 'buys', 'tl', 'drinks', 'ding', 'dlog', 'audit'];
+var EVENT_KEYS = ['stations', 'owners', 'items', 'plan', 'sheets', 'lines', 'moves', 'ck', 'cklog', 'buys', 'tl', 'drinks', 'ding', 'dlog', 'posp', 'posS', 'posL', 'posD', 'posDev', 'audit'];
 var TABLE_KEY = {
   evt_people: 'people', evt_events: 'events', evt_event_members: 'members', evt_checklist_templates: 'templates', evt_checklist_template_items: 'tplItems',
   evt_stations: 'stations', evt_station_owners: 'owners', evt_items: 'items', evt_plan: 'plan',
   evt_count_sheets: 'sheets', evt_count_lines: 'lines', evt_movements: 'moves',
   evt_checklist_items: 'ck', evt_checklist_log: 'cklog', evt_purchases: 'buys', evt_timeline: 'tl',
-  evt_drinks: 'drinks', evt_drink_plan: 'dplan', evt_drink_ingredients: 'ding', evt_drink_log: 'dlog'
+  evt_drinks: 'drinks', evt_drink_plan: 'dplan', evt_drink_ingredients: 'ding', evt_drink_log: 'dlog',
+  evt_pos_products: 'posp', evt_pos_sales: 'posS', evt_pos_sale_lines: 'posL', evt_pos_done: 'posD', evt_pos_devices: 'posDev'
 };
 
 function reload(keys) {
@@ -721,7 +797,9 @@ function reload(keys) {
   }
   return Promise.all(jobs).then(function () {
     if (S.offline) { S.offline = false; }
+    S.posNet = true;
     S.R = CALC.build();
+    if (keys.indexOf('posS') >= 0 || keys.indexOf('posD') >= 0) posCheckNew();
     render();
   }, function (e) {
     if (isNetErr(e)) { S.offline = true; render(); }
@@ -771,6 +849,7 @@ function onRealtime(p) {
   rtTimer = setTimeout(function () {
     var keys = uniq(rtPending); rtPending = [];
     if (keys.indexOf('lines') >= 0 && keys.indexOf('sheets') < 0) keys.push('sheets');
+    if (keys.indexOf('posS') >= 0 && keys.indexOf('posL') < 0) keys.push('posL');
     reload(keys);
   }, 400);
 }
@@ -1178,7 +1257,7 @@ function vHeader() {
   if (S.offline) h += offlineBanner();
   if (ev) h += vAnnounce(ev);
   if (isMgr() && LS.get(K_SHORTPIN) === S.me.id) h += '<div class="banner hold">你的管理員 PIN 還不是 4 位數，請到「活動」分頁或「切換活動」頁的「我的帳號」更改。</div>';
-  h += '<nav class="tabs" role="tablist">' + TABS.filter(function (t) { return t[0] !== 'drink' || drinksOn(); }).map(function (t) {
+  h += '<nav class="tabs" role="tablist">' + TABS.filter(function (t) { return (t[0] !== 'drink' || drinksOn()) && (t[0] !== 'pos' || posOn()); }).map(function (t) {
     return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (S.ui.tab === t[0]) + '">' + t[1] + '</button>';
   }).join('') + '</nav></header>';
   return h;
@@ -1214,9 +1293,583 @@ function vBody() {
     return '<div class="panels"><section class="panel"><div class="empty">' + (S.G.events.length ? '請選擇活動。' : (isMgr() ? '還沒有活動，請按上方「＋建立活動」。' : '還沒有活動，請管理員先建立。')) + '</div></section></div>';
   }
   if (S.ui.tab === 'drink' && !drinksOn()) S.ui.tab = 'count';
-  var m = { count: vCount, settle: vSettle, check: vCheck, buy: vBuy, drink: vDrink, timeline: vTimeline, items: vItems, log: vLog, event: vEvent }[S.ui.tab];
+  if (S.ui.tab === 'pos' && !posOn()) S.ui.tab = 'count';
+  if (S.ui.tab !== 'pos') document.title = BASE_TITLE;
+  setTimeout(posKeepAwake, 0);
+  var m = { count: vCount, pos: vPos, settle: vSettle, check: vCheck, buy: vBuy, drink: vDrink, timeline: vTimeline, items: vItems, log: vLog, event: vEvent }[S.ui.tab];
   var out = m();
   return out.indexOf('<div class="panels">') === 0 || out.indexOf('<div class="pagebar">') === 0 ? out : '<div class="panels">' + out + '</div>';
+}
+
+/* ---------------------------------------------------------------------------
+   POS 收銀：多裝置點餐、出餐、離線補傳（只記收銀，不連動盤點）
+   - 結帳先在本機產生訂單編號（client_ref）與單號（裝置代號＋流水號），連線時直接送伺服器檢查庫存；
+     斷線時存進本機佇列，每 4 秒重送，伺服器以 client_ref 判斷，不會重複入帳
+   - 出餐完成／還原也走佇列，只更新出餐狀態，不覆寫訂單
+   - 即時同步之外，每 15 秒重新讀取一次作為備援
+   --------------------------------------------------------------------------- */
+var PAYMENTS = ['現金', 'LINE Pay', '全支付', '信用卡'];
+var POS_BAR_CAT = '出杯';
+var POS_OTHER = '其他';
+var POS_CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+var POS_ROLES = ['兩者', '收銀', '出餐'];
+var POS_LIVE_MS = 120000;
+var K_POSDEV = 'phase_pos_dev', K_POSCID = 'phase_pos_cid', K_POSQ = 'phase_pos_q', K_POSSEQ = 'phase_pos_seq';
+var BASE_TITLE = document.title;
+
+/* 常用查詢 */
+function posOn() { var ev = curEvent(); return !!(ev && ev.pos_enabled); }
+function posPays() { var ev = curEvent(); return ev && ev.pos_payments && ev.pos_payments.length ? ev.pos_payments : ['現金']; }
+function posCats() { var ev = curEvent(); return ev && ev.pos_categories && ev.pos_categories.length ? ev.pos_categories : ['費南雪', '濾掛', '出杯']; }
+function posCatOf(c) { return c || POS_OTHER; }
+function posProducts() { return S.D.posp.filter(function (p) { return !p.archived; }).sort(function (a, b) { return a.sort - b.sort; }); }
+function money(n) { var v = Math.round(num(n)), s = String(Math.abs(v)); return (v < 0 ? '−$' : '$') + s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function newRef() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
+}
+function jget(k, d) { try { var v = JSON.parse(LS.get(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+function jset(k, v) { LS.set(k, JSON.stringify(v)); }
+function hhmm(ts) { var d = new Date(ts); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
+
+/* 本機：這台裝置的識別碼與設定（每場活動各自：代號、用途、出餐顯示分類、逾時分鐘、提示音） */
+function posCid() { var c = LS.get(K_POSCID); if (!c) { c = newRef(); LS.set(K_POSCID, c); } return c; }
+function posDev() {
+  var d = jget(K_POSDEV, {})[S.ev] || {};
+  return { code: POS_CODES.indexOf(d.code) >= 0 ? d.code : '', role: POS_ROLES.indexOf(d.role) >= 0 ? d.role : '兩者', cats: d.cats || [], warn: d.warn > 0 ? d.warn : 10, sound: !!d.sound };
+}
+function posDevSave(d) { var all = jget(K_POSDEV, {}); all[S.ev] = d; jset(K_POSDEV, all); }
+
+/* 本機：待同步佇列（結帳、出餐狀態），重新整理或斷電後仍在 */
+var POSQ = jget(K_POSQ, []), posFlushing = false;
+function posQSave() { jset(K_POSQ, POSQ); }
+function posQOf() { return POSQ.filter(function (o) { return o.ev === S.ev; }); }
+function posQWaiting() { return POSQ.filter(function (o) { return !o.err; }).length; }
+function posQErrors() { return POSQ.filter(function (o) { return o.err; }); }
+function posNetOk() { return S.posNet !== false && !S.offline && navigator.onLine !== false; }
+
+/* 單號：裝置代號＋這台在這場的流水號；以本機紀錄、雲端訂單、佇列三者最大值接續 */
+function posNextSeq(code) {
+  var all = jget(K_POSSEQ, {}), k = S.ev + '|' + code, m = all[k] || 0;
+  S.D.posS.forEach(function (s) { if (s.type === '銷售' && s.device === code && s.seq > m) m = s.seq; });
+  POSQ.forEach(function (o) { if (o.k === 'sale' && o.ev === S.ev && o.p.device === code && o.p.seq > m) m = o.p.seq; });
+  all[k] = m + 1; jset(K_POSSEQ, all);
+  return m + 1;
+}
+
+/* 訂單：雲端＋本機還沒送上去的，合在一起看 */
+var posIdxCache = { L: null, map: {} };
+function posLineIdx() {
+  if (posIdxCache.L !== S.D.posL) {
+    var m = {};
+    S.D.posL.forEach(function (l) { (m[l.sale_id] = m[l.sale_id] || []).push(l); });
+    Object.keys(m).forEach(function (k) { m[k].sort(function (a, b) { return a.line_no - b.line_no; }); });
+    posIdxCache = { L: S.D.posL, map: m };
+  }
+  return posIdxCache.map;
+}
+function posLines(s) { return s.pending ? s.lines : (posLineIdx()[s.id] || []); }
+function posTime(s) { return s.client_ts || s.created_at; }
+function posSales() {
+  var refs = {}, out = [];
+  S.D.posS.forEach(function (s) { if (s.type === '銷售') { refs[s.client_ref] = 1; out.push(s); } });
+  posQOf().forEach(function (o) { if (o.k === 'sale' && !refs[o.p.client_ref]) out.push(assign({ qerr: o.err || '' }, o.view)); });
+  return out;
+}
+function posVoided() { var v = {}; S.D.posS.forEach(function (s) { if (s.type === '作廢') v[s.voids_id] = s; }); return v; }
+function posIsVoid(s, V) { return !!(s.id && V[s.id]); }
+/* 出餐狀態：本機佇列中的操作優先，其次雲端 */
+function posDoneMap() {
+  var m = {};
+  S.D.posD.forEach(function (d) { m[d.sale_id] = { done: d.done, t: d.updated_at }; });
+  posQOf().forEach(function (o) { if (o.k === 'done') m['ref:' + o.ref] = { done: o.done, t: o.t }; });
+  return m;
+}
+function posDoneOf(s, M) { return M['ref:' + s.client_ref] || (s.id && M[s.id]) || null; }
+/* 庫存：起始庫存 − 所有裝置未作廢訂單（含本機待同步） */
+function posSoldMap() {
+  var V = posVoided(), m = {};
+  posSales().forEach(function (s) { if (posIsVoid(s, V)) return; posLines(s).forEach(function (l) { m[l.product_id] = (m[l.product_id] || 0) + l.qty; }); });
+  return m;
+}
+function posLeft(p, SM) { return p.start_stock == null ? null : p.start_stock - (SM[p.id] || 0); }
+function posDupDevice() {
+  var d = posDev(), cid = posCid(), now = Date.now();
+  if (!d.code) return null;
+  return find(S.D.posDev, function (x) { return x.code === d.code && x.client_id !== cid && now - new Date(x.last_seen).getTime() < POS_LIVE_MS; });
+}
+
+/* 收銀狀態：換活動就清空 */
+function posState() {
+  var u = S.ui.pos;
+  if (!u || u.ev !== S.ev) u = S.ui.pos = { ev: S.ev, cart: [], pay: '', disc: '', recv: '', note: '', day: null, more: 0, fDev: '', fPay: '', drawer: false, lock: 0, flash: null };
+  if (posPays().indexOf(u.pay) < 0) u.pay = posPays()[0];
+  return u;
+}
+function cartQty(id) { var c = find(posState().cart, function (x) { return x.id === id; }); return c ? c.qty : 0; }
+function posCalc() {
+  var u = posState(), sub = 0, n = 0, lines = [];
+  u.cart = u.cart.filter(function (c) { var p = byId(S.D.posp, c.id); return p && !p.archived && c.qty > 0; });
+  u.cart.forEach(function (c) { var p = byId(S.D.posp, c.id); lines.push({ p: p, qty: c.qty, amt: p.price * c.qty }); sub += p.price * c.qty; n += c.qty; });
+  var disc = u.disc === '' ? 0 : Math.round(num(u.disc)), tot = sub - disc;
+  var recv = u.pay === '現金' && u.recv !== '' ? Math.round(num(u.recv)) : null;
+  return { lines: lines, n: n, sub: sub, disc: disc, tot: tot, recv: recv, change: recv != null ? recv - tot : null };
+}
+function posDays() {
+  var d = (S.R.days || []).slice();
+  posSales().forEach(function (s) { if (d.indexOf(s.biz_date) < 0) d.push(s.biz_date); });
+  return d.sort();
+}
+function posDay() {
+  var u = posState(), days = posDays();
+  if (u.day === null) u.day = days.indexOf(todayStr()) >= 0 ? todayStr() : '';
+  if (u.day && days.indexOf(u.day) < 0) u.day = '';
+  return u.day;
+}
+function posDayLabel(d) { return d ? mdw(d) : '整場'; }
+
+/* 同步：送出佇列；網路錯誤就停下等下一輪，其他錯誤標在那一筆上並繼續 */
+function posFlush() {
+  if (posFlushing || !S.token || !posQWaiting()) return Promise.resolve();
+  posFlushing = true;
+  var sent = 0;
+  function fin() { posFlushing = false; if (sent) reload(['posS', 'posL', 'posD']); else render(); }
+  function next() {
+    var o = find(POSQ, function (x) { return !x.err; });
+    if (!o) { fin(); return null; }
+    var pr = o.k === 'sale' ? sb.rpc('evt_pos_sale_create', { p_token: S.token, p_event_id: o.ev, p: o.p })
+      : sb.rpc('evt_pos_done_set', { p_token: S.token, p: { client_ref: o.ref, done: o.done } });
+    return pr.then(function (r) {
+      if (r.error) throw r.error;
+      S.posNet = true; S.posAuthErr = false;
+      var i = POSQ.indexOf(o); if (i >= 0) POSQ.splice(i, 1);
+      posQSave(); sent++;
+      return next();
+    }).catch(function (e) {
+      if (isNetErr(e)) { S.posNet = false; fin(); return null; }
+      if (e && e.hint === 'EVT_AUTH') { S.posAuthErr = true; fin(); return null; }
+      o.err = (e && e.message) || String(e); posQSave();
+      return next();
+    });
+  }
+  return Promise.resolve(next());
+}
+function posBeat() {
+  var d = posDev();
+  if (!S.token || !S.ev || !posOn() || !d.code || document.visibilityState === 'hidden') return;
+  sb.rpc('evt_pos_heartbeat', { p_token: S.token, p_event_id: S.ev, p: { client_id: posCid(), code: d.code, role: d.role } })
+    .then(function (r) { if (!r.error || !isNetErr(r.error)) S.posNet = true; else S.posNet = false; }, function () { S.posNet = false; });
+}
+setInterval(function () { if (posQWaiting()) posFlush(); }, 4000);
+setInterval(function () { if (S.token && S.ev && posOn() && document.visibilityState !== 'hidden') reload(['posp', 'posS', 'posL', 'posD', 'posDev']); }, 15000);
+setInterval(posBeat, 30000);
+setInterval(function () { if (S.ui.tab === 'pos' && S.ui.pv === 'kitchen') render(); }, 30000);
+window.addEventListener('online', function () { S.posNet = true; posFlush(); render(); });
+window.addEventListener('offline', function () { S.posNet = false; render(); });
+window.addEventListener('beforeunload', function (e) { if (posQWaiting()) { e.preventDefault(); e.returnValue = '還有訂單尚未同步，離開後會在下次開啟時繼續補傳'; return e.returnValue; } });
+
+/* 提示音：iOS 需要使用者先點一次按鈕才能出聲 */
+var posAudio = null, posSeen = null;
+function posBeep() {
+  try {
+    if (posAudio) {
+      var o = posAudio.createOscillator(), g = posAudio.createGain();
+      o.frequency.value = 880; g.gain.value = 0.2; o.connect(g); g.connect(posAudio.destination);
+      o.start(); o.stop(posAudio.currentTime + 0.3);
+    }
+  } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) {}
+}
+function posSoundUnlock() {
+  try { var AC = window.AudioContext || window.webkitAudioContext; if (AC && !posAudio) posAudio = new AC(); if (posAudio && posAudio.resume) posAudio.resume(); } catch (e) {}
+  posBeep();
+}
+/* 新訂單進來時提示（不含這台自己結的帳） */
+function posCheckNew() {
+  if (!S.ev || !posOn()) return;
+  var d = posDev(), keys = {}, fresh = 0;
+  posKitchen().pending.forEach(function (o) {
+    keys[o.s.client_ref] = 1;
+    if (posSeen && posSeen.ev === S.ev && !posSeen.keys[o.s.client_ref] && o.s.device !== d.code) fresh++;
+  });
+  posSeen = { ev: S.ev, keys: keys };
+  if (fresh && d.sound && d.role !== '收銀') posBeep();
+}
+/* 螢幕常亮：在 POS 分頁時盡量保持，不支援就略過 */
+var posWake = null, posPersisted = false;
+function posKeepAwake() {
+  var want = S.ui.tab === 'pos' && posOn() && document.visibilityState !== 'hidden';
+  if (want && !posPersisted) { posPersisted = true; try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
+  if (want && !posWake && navigator.wakeLock && navigator.wakeLock.request) {
+    navigator.wakeLock.request('screen').then(function (w) { posWake = w; w.addEventListener('release', function () { posWake = null; }); }, function () {});
+  } else if (!want && posWake) { try { posWake.release(); } catch (e) {} posWake = null; }
+}
+document.addEventListener('visibilitychange', function () { posKeepAwake(); if (document.visibilityState === 'visible') { posBeat(); posFlush(); } });
+
+/* 出單機：日後接上時在這裡實作 */
+function printTicket(order) { return order; }
+
+/* ---------- 畫面 ---------- */
+function posSyncPill() {
+  var w = posQWaiting(), er = posQErrors().length;
+  if (S.posAuthErr && w) return '<span class="tag warn">登入已失效，重新登入後補傳 ' + w + ' 筆</span>';
+  if (!posNetOk()) return '<span class="tag warn">離線' + (w ? '・待同步 ' + w + ' 筆' : '') + '</span>';
+  if (w) return '<span class="tag warn">待同步 ' + w + ' 筆</span>';
+  if (er) return '<span class="tag warn">' + er + ' 筆補傳失敗</span>';
+  return '<span class="tag ok">已同步</span>';
+}
+function vPos() {
+  var d = posDev(), ev = curEvent(), h = '';
+  var views = [['sell', '收銀'], ['kitchen', '出餐'], ['log', '紀錄'], ['set', '設定']].filter(function (v) {
+    return !(v[0] === 'sell' && d.role === '出餐') && !(v[0] === 'kitchen' && d.role === '收銀');
+  });
+  if (!d.code) S.ui.pv = 'set';
+  else if (!find(views, function (v) { return v[0] === S.ui.pv; })) S.ui.pv = views[0][0];
+  var KO = posKitchen(), nP = KO.pending.length;
+  document.title = (nP && d.role !== '收銀' ? '(' + nP + ') ' : '') + 'POS・' + ev.name;
+  h += '<div class="posbar"><div class="seg" role="group" aria-label="POS 功能">' + views.map(function (v) {
+    return '<button data-act="posView" data-v="' + v[0] + '" aria-pressed="' + (S.ui.pv === v[0]) + '"' + (!d.code && v[0] !== 'set' ? ' disabled' : '') + '>' + v[1] + (v[0] === 'kitchen' && nP ? '（' + nP + '）' : '') + '</button>';
+  }).join('') + '</div><span class="row" style="gap:8px">' + posSyncPill() + (d.code ? '<span class="tag">裝置 ' + d.code + '・' + d.role + '</span>' : '') + '</span></div>';
+  if (S.ui.pv === 'sell') h += vPosSell();
+  else if (S.ui.pv === 'kitchen') h += vPosKitchen(KO);
+  else if (S.ui.pv === 'log') h += vPosLog();
+  else h += vPosSet();
+  var u = posState();
+  if (u.flash && Date.now() < u.flash.until) h += '<div class="posflash" data-act="posFlashOff" role="status"><div><span>單號</span><b>' + esc(u.flash.label) + '</b><small>' + esc(u.flash.sub) + '</small></div></div>';
+  return h;
+}
+function vPosSell() {
+  var u = posState(), d = posDev(), ev = curEvent(), m = isMgr(), P = posProducts(), c = posCalc(), SM = posSoldMap(), dup = posDupDevice(), h = '';
+  var block = ev.status === '已結束' ? '這場活動已結束，不能再結帳。' : !canEditStations() ? '你沒有被加入這場活動，不能結帳。' :
+    dup ? '裝置代號 ' + d.code + ' 和 ' + pname(dup.person_id) + ' 的裝置重複，請到「設定」更換代號後才能結帳。' : '';
+  if (dup) h += '<div class="banner warn">' + esc(block) + '</div>';
+  h += '<div class="possell"><section class="panel posmenu">';
+  if (!P.length) h += '<div class="empty">還沒有商品。' + (m ? '請到「設定」新增商品與售價。' : '請管理員先設定商品與售價。') + '</div>';
+  else {
+    posCats().concat([POS_OTHER]).forEach(function (cat) {
+      var L = P.filter(function (p) { return posCatOf(p.category) === cat || (cat === POS_OTHER && p.category && posCats().indexOf(p.category) < 0); });
+      if (!L.length) return;
+      h += '<h3 class="poscat">' + esc(cat) + '</h3><div class="posgrid">' + L.map(function (p) {
+        var q = cartQty(p.id), left = posLeft(p, SM), out = p.sold_out || (left != null && left <= 0);
+        var full = left != null && q >= left;
+        return '<button class="posbtn' + (out ? ' out' : '') + '" data-act="posAdd" data-id="' + p.id + '" aria-pressed="' + (q > 0) + '"' + (out || full ? ' disabled' : '') + ' aria-label="' + esc(p.name) + ' ' + money(p.price) + (out ? '，售完' : '') + (q ? '，已選 ' + q : '') + '">' +
+          '<span class="nm">' + esc(p.name) + '</span><span class="pr">' + money(p.price) + '</span>' +
+          (out ? '<span class="left low">售完</span>' : left != null ? '<span class="left' + (left - q <= 3 ? ' low' : '') + '">餘 ' + (left - q) + '</span>' : '') +
+          (q ? '<span class="q">' + q + '</span>' : '') + '</button>';
+      }).join('') + '</div>';
+    });
+  }
+  h += '</section><section class="panel poscart nofold' + (u.drawer ? ' open' : '') + '" aria-label="本筆明細">';
+  h += '<div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">本筆明細' + (c.n ? '（' + c.n + ' 件）' : '') + '</h2><span class="row btns">' + (c.lines.length ? '<button class="btn ghost sm" data-act="posClear">清除全部</button>' : '') + '<button class="btn ghost sm posclose" data-act="posDrawer">收合</button></span></div>';
+  if (!c.lines.length) h += '<div class="hint" style="padding:16px 0">點商品加入，點一下加一份。</div>';
+  else {
+    h += '<div class="poslines">' + c.lines.map(function (l) {
+      return '<div class="posline"><div class="nm">' + esc(l.p.name) + '<span class="mut small"> ' + money(l.p.price) + '</span></div>' +
+        '<span class="qty"><button class="btn ghost sm" data-act="posQty" data-id="' + l.p.id + '" data-v="-1" aria-label="' + esc(l.p.name) + ' 減一">−</button><b>' + l.qty + '</b><button class="btn ghost sm" data-act="posQty" data-id="' + l.p.id + '" data-v="1" aria-label="' + esc(l.p.name) + ' 加一">＋</button></span>' +
+        '<b class="amt">' + money(l.amt) + '</b><button class="btn ghost sm" data-act="posRm" data-id="' + l.p.id + '" aria-label="移除 ' + esc(l.p.name) + '">×</button></div>';
+    }).join('') + '</div>';
+  }
+  h += '<div class="field" style="margin-top:16px"><label for="pos-note">備註（出餐看得到）</label><input type="text" id="pos-note" data-pos="note" maxlength="200" value="' + esc(u.note) + '" placeholder="例如：少冰、去糖"></div>';
+  h += '<div class="field" style="margin-top:16px"><label>付款方式</label><div><div class="seg posseg" role="group" aria-label="付款方式">' + posPays().map(function (p) {
+    return '<button data-act="posPay" data-v="' + esc(p) + '" aria-pressed="' + (u.pay === p) + '">' + esc(p) + '</button>';
+  }).join('') + '</div></div></div>';
+  h += '<div class="grid2 form" style="margin-top:16px"><div class="field"><label for="pos-disc">折扣（元）</label><input type="number" inputmode="numeric" min="0" step="1" id="pos-disc" data-pos="disc" value="' + esc(u.disc) + '" placeholder="0"></div>' +
+    (u.pay === '現金' ? '<div class="field"><label for="pos-recv">收款（元，選填）</label><input type="number" inputmode="numeric" min="0" step="1" id="pos-recv" data-pos="recv" value="' + esc(u.recv) + '"></div>' : '') + '</div>';
+  if (u.pay === '現金') h += '<div class="row btns" id="pos-quick" style="margin-top:8px">' + posQuickHtml(c) + '</div>';
+  h += '<div class="postot"><div><span>小計</span><b id="pos-sub">' + money(c.sub) + '</b></div><div><span>折扣</span><b id="pos-dsc">' + (c.disc ? '−' + money(c.disc) : '$0') + '</b></div>' +
+    (u.pay === '現金' ? '<div><span>找零</span><b id="pos-chg">' + posChangeText(c) + '</b></div>' : '') +
+    '<div class="big"><span>應收</span><b id="pos-tot">' + money(c.tot) + '</b></div></div>';
+  if (block) h += '<p class="hint" style="color:var(--warn);margin-top:12px">' + esc(block) + '</p>';
+  else if (!posNetOk()) h += '<p class="hint" style="margin-top:12px">目前離線：結帳會先存在這台裝置，恢復連線後自動補傳。</p>';
+  h += '<div class="foot"><button class="btn posgo" data-act="posGo"' + (c.lines.length && !block ? '' : ' disabled') + '>結帳 <span id="pos-go-amt">' + money(c.tot) + '</span>（' + esc(u.pay) + '）</button></div>';
+  h += '</section></div>';
+  h += '<button class="posdrawerbar' + (u.drawer ? ' hide' : '') + '" data-act="posDrawer"><span>本筆明細' + (c.n ? ' ' + c.n + ' 件' : '') + '</span><b>' + money(c.tot) + '</b><span class="go">' + (c.n ? '結帳 ›' : '展開 ›') + '</span></button>';
+  return h;
+}
+function posQuickHtml(c) {
+  var quick = [];
+  if (c.tot > 0) { quick.push(c.tot); [100, 500, 1000].forEach(function (b) { var v = Math.ceil(c.tot / b) * b; if (v > c.tot && quick.indexOf(v) < 0) quick.push(v); }); }
+  return quick.length ? quick.map(function (v) { return '<button class="btn ghost sm" data-act="posRecv" data-v="' + v + '">' + money(v) + '</button>'; }).join('') : '<span class="hint">' + (c.lines.length ? '應收 $0，不用收款' : '先選商品') + '</span>';
+}
+function posChangeText(c) { return c.recv == null ? '—' : c.change < 0 ? '還差 ' + money(-c.change) : money(c.change); }
+/* 輸入折扣、收款時直接更新金額，不重繪整頁 */
+function posRefresh() {
+  var c = posCalc(), u = posState(), set = function (id, t) { var e = $('#' + id); if (e) e.textContent = t; };
+  set('pos-dsc', c.disc ? '−' + money(c.disc) : '$0'); set('pos-tot', money(c.tot)); set('pos-go-amt', money(c.tot));
+  if (u.pay === '現金') { set('pos-chg', posChangeText(c)); var qk = $('#pos-quick'); if (qk) qk.innerHTML = posQuickHtml(c); }
+}
+/* 出餐：待出餐由舊到新；依這台的「出餐顯示分類」過濾品項，過濾後沒有品項的訂單不顯示 */
+function posKitchen() {
+  var d = posDev(), V = posVoided(), M = posDoneMap(), pend = [], done = [];
+  posSales().forEach(function (s) {
+    if (posIsVoid(s, V)) return;
+    var L = posLines(s).filter(function (l) { return !d.cats.length || d.cats.indexOf(posCatOf(l.category)) >= 0; });
+    if (!L.length) return;
+    var st = posDoneOf(s, M);
+    (st && st.done ? done : pend).push({ s: s, L: L, st: st });
+  });
+  pend.sort(function (a, b) { return posTime(a.s) < posTime(b.s) ? -1 : 1; });
+  done.sort(function (a, b) { return a.st.t < b.st.t ? 1 : -1; });
+  return { pending: pend, done: done.slice(0, 30) };
+}
+function vPosKitchen(KO) {
+  var d = posDev(), now = Date.now(), h = '';
+  if (!posNetOk()) h += '<div class="banner warn">離線，資料可能過期。恢復連線後會自動更新。</div>';
+  h += '<section class="panel">' + pHead('待出餐（' + KO.pending.length + '）', '由舊到新排列。' + (d.cats.length ? '這台只顯示：' + esc(d.cats.join('、')) + '。' : '顯示全部分類。') + '等待超過 ' + d.warn + ' 分鐘外框加粗。',
+    '<button class="btn ghost" data-act="posSound">' + (d.sound && posAudio ? '測試提示音' : '開啟提示音') + '</button>');
+  if (!KO.pending.length) h += '<div class="empty">目前沒有待出餐的訂單。</div>';
+  else h += '<div class="poskq">' + KO.pending.map(function (o) {
+    var s = o.s, mins = Math.max(0, Math.floor((now - new Date(posTime(s)).getTime()) / 60000));
+    return '<div class="poscard' + (mins >= d.warn ? ' late' : '') + '"><div class="row" style="justify-content:space-between"><b class="lbl">' + esc(s.label || '') + '</b><span class="mut small">' + hhmm(posTime(s)) + '・等 ' + mins + ' 分</span></div>' +
+      '<ul>' + o.L.map(function (l) { return '<li class="' + (posCatOf(l.category) === POS_BAR_CAT ? 'kbar' : 'klite') + '"><span>' + esc(l.name) + '</span><b>× ' + l.qty + '</b></li>'; }).join('') + '</ul>' +
+      (s.note ? '<div class="pnote">' + esc(s.note) + '</div>' : '') + (s.pending ? '<span class="tag hold">待同步</span>' : '') +
+      '<button class="btn" data-act="posDone" data-ref="' + esc(s.client_ref) + '" data-v="1">完成</button></div>';
+  }).join('') + '</div>';
+  h += '</section><section class="panel">' + pHead('已完成（最近 30 筆）', '按錯了可以「還原」，訂單會回到待出餐。');
+  h += KO.done.length ? KO.done.map(function (o) {
+    return '<div class="log"><span class="tm">' + hhmm(posTime(o.s)) + '</span><span class="tx"><b>' + esc(o.s.label || '') + '</b> ' + esc(o.L.map(function (l) { return l.name + '×' + l.qty; }).join('、')) + '</span><button class="btn ghost sm" data-act="posDone" data-ref="' + esc(o.s.client_ref) + '" data-v="0">還原</button></div>';
+  }).join('') : '<div class="empty">還沒有完成的訂單。</div>';
+  return h + '</section>';
+}
+/* 紀錄與對帳 */
+function posFiltered() {
+  var u = posState(), day = posDay();
+  return posSales().filter(function (s) { return (!day || s.biz_date === day) && (!u.fDev || s.device === u.fDev) && (!u.fPay || s.payment === u.fPay); });
+}
+function posStats(list) {
+  var V = posVoided(), T = { n: 0, qty: 0, total: 0, disc: 0, nVoid: 0, voidAmt: 0, pay: {}, cats: [] }, by = {};
+  list.forEach(function (s) {
+    if (posIsVoid(s, V)) { T.nVoid++; T.voidAmt += s.total; return; }
+    T.n++; T.total += s.total; T.disc += s.discount;
+    (T.pay[s.payment] = T.pay[s.payment] || { n: 0, amt: 0 }).n++; T.pay[s.payment].amt += s.total;
+    posLines(s).forEach(function (l) { by[l.product_id] = (by[l.product_id] || 0) + l.qty; T.qty += l.qty; });
+  });
+  T.pays = posPays().slice();
+  Object.keys(T.pay).forEach(function (k) { if (T.pays.indexOf(k) < 0) T.pays.push(k); });
+  /* 品項完整列出：未停用的商品數量 0 也列；停用的有賣才列 */
+  var items = S.D.posp.slice().sort(function (a, b) { return a.sort - b.sort; }).filter(function (p) { return !p.archived || by[p.id]; });
+  var cats = posCats().slice();
+  items.forEach(function (p) { var c = posCatOf(p.category); if (cats.indexOf(c) < 0) cats.push(c); });
+  cats.forEach(function (c) {
+    var L = items.filter(function (p) { return posCatOf(p.category) === c; }).map(function (p) { return { name: p.name, qty: by[p.id] || 0, off: p.archived }; });
+    if (L.length) T.cats.push({ cat: c, items: L, qty: sum(L, function (x) { return x.qty; }) });
+  });
+  return T;
+}
+function posSaleText(s) {
+  var L = posLines(s).map(function (l) { return l.name + '×' + l.qty; }).join('、');
+  return '<b>' + money(s.total) + '</b> ' + esc(s.payment) + ' ・ ' + esc(L) + (s.discount ? '（折 ' + money(s.discount) + '）' : '') +
+    (s.received != null ? ' ・ 收 ' + money(s.received) + ' 找 ' + money(s.change_due) : '') + (s.note ? ' ・ ' + esc(s.note) : '');
+}
+function vPosLog() {
+  var u = posState(), m = isMgr(), day = posDay(), days = posDays(), list = posFiltered(), T = posStats(list), V = posVoided(), h = '';
+  var devs = uniq(posSales().map(function (s) { return s.device; }).filter(Boolean)).sort();
+  var chip = function (act, v, cur, lb) { return '<button class="chip" data-act="' + act + '" data-v="' + esc(v) + '" aria-pressed="' + (cur === v) + '">' + esc(lb) + '</button>'; };
+  h += '<section class="panel">' + pHead('彙總', '合併所有裝置的訂單；作廢的不算。' + (posQWaiting() ? '包含這台還沒同步的訂單。' : ''), shareBtns('printPos', 'copyPos')) +
+    '<div class="chips" role="group" aria-label="營業日" style="margin-bottom:8px">' + [''].concat(days).map(function (d) { return chip('posDay', d, day, d ? md(d) + (d === todayStr() ? ' 今天' : '') : '整場'); }).join('') + '</div>' +
+    (devs.length > 1 ? '<div class="chips" role="group" aria-label="裝置" style="margin-bottom:8px">' + chip('posFDev', '', u.fDev, '全部裝置') + devs.map(function (x) { return chip('posFDev', x, u.fDev, '裝置 ' + x); }).join('') + '</div>' : '') +
+    '<div class="chips" role="group" aria-label="付款方式" style="margin-bottom:16px">' + chip('posFPay', '', u.fPay, '全部付款') + T.pays.map(function (x) { return chip('posFPay', x, u.fPay, x); }).join('') + '</div>' +
+    '<div class="posnums"><div><span>總數量</span><b>' + T.qty + '</b></div><div><span>筆數</span><b>' + T.n + '</b></div></div>' +
+    (T.nVoid ? '<p class="hint" style="margin-top:8px">另有 ' + T.nVoid + ' 筆作廢，不計入。</p>' : '');
+  h += '<div class="sect"><h3>品項數量</h3><div class="tw"><table><thead><tr><th>品項</th><th class="n">數量</th></tr></thead><tbody>' + T.cats.map(function (c) {
+    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td></tr>' + c.items.map(function (x) {
+      return '<tr><td>' + esc(x.name) + (x.off ? ' <span class="tag">已停用</span>' : '') + '</td><td class="n' + (x.qty ? '' : ' mut') + '">' + x.qty + '</td></tr>';
+    }).join('');
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td></tr></tbody></table></div></div>';
+  h += '<div class="sect"><h3>對帳</h3><div class="tw"><table><thead><tr><th>付款方式</th><th class="n">筆數</th><th class="n">金額</th></tr></thead><tbody>' + T.pays.map(function (p) {
+    var x = T.pay[p] || { n: 0, amt: 0 };
+    return '<tr><td>' + esc(p) + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>';
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.n + '</td><td class="n">' + money(T.total) + '</td></tr></tbody></table></div>' +
+    (T.disc ? '<p class="hint" style="margin-top:8px">金額為折扣後；折扣合計 ' + money(T.disc) + '。</p>' : '') + '</div>';
+  h += '<div class="foot"><button class="btn ghost" data-act="posCsv" data-v="detail">匯出明細 CSV</button><button class="btn ghost" data-act="posCsv" data-v="sum">匯出品項彙總 CSV</button></div></section>';
+  var rows = list.slice().sort(function (a, b) { return posTime(a) < posTime(b) ? 1 : -1; }), lim = 30 + (u.more || 0);
+  h += '<section class="panel">' + pHead('訂單（' + rows.length + '）', '新的在上面。結錯時按「作廢」並填原因，原紀錄保留、不計入統計；結帳本人或管理員可以作廢，還沒同步的訂單要同步後才能作廢。');
+  h += rows.length ? rows.slice(0, lim).map(function (s) {
+    var v = s.id && V[s.id], mine = s.created_by === S.me.id;
+    return '<div class="log' + (v ? ' void' : '') + '"><span class="tm">' + tm(posTime(s)) + '</span><span class="tx"><b>' + esc(s.label || '') + '</b> ' + posSaleText(s) + '</span>' + whoHtml(s.created_by, s.auth_mode) +
+      (s.pending ? (s.qerr ? '<span class="tag warn">補傳失敗：' + esc(s.qerr) + '</span>' : '<span class="tag hold">待同步</span>') : '') +
+      (s.offline ? '<span class="tag">離線補傳</span>' : '') + (s.over_stock ? '<span class="tag warn">超過庫存：' + esc(s.over_stock) + '</span>' : '') +
+      (v ? '<span class="tag warn">已作廢・' + esc(pname(v.created_by)) + '：' + esc(v.note || '') + '</span>' :
+        (!s.pending && (mine || m) && canEditStations() ? '<button class="btn ghost sm" data-act="posVoid" data-id="' + s.id + '">作廢</button>' : '')) + '</div>';
+  }).join('') : '<div class="empty">' + esc(posDayLabel(day)) + '沒有符合的訂單。</div>';
+  if (rows.length > lim) h += '<div class="foot"><button class="btn ghost" data-act="posMore">再顯示 30 筆（還有 ' + (rows.length - lim) + ' 筆）</button></div>';
+  return h + '</section>';
+}
+/* 設定 */
+function vPosSet() {
+  var d = posDev(), m = isMgr(), cid = posCid(), now = Date.now(), dup = posDupDevice(), h = '';
+  var live = S.D.posDev.filter(function (x) { return now - new Date(x.last_seen).getTime() < POS_LIVE_MS && x.client_id !== cid; });
+  h += '<section class="panel">' + pHead('這台裝置', '存在這台裝置上，每場活動各自設定。代號用來產生單號（例如 A12），同一場的每台裝置要用不同代號。');
+  if (!d.code) h += '<div class="banner hold" style="margin:0 0 16px">第一次在這台使用 POS：請先選裝置代號與用途。</div>';
+  if (dup) h += '<div class="banner warn" style="margin:0 0 16px">代號 ' + d.code + ' 和 ' + esc(pname(dup.person_id)) + ' 的裝置重複，請換一個代號，換好之前不能結帳。</div>';
+  h += '<div class="grid2 form"><div class="field"><label for="pos-code">裝置代號</label><select id="pos-code" data-posdev="code"><option value="">請選擇</option>' + POS_CODES.map(function (c) {
+    var u = find(live, function (x) { return x.code === c; });
+    return '<option value="' + c + '"' + (d.code === c ? ' selected' : '') + '>' + c + (u ? '（' + esc(pname(u.person_id)) + ' 使用中）' : '') + '</option>';
+  }).join('') + '</select></div>' +
+    '<div class="field"><label for="pos-warn">出餐逾時提醒（分鐘）</label><input type="number" inputmode="numeric" min="1" step="1" id="pos-warn" data-posdev="warn" value="' + d.warn + '"></div></div>';
+  h += '<div class="field" style="margin-top:16px"><label>用途</label><div><div class="seg" role="group" aria-label="用途">' + POS_ROLES.map(function (r) {
+    return '<button data-act="posRole" data-v="' + r + '" aria-pressed="' + (d.role === r) + '">' + r + '</button>';
+  }).join('') + '</div></div></div>';
+  if (d.role !== '收銀') {
+    var cats = posCats().concat(S.D.posp.some(function (p) { return !p.category || posCats().indexOf(p.category) < 0; }) ? [POS_OTHER] : []);
+    h += '<div class="field" style="margin-top:16px"><label>出餐顯示分類（都不勾＝全部）</label><div class="row">' + cats.map(function (c) {
+      return '<label class="pck"><input type="checkbox" data-poscat="' + esc(c) + '"' + (d.cats.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(c) + '</label>';
+    }).join('') + '</div></div>' +
+      '<div class="field" style="margin-top:16px"><label>新訂單提示音與震動</label><div class="row btns"><button class="btn ghost" data-act="posSound">' + (d.sound ? '已開啟，點一下測試' : '開啟提示音') + '</button>' + (d.sound ? '<button class="btn ghost" data-act="posSoundOff">關閉</button>' : '') + '</div><span class="hint">iPhone／iPad 每次重新開啟網頁後，要在這裡或出餐頁點一次才會出聲。</span></div>';
+  }
+  h += '</section>';
+  h += '<section class="panel">' + pHead('同步與裝置', '版本 v' + APP_VERSION + '。結帳先存在裝置上再送出；斷線時自動每 4 秒重試。', '', posSyncPill());
+  var Q = posQOf();
+  if (Q.length) {
+    h += '<div class="sect" style="margin-top:0;padding-top:0;border:0"><h3>這台待同步（' + Q.length + '）</h3>' + Q.map(function (o, i) {
+      var t = o.k === 'sale' ? '結帳 ' + o.view.label + ' ' + money(o.view.total) + '（' + o.view.payment + '）' : '出餐' + (o.done ? '完成' : '還原');
+      return '<div class="log"><span class="tm">' + tm(o.t) + '</span><span class="tx">' + esc(t) + (o.err ? ' <span class="tag warn">失敗：' + esc(o.err) + '</span>' : '') + '</span>' +
+        (o.err && m ? '<button class="btn warn sm" data-act="posQDrop" data-v="' + POSQ.indexOf(o) + '">移除</button>' : '') + '</div>';
+    }).join('') + (posQErrors().length ? '<div class="foot"><button class="btn ghost" data-act="posRetry">失敗的重新送出</button></div>' : '') + '</div>';
+  }
+  var devs = S.D.posDev.slice().sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+  h += '<div class="tw"><table><thead><tr><th>代號</th><th>用途</th><th>登入者</th><th>最後上線</th></tr></thead><tbody>' + (devs.length ? devs.map(function (x) {
+    var on = now - new Date(x.last_seen).getTime() < POS_LIVE_MS, same = x.code === d.code && x.client_id !== cid && on;
+    return '<tr><td><b' + (same ? ' style="color:var(--warn)"' : '') + '>' + esc(x.code) + '</b>' + (x.client_id === cid ? ' <span class="tag">這台</span>' : '') + (same ? ' <span class="tag warn">代號重複</span>' : '') + '</td><td>' + esc(x.role) + '</td><td>' + esc(pname(x.person_id)) + '</td><td><span class="' + (on ? 'ok' : 'mut') + '">' + (on ? '在線' : tm(x.last_seen)) + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="4" class="mut">還沒有裝置登記。</td></tr>') + '</tbody></table></div>';
+  h += '<div class="foot"><button class="btn ghost" data-act="posBackup">備份 JSON（本場 POS）</button></div></section>';
+  h += vPosStock();
+  if (m) h += vPosProducts() + vPosCats();
+  return h;
+}
+function vPosStock() {
+  var P = posProducts(), SM = posSoldMap(), can = canEditStations();
+  return '<section class="panel">' + pHead('售完與庫存', '任何人都可以標記售完，所有裝置會同步變灰。起始庫存由管理員在「商品與售價」設定，空白＝不計庫存。') +
+    (P.length ? '<div class="tw"><table><thead><tr><th>商品</th><th class="n">起始</th><th class="n">已賣</th><th class="n">剩餘</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p) {
+      var left = posLeft(p, SM);
+      return '<tr><td>' + esc(p.name) + (p.sold_out ? ' <span class="tag warn">售完</span>' : '') + '</td><td class="n">' + (p.start_stock == null ? '<span class="mut">不計</span>' : p.start_stock) + '</td><td class="n">' + (SM[p.id] || 0) + '</td>' +
+        '<td class="n' + (left != null && left <= 3 ? ' lowtx' : '') + '">' + (left == null ? '—' : left) + '</td><td class="ops">' +
+        (can ? '<button class="btn ' + (p.sold_out ? 'ghost' : 'warn') + ' sm" data-act="posSoldOut" data-id="' + p.id + '" data-v="' + (p.sold_out ? 0 : 1) + '">' + (p.sold_out ? '取消售完' : '標記售完') + '</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="empty">還沒有商品。</div>') + '</section>';
+}
+function posSrcLabel(p) {
+  if (p.source === 'drink') return '特調';
+  if (p.source === 'custom') return '自訂';
+  var it = item(p.item_id);
+  return it ? (it.kind === 'drip' ? '濾掛' : it.kind === 'giftbox' ? '禮盒' : '咖啡豆') : '品項';
+}
+function posCatSel(attrs, cur) {
+  var L = posCats().slice(); if (cur && L.indexOf(cur) < 0) L.push(cur);
+  return '<select ' + attrs + '><option value="">' + POS_OTHER + '</option>' + L.map(function (c) { return '<option' + (cur === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+}
+function vPosProducts() {
+  var P = posProducts(), A = S.D.posp.filter(function (p) { return p.archived; }), n = S.ui.posNew || (S.ui.posNew = { src: 'item' });
+  var used = {}; P.forEach(function (p) { if (p.item_id) used[p.item_id] = 1; if (p.drink_id) used[p.drink_id] = 1; });
+  var h = '<section class="panel">' + pHead('商品與售價', '只有管理員可以修改，改了所有裝置會即時更新。可從本場品項、特調飲品挑選，或自訂商品。改售價只影響之後的結帳，已結帳的金額不變；停用不會刪除，歷史紀錄照常顯示。');
+  if (P.length) {
+    h += '<div class="tw"><table><thead><tr><th>商品</th><th>分類</th><th class="n">售價（元）</th><th class="n">起始庫存</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p, i) {
+      return '<tr><td><input type="text" data-pp="' + p.id + '|name" value="' + esc(p.name) + '" maxlength="60" aria-label="商品名稱" style="min-width:140px"><div class="hint">' + posSrcLabel(p) + '</div></td>' +
+        '<td>' + posCatSel('data-pp="' + p.id + '|category" aria-label="' + esc(p.name) + ' 分類" style="min-width:110px"', p.category || '') + '</td>' +
+        '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|price" value="' + p.price + '" aria-label="' + esc(p.name) + ' 售價"></td>' +
+        '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|start_stock" value="' + (p.start_stock == null ? '' : p.start_stock) + '" placeholder="不計" aria-label="' + esc(p.name) + ' 起始庫存"></td>' +
+        '<td class="ops"><button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="-1"' + (i ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 上移">↑</button> <button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="1"' + (i < P.length - 1 ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 下移">↓</button> <button class="btn warn sm" data-act="posArch" data-id="' + p.id + '">停用</button></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  } else h += '<div class="empty">還沒有商品。可以在下方新增，或從其他活動複製。</div>';
+  var items = S.D.items.filter(function (it) { return !it.archived && !used[it.id]; });
+  var drinks = drinksOn() ? S.D.drinks.filter(function (d) { return !d.archived && !used[d.id]; }) : [];
+  var grp = function (k, lb) {
+    var L = items.filter(function (it) { return it.kind === k; });
+    return L.length ? '<optgroup label="' + lb + '">' + L.map(function (it) { return '<option value="' + it.id + '"' + (n.ref === it.id ? ' selected' : '') + '>' + esc(itemName(it.id)) + '</option>'; }).join('') + '</optgroup>' : '';
+  };
+  var srcs = [['item', '本場品項'], ['custom', '自訂商品']];
+  if (drinksOn()) srcs.splice(1, 0, ['drink', '特調飲品']);
+  if (!find(srcs, function (s) { return s[0] === n.src; })) n.src = 'item';
+  h += '<div class="sect"><h3>新增商品</h3><div class="grid2 form">' +
+    '<div class="field"><label for="pn-src">來源</label><select id="pn-src" data-pn="src">' + srcs.map(function (s) { return '<option value="' + s[0] + '"' + (n.src === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select></div>';
+  if (n.src === 'item') h += '<div class="field"><label for="pn-ref">品項</label><select id="pn-ref" data-pn="ref"><option value="">請選擇</option>' + grp('bean', '咖啡豆') + grp('drip', '濾掛') + grp('giftbox', '禮盒') + '</select></div>';
+  else if (n.src === 'drink') h += '<div class="field"><label for="pn-ref">飲品</label><select id="pn-ref" data-pn="ref"><option value="">請選擇</option>' + drinks.map(function (d) { return '<option value="' + d.id + '"' + (n.ref === d.id ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select></div>';
+  else h += '<div class="field"><label for="pn-name">商品名稱</label><input type="text" id="pn-name" data-pn="name" maxlength="60" value="' + esc(n.name || '') + '" placeholder="例如：原味費南雪、冰拿鐵"></div>';
+  h += '<div class="field"><label for="pn-cat">分類</label>' + posCatSel('id="pn-cat" data-pn="cat"', n.cat || '') + '</div>' +
+    '<div class="field"><label for="pn-price">售價（元）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-price" data-pn="price" value="' + esc(n.price || '') + '"></div>' +
+    '<div class="field"><label for="pn-stock">起始庫存（選填）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-stock" data-pn="stock" value="' + esc(n.stock || '') + '" placeholder="不計"></div>' +
+    '<div class="field"><button class="btn" data-act="posAddProduct">新增商品</button></div></div>' +
+    (n.src === 'item' && !items.length ? '<p class="hint" style="margin-top:8px">本場品項都已加入。</p>' : '') +
+    (n.src === 'drink' && !drinks.length ? '<p class="hint" style="margin-top:8px">特調飲品都已加入，或還沒有飲品。</p>' : '') + '</div>';
+  var others = S.G.events.filter(function (e) { return e.id !== S.ev; });
+  if (others.length) h += '<div class="sect"><h3>從其他活動複製商品</h3><div class="grid2 form"><div class="field" style="grid-column:span 2"><label for="pos-copy">活動</label><select id="pos-copy">' + others.map(function (e) { return '<option value="' + e.id + '">' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select></div><div class="field"><button class="btn ghost" data-act="posCopy">複製商品</button></div></div><p class="hint" style="margin-top:8px">名稱、分類、售價、起始庫存一起複製；本場已有同名商品的會略過。</p></div>';
+  if (A.length) h += '<div class="sect"><h3>已停用的商品</h3>' + A.map(function (p) {
+    return '<div class="log"><span class="tx">' + esc(p.name) + ' <span class="mut small">' + money(p.price) + '</span></span><button class="btn ghost sm" data-act="posUnarch" data-id="' + p.id + '">恢復販售</button></div>';
+  }).join('') + '</div>';
+  return h + '</section>';
+}
+function vPosCats() {
+  var C = posCats(), cnt = {};
+  S.D.posp.forEach(function (p) { if (!p.archived && p.category) cnt[p.category] = (cnt[p.category] || 0) + 1; });
+  return '<section class="panel">' + pHead('分類', '收銀畫面依這裡的順序分區。改名時，用到的商品一起改；有商品的分類不能刪除。') +
+    C.map(function (c, i) {
+      return '<div class="log"><span class="tx"><input type="text" data-pcat="' + esc(c) + '" value="' + esc(c) + '" maxlength="20" aria-label="分類名稱" style="max-width:220px"></span><span class="mut small">' + (cnt[c] || 0) + ' 項</span>' +
+        '<span class="row btns"><button class="btn ghost sm" data-act="posCatMove" data-v="' + i + '|-1"' + (i ? '' : ' disabled') + ' aria-label="' + esc(c) + ' 上移">↑</button><button class="btn ghost sm" data-act="posCatMove" data-v="' + i + '|1"' + (i < C.length - 1 ? '' : ' disabled') + ' aria-label="' + esc(c) + ' 下移">↓</button>' +
+        '<button class="btn warn sm" data-act="posCatDel" data-v="' + i + '"' + (cnt[c] || C.length < 2 ? ' disabled' : '') + '>刪除</button></span></div>';
+    }).join('') +
+    '<div class="inline-add"><input type="text" id="pos-newcat" maxlength="20" placeholder="新分類名稱" aria-label="新分類名稱"><button class="btn ghost" data-act="posCatAdd">新增分類</button></div></section>';
+}
+/* 活動分頁：POS 開關與付款方式（管理員） */
+function vPosConfig(ev) {
+  var on = S.ui.posCfg && S.ui.posCfg.ev === ev.id ? S.ui.posCfg : (S.ui.posCfg = { ev: ev.id, on: !!ev.pos_enabled, pays: (ev.pos_payments || ['現金']).slice() });
+  return '<section class="panel"><h2>POS 收銀</h2><p class="sub">市集等需要現場收銀的活動可以開啟，會多一個「POS」分頁，可多台裝置同時點餐與出餐。付款方式每場自己選；只記錄付款方式，不串接金流。</p>' +
+    '<div class="field"><label>使用 POS</label><div><div class="seg" role="group" aria-label="使用 POS"><button data-act="posCfgOn" data-v="0" aria-pressed="' + !on.on + '">不使用</button><button data-act="posCfgOn" data-v="1" aria-pressed="' + on.on + '">使用</button></div></div></div>' +
+    '<div class="field" style="margin-top:16px"><label>付款方式</label><div class="row">' + PAYMENTS.map(function (p) {
+      return '<label class="pck"><input type="checkbox" data-poscfg="' + esc(p) + '"' + (on.pays.indexOf(p) >= 0 ? ' checked' : '') + '> ' + esc(p) + '</label>';
+    }).join('') + '</div></div>' +
+    '<div class="foot"><button class="btn" data-act="posCfgSave">儲存 POS 設定</button></div></section>';
+}
+/* 匯出、複製、列印（彙總以數量為主；金額只在對帳） */
+function posFilterLabel() {
+  var u = posState(), day = posDay();
+  return posDayLabel(day) + (u.fDev ? '・裝置 ' + u.fDev : '') + (u.fPay ? '・' + u.fPay : '');
+}
+function posCsv(kind, all) {
+  var ev = curEvent(), list = all ? posSales() : posFiltered(), V = posVoided(), base = ev.name + '_' + ev.start_date + '_POS', tag = all ? '整場' : posFilterLabel().replace(/[\/\s・（）]/g, '');
+  if (kind === 'detail') {
+    var r = [['單號', '時間', '營業日', '裝置', '分類', '品項', '單價', '數量', '小計', '付款方式', '整筆折扣', '備註', '結帳人', '狀態']];
+    list.slice().sort(function (a, b) { return posTime(a) < posTime(b) ? -1 : 1; }).forEach(function (s) {
+      if (posIsVoid(s, V)) return;
+      posLines(s).forEach(function (l) { r.push([s.label, tm(posTime(s)), s.biz_date, s.device, posCatOf(l.category), l.name, l.price, l.qty, l.amount, s.payment, s.discount, s.note, pname(s.created_by), s.pending ? '待同步' : s.offline ? '離線補傳' : '']); });
+    });
+    csvDownload(base + '明細_' + tag + '.csv', r);
+  } else {
+    var T = posStats(list), r2 = [['分類', '品項', '數量']];
+    T.cats.forEach(function (c) { c.items.forEach(function (x) { r2.push([c.cat, x.name, x.qty]); }); r2.push([c.cat, '小計', c.qty]); });
+    r2.push(['', '總數量', T.qty]);
+    csvDownload(base + '品項彙總_' + tag + '.csv', r2);
+  }
+}
+function posText(kind) {
+  var ev = curEvent(), T = posStats(posFiltered()), L = [];
+  var head = ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + '）POS 彙總・' + posFilterLabel();
+  var stamp = '複製時間 ' + tm(new Date().toISOString());
+  if (kind === 'tsv') {
+    L.push(head, stamp, '', ['分類', '品項', '數量'].join('\t'));
+    T.cats.forEach(function (c) { c.items.forEach(function (x) { L.push([c.cat, String(x.name).replace(/[\t\n]/g, ' '), x.qty].join('\t')); }); L.push([c.cat, '小計', c.qty].join('\t')); });
+    L.push(['', '總數量', T.qty].join('\t'), '', ['付款方式', '筆數', '金額'].join('\t'));
+    T.pays.forEach(function (p) { var x = T.pay[p] || { n: 0, amt: 0 }; L.push([p, x.n, x.amt].join('\t')); });
+    return L.join('\n');
+  }
+  L.push('【' + head + '】', stamp, '', '總數量 ' + T.qty + '｜' + T.n + ' 筆' + (T.nVoid ? '｜作廢 ' + T.nVoid + ' 筆不計' : ''));
+  T.cats.forEach(function (c) {
+    L.push('', '■ ' + c.cat + ' ' + c.qty);
+    c.items.forEach(function (x) { L.push('・' + x.name + ' ' + x.qty); });
+  });
+  return L.join('\n');
+}
+function posPrintHtml() {
+  var T = posStats(posFiltered());
+  var h = printHead('POS 彙總', esc(posFilterLabel()));
+  h += '<div class="sec"><h2>品項數量<small>總數量 ' + T.qty + '・' + T.n + ' 筆</small></h2><table><thead><tr><th>品項</th><th class="n">數量</th></tr></thead><tbody>' + T.cats.map(function (c) {
+    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td></tr>' + c.items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="n">' + x.qty + '</td></tr>'; }).join('');
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td></tr></tbody></table></div>';
+  h += '<div class="sec"><h2>對帳</h2><table><thead><tr><th>付款方式</th><th class="n">筆數</th><th class="n">金額</th></tr></thead><tbody>' + T.pays.map(function (p) {
+    var x = T.pay[p] || { n: 0, amt: 0 }; return '<tr><td>' + esc(p) + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>';
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.n + '</td><td class="n">' + money(T.total) + '</td></tr></tbody></table></div>';
+  return h + '<div class="ft">金額為折扣後' + (T.disc ? '（折扣合計 ' + money(T.disc) + '）' : '') + '，不含作廢的訂單' + (T.nVoid ? '（' + T.nVoid + ' 筆）' : '') + '。POS 只記收銀，不連動盤點。</div>';
+}
+function posSaveCats(cats, renames, msg) {
+  call('evt_pos_config_save', { p_event_id: S.ev, p: { categories: cats, renames: renames || {} } }, ['events', 'posp'], msg);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2890,14 +3543,14 @@ function vCsvPreview() {
 var TABLE_LABEL = {
   evt_shared_secret: '共用密碼', evt_events: '活動', evt_event_members: '參加夥伴', evt_stations: '崗位', evt_station_owners: '崗位負責人', evt_items: '品項', evt_plan: '預計量', evt_people: '人員',
   evt_checklist_items: '清單項目', evt_checklist_templates: '範本', evt_checklist_template_items: '範本項目', evt_purchases: '備料', evt_timeline: '時程', evt_pins: 'PIN',
-  evt_drinks: '特調飲品', evt_drink_plan: '特調杯數', evt_drink_ingredients: '特調配方'
+  evt_drinks: '特調飲品', evt_drink_plan: '特調杯數', evt_drink_ingredients: '特調配方', evt_pos_products: 'POS 商品'
 };
 var FIELD_LABEL = {
   name: '名稱', bean_ref_id: '咖啡豆資料庫 ID', bean_ref_name: '咖啡豆資料庫名稱', booth: '展台', category: '分類', spec_g: '規格 g', plan_batch1: '第一批', plan_total: '總預計', tasting_g: '試喝量 g', archived: '封存', note: '備註',
   needs_confirm: '待確認', title: '品項', qty: '數量', purpose: '用途', phase: '階段', assignee_id: '指派', link_page: '連結', sort: '排序', status: '狀態',
   order_qty: '訂購數量', received_qty: '實收數量', supplier: '供應商', eta: '預計到貨', total_need: '需求量', unit: '單位', item_name: '品項', buyer_id: '採購人',
   start_date: '開始', end_date: '結束', setup_date: '佈場', count_date: '帶出對點日', venue: '場地', is_manager: '管理員', active: '啟用', check_date: '對點日期',
-  content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調',
+  content: '內容', people: '人員', place: '地點', time_text: '時間', phase_label: '區段', date: '日期', station_id: '崗位', parent_item_id: '所屬豆款', has_drinks: '出杯特調', pos_enabled: 'POS 收銀', pos_payments: 'POS 付款方式', price: '售價', source: '來源',
   steps: '出杯步驟', coffee_bean_name: '特調用咖啡豆', coffee_bean_total_g: '咖啡豆總用量 g', planned_cups: '預計杯數', extra_cups: '可再加杯數', prep_cups_override: '備貨杯數（手動）', grams_per_cup: '每杯 g', has_coffee: '含咖啡', booths: '展台清單', booth_label: '展台稱呼', announcement: '重要公告', contents: '內容物'
 };
 var SKIP_FIELDS = ['deleted_at', 'deleted_by', 'updated_at', 'updated_by', 'created_at', 'created_by', 'confirmed_at', 'archived_at', 'archived_by'];
@@ -2909,6 +3562,7 @@ function fmtVal(k, v) {
   if (k === 'parent_item_id' || k === 'item_id') return itemName(v);
   if (v === true) return '是';
   if (v === false) return '否';
+  if (Array.isArray(v)) return v.join('、') || '（空）';
   return String(v);
 }
 /* 崗位負責人的紀錄沒有活動欄位，會出現在每一場；只留本場崗位的 */
@@ -2987,7 +3641,7 @@ function vLog() {
   h += '</section><section class="panel">' + pHead('匯出', '活動結束後建議全部匯出存檔。CSV 可用 Excel 或 Google 試算表開啟。資料庫為免費方案、沒有自動備份，建議每天收店盤點簽署後匯出一次「整場資料」。') +
     '<h3>CSV</h3><div class="row btns">' +
     '<button class="btn ghost" data-act="exp" data-v="settle">結算 CSV</button><button class="btn ghost" data-act="exp" data-v="daily">每日銷售 CSV</button><button class="btn ghost" data-act="exp" data-v="moves">異動紀錄 CSV</button>' +
-    '<button class="btn ghost" data-act="exp" data-v="sheets">盤點單明細 CSV</button><button class="btn ghost" data-act="exp" data-v="check">勾選紀錄 CSV</button><button class="btn ghost" data-act="exp" data-v="audit">設定變更 CSV</button></div>' +
+    '<button class="btn ghost" data-act="exp" data-v="sheets">盤點單明細 CSV</button><button class="btn ghost" data-act="exp" data-v="check">勾選紀錄 CSV</button><button class="btn ghost" data-act="exp" data-v="audit">設定變更 CSV</button>' + (posOn() || S.D.posS.length ? '<button class="btn ghost" data-act="exp" data-v="pos">POS 銷售明細 CSV</button>' : '') + '</div>' +
     '<div class="foot"><button class="btn" data-act="exp" data-v="json">匯出整場資料（JSON，含簽名）</button></div></section>';
   return h;
 }
@@ -3047,6 +3701,8 @@ function exportData(kind) {
     var r5 = [['時間', '崗位', '項目', '動作', '操作人', '登入方式']];
     S.D.cklog.forEach(function (l) { var c = ckBy[l.item_id]; r5.push([tm(l.created_at), c ? (station(c.station_id) || {}).name : '', c ? c.title : '', l.action, pname(l.person_id), modeLabel(l.auth_mode)]); });
     csvDownload(base + '_勾選紀錄.csv', r5);
+  } else if (kind === 'pos') {
+    posCsv('detail', true);
   } else if (kind === 'audit') {
     var r6 = [['時間', '對象', '動作', '內容', '操作人', '登入方式']];
     S.D.audit.filter(auditMine).forEach(function (a) { var div = document.createElement('div'); div.innerHTML = auditText(a); r6.push([tm(a.created_at), TABLE_LABEL[a.table_name] || a.table_name, a.action, div.textContent, pname(a.person_id), modeLabel(a.auth_mode)]); });
@@ -3199,6 +3855,7 @@ function vEvent() {
       evField('note', '備註', 'text', ev.note, m) + '</div>' +
       '<p class="hint" style="margin-top:16px">狀態改為「已結束」後，崗位負責人的編輯權限自動失效。</p>' +
       (m ? '<div class="foot"><button class="btn" data-act="saveEvent">儲存活動設定</button><button class="btn warn" data-act="delEvent" data-id="' + ev.id + '" style="margin-left:auto">刪除這場活動</button></div>' : '') + '</section>';
+    if (m) h += vPosConfig(ev);
     if (m) h += vBoothCard(ev);
     if (m) h += vMembersCard(ev);
     if (m) {
@@ -3834,6 +4491,166 @@ var A = {
     var k = e.getAttribute('data-v');
     copyText(drinkText(k)).then(function () { toast(k === 'tsv' ? '已複製特調表格，可以貼到 Excel 或 Google 試算表' : '已複製特調文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
   },
+  /* POS */
+  posView: function (e) { S.ui.pv = e.getAttribute('data-v'); posState().drawer = false; renderNow(); window.scrollTo(0, 0); },
+  posAdd: function (e) {
+    var u = posState(), id = e.getAttribute('data-id'), c = find(u.cart, function (x) { return x.id === id; });
+    if (c) c.qty++; else u.cart.push({ id: id, qty: 1 });
+    renderNow();
+  },
+  posQty: function (e) {
+    var u = posState(), id = e.getAttribute('data-id'), c = find(u.cart, function (x) { return x.id === id; }), p = byId(S.D.posp, id);
+    if (!c) return;
+    var add = +e.getAttribute('data-v'), left = p ? posLeft(p, posSoldMap()) : null;
+    if (add > 0 && left != null && c.qty + add > left) { toast('「' + p.name + '」只剩 ' + Math.max(left, 0), true); return; }
+    c.qty += add;
+    if (c.qty <= 0) u.cart = u.cart.filter(function (x) { return x !== c; });
+    renderNow();
+  },
+  posRm: function (e) { var u = posState(), id = e.getAttribute('data-id'); u.cart = u.cart.filter(function (x) { return x.id !== id; }); renderNow(); },
+  posClear: function () { var u = posState(); u.cart = []; u.disc = ''; u.recv = ''; u.note = ''; renderNow(); },
+  posDrawer: function () { var u = posState(); u.drawer = !u.drawer; renderNow(); },
+  posPay: function (e) { posState().pay = e.getAttribute('data-v'); renderNow(); },
+  posRecv: function (e) { posState().recv = e.getAttribute('data-v'); renderNow(); },
+  posFlashOff: function () { posState().flash = null; renderNow(); },
+  posGo: function () {
+    var u = posState(), d = posDev(), c = posCalc(), ev = curEvent(), pay = u.pay, now = Date.now();
+    if (now < u.lock) return;
+    u.lock = now + 1000;
+    if (!d.code) { toast('請先到「設定」選裝置代號', true); return; }
+    if (posDupDevice()) { toast('裝置代號重複，請先到「設定」更換代號', true); return; }
+    if (ev.status === '已結束') { toast('這場活動已結束，不能再結帳', true); return; }
+    if (!c.lines.length) { toast('請先選商品', true); return; }
+    if (u.disc !== '' && (!/^\d+$/.test(String(u.disc).trim()) || c.disc > c.sub)) { toast('折扣請填 0 到 ' + c.sub + ' 的整數', true); return; }
+    if (c.recv != null && (!/^\d+$/.test(String(u.recv).trim()) || c.recv < c.tot)) { toast('收款金額不足（應收 ' + money(c.tot) + '）', true); return; }
+    var SM = posSoldMap(), bad = find(c.lines, function (l) { var left = posLeft(l.p, SM); return l.p.sold_out || (left != null && l.qty > left); });
+    if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足（剩 ' + Math.max(posLeft(bad.p, SM), 0) + '）'), true); return; }
+    var seq = posNextSeq(d.code), label = d.code + seq, ts = new Date().toISOString();
+    var p = {
+      client_ref: newRef(), device: d.code, seq: seq, payment: pay, discount: c.disc, received: c.recv, note: u.note.trim() || null, client_ts: ts, strict: true,
+      lines: c.lines.map(function (l) { return { product_id: l.p.id, qty: l.qty, price: l.p.price }; })
+    };
+    var view = {
+      pending: true, client_ref: p.client_ref, label: label, device: d.code, seq: seq, payment: pay, subtotal: c.sub, discount: c.disc, total: c.tot,
+      received: c.recv, change_due: c.change, note: p.note, client_ts: ts, created_at: ts, created_by: S.me.id, biz_date: todayStr(),
+      lines: c.lines.map(function (l) { return { product_id: l.p.id, name: l.p.name, category: l.p.category, price: l.p.price, qty: l.qty, amount: l.amt }; })
+    };
+    var sub = money(c.tot) + '・' + pay + (c.change != null ? '・找零 ' + money(c.change) : '');
+    function ok(offline) {
+      u.cart = []; u.disc = ''; u.recv = ''; u.note = ''; u.drawer = false;
+      u.flash = { label: label, sub: sub + (offline ? '・離線，稍後補傳' : ''), until: Date.now() + 2200 };
+      setTimeout(function () { if (u.flash && Date.now() >= u.flash.until) { u.flash = null; render(); } }, 2300);
+      renderNow();
+      printTicket(view);
+    }
+    function queue() { p.strict = false; POSQ.push({ k: 'sale', ev: S.ev, p: p, view: view, t: ts }); posQSave(); ok(true); }
+    if (!posNetOk()) { queue(); return; }
+    sb.rpc('evt_pos_sale_create', { p_token: S.token, p_event_id: S.ev, p: p }).then(function (r) {
+      if (r.error) throw r.error;
+      S.posNet = true; ok(false); reload(['posS', 'posL', 'posp']);
+    }).catch(function (e) {
+      if (isNetErr(e)) { S.posNet = false; queue(); return; }
+      u.lock = 0;
+      handleErr(e);
+      if (/售價已改|已售完|已停售|庫存不足/.test((e && e.message) || '')) reload(['posp', 'posS', 'posL']);
+    });
+  },
+  posDone: function (e) {
+    POSQ.push({ k: 'done', ev: S.ev, ref: e.getAttribute('data-ref'), done: e.getAttribute('data-v') === '1', t: new Date().toISOString() });
+    posQSave(); renderNow(); posFlush();
+  },
+  posSound: function () { var d = posDev(); d.sound = true; posDevSave(d); posSoundUnlock(); renderNow(); toast('已開啟提示音與震動'); },
+  posSoundOff: function () { var d = posDev(); d.sound = false; posDevSave(d); renderNow(); },
+  posRole: function (e) { var d = posDev(); d.role = e.getAttribute('data-v'); posDevSave(d); posBeat(); renderNow(); },
+  posDay: function (e) { var u = posState(); u.day = e.getAttribute('data-v'); u.more = 0; renderNow(); },
+  posFDev: function (e) { var u = posState(); u.fDev = e.getAttribute('data-v'); u.more = 0; renderNow(); },
+  posFPay: function (e) { var u = posState(); u.fPay = e.getAttribute('data-v'); u.more = 0; renderNow(); },
+  posMore: function () { posState().more += 30; renderNow(); },
+  posCsv: function (e) { posCsv(e.getAttribute('data-v')); },
+  posVoid: function (e) {
+    var s = byId(S.D.posS, e.getAttribute('data-id'));
+    if (!s || !confirm('確定要作廢訂單 ' + (s.label || '') + '（' + money(s.total) + '，' + s.payment + '）？\n作廢後不計入統計，原紀錄會保留。')) return;
+    var why = prompt('請填作廢原因：');
+    if (why === null) return;
+    if (!why.trim()) { toast('請填寫作廢原因', true); return; }
+    call('evt_pos_sale_void', { p_sale_id: s.id, p_reason: why.trim() }, ['posS'], '已作廢 ' + (s.label || '') + '，原紀錄保留');
+  },
+  posRetry: function () { POSQ.forEach(function (o) { delete o.err; }); posQSave(); S.posAuthErr = false; posFlush(); renderNow(); },
+  posQDrop: function (e) {
+    var o = POSQ[+e.getAttribute('data-v')];
+    if (!o || !confirm('移除這筆待同步資料？' + (o.k === 'sale' ? '\n結帳 ' + o.view.label + ' ' + money(o.view.total) + ' 將不會入帳，建議先按「備份 JSON」留存。' : ''))) return;
+    POSQ.splice(POSQ.indexOf(o), 1); posQSave(); renderNow();
+  },
+  posBackup: function () {
+    var ev = curEvent(), out = { exported_at: new Date().toISOString(), app_version: APP_VERSION, event: ev, device: posDev(), client_id: posCid(),
+      products: S.D.posp, sales: S.D.posS, lines: S.D.posL, done: S.D.posD, devices: S.D.posDev, queue: posQOf() };
+    download(ev.name + '_POS備份_' + todayStr() + '.json', JSON.stringify(out, null, 1), 'application/json');
+  },
+  posSoldOut: function (e) {
+    var on = e.getAttribute('data-v') === '1', p = byId(S.D.posp, e.getAttribute('data-id'));
+    call('evt_pos_soldout_set', { p_product_id: p.id, p_sold_out: on }, ['posp'], on ? '已標記「' + p.name + '」售完' : '已取消「' + p.name + '」售完');
+  },
+  posAddProduct: function () {
+    var n = S.ui.posNew || {}, price = String(n.price || '').trim(), stock = String(n.stock || '').trim(), p = { event_id: S.ev, source: n.src, category: n.cat || null };
+    if (n.src === 'custom') { p.name = (n.name || '').trim(); if (!p.name) { toast('請輸入商品名稱', true); return; } }
+    else { if (!n.ref) { toast(n.src === 'drink' ? '請選飲品' : '請選品項', true); return; } p[n.src === 'drink' ? 'drink_id' : 'item_id'] = n.ref; }
+    if (!/^\d+$/.test(price)) { toast('售價請填 0 以上的整數', true); return; }
+    if (stock && !/^\d+$/.test(stock)) { toast('起始庫存請填 0 以上的整數，或留空', true); return; }
+    p.price = +price; p.start_stock = stock === '' ? null : +stock;
+    call('evt_pos_product_save', { p: p }, ['posp'], '已新增商品').then(function (r) { if (r.ok) { S.ui.posNew = { src: n.src, cat: n.cat }; renderNow(); } });
+  },
+  posArch: function (e) {
+    var p = byId(S.D.posp, e.getAttribute('data-id'));
+    if (!p || !confirm('停用商品「' + p.name + '」？\n收銀畫面不再顯示，已結帳的紀錄不受影響，之後可以恢復販售。')) return;
+    call('evt_pos_product_save', { p: { id: p.id, archived: true } }, ['posp'], '已停用商品');
+  },
+  posUnarch: function (e) { call('evt_pos_product_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['posp'], '已恢復販售'); },
+  posMove: function (e) {
+    var P = posProducts(), i = P.indexOf(byId(P, e.getAttribute('data-id'))), j = i + +e.getAttribute('data-v');
+    if (i < 0 || j < 0 || j >= P.length) return;
+    var order = P.map(function (p) { return p.id; }); order[i] = P[j].id; order[j] = P[i].id;
+    var jobs = [];
+    order.forEach(function (id, k) { if (byId(P, id).sort !== k + 1) jobs.push({ id: id, sort: k + 1 }); });
+    var run = function () {
+      var x = jobs.shift();
+      if (!x) { reload(['posp']); return; }
+      call('evt_pos_product_save', { p: x }, []).then(function (r) { if (r.ok) run(); else reload(['posp']); });
+    };
+    run();
+  },
+  posCopy: function () {
+    var from = val('#pos-copy'), fe = byId(S.G.events, from);
+    if (!fe || !confirm('從「' + fe.name + '」複製商品到這場？本場已有同名商品的會略過。')) return;
+    call('evt_pos_products_copy', { p_from: from, p_to: S.ev }, ['posp']).then(function (r) { if (r.ok) toast(r.data ? '已複製 ' + r.data + ' 項商品' : '沒有新商品可以複製（都已經有了）'); });
+  },
+  posCatMove: function (e) {
+    var v = e.getAttribute('data-v').split('|'), C = posCats().slice(), i = +v[0], j = i + +v[1];
+    if (j < 0 || j >= C.length) return;
+    var t = C[i]; C[i] = C[j]; C[j] = t;
+    posSaveCats(C, null, '已調整分類順序');
+  },
+  posCatDel: function (e) {
+    var C = posCats().slice(), i = +e.getAttribute('data-v');
+    if (!confirm('刪除分類「' + C[i] + '」？')) return;
+    C.splice(i, 1); posSaveCats(C, null, '已刪除分類');
+  },
+  posCatAdd: function () {
+    var n = val('#pos-newcat').trim(), C = posCats().slice();
+    if (!n) { toast('請輸入分類名稱', true); return; }
+    if (C.indexOf(n) >= 0) { toast('已經有「' + n + '」這個分類', true); return; }
+    C.push(n); posSaveCats(C, null, '已新增分類');
+  },
+  posCfgOn: function (e) { S.ui.posCfg.on = e.getAttribute('data-v') === '1'; renderNow(); },
+  posCfgSave: function () {
+    var c = S.ui.posCfg;
+    if (!c.pays.length) { toast('請至少選一種付款方式', true); return; }
+    call('evt_pos_config_save', { p_event_id: S.ev, p: { enabled: c.on, payments: c.pays } }, ['events'], c.on ? '已開啟 POS，上方多了「POS」分頁' : '已儲存 POS 設定').then(function (r) { if (r.ok) { S.ui.posCfg = null; renderNow(); } });
+  },
+  printPos: function () { printHtml(posPrintHtml()); },
+  copyPos: function (e) {
+    var k = e.getAttribute('data-v');
+    copyText(posText(k)).then(function () { toast(k === 'tsv' ? '已複製 POS 彙總表格，可以貼到 Excel 或 Google 試算表' : '已複製 POS 彙總文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
+  },
   copyStatus: function (e) {
     var k = e.getAttribute('data-v');
     copyText(statusText(k)).then(function () { toast(k === 'tsv' ? '已複製品項現況表格，可以貼到 Excel 或 Google 試算表' : '已複製品項現況文字，可以貼到 LINE'); }, function (er) { toast('複製失敗：' + er.message, true); });
@@ -4210,6 +5027,44 @@ document.addEventListener('change', function (ev) {
   if (t.type === 'file') { Object.keys(IMP).forEach(function (k) { if (IMP[k].file === t.id) { var cb = document.querySelector('[data-act=impClear][data-v=' + k + ']'); if (cb) cb.disabled = false; } }); }
   if (a === 'tick' || a === 'showCalc' || a === 'pMgr' || a === 'pOwner' || a === 'pActive') { A[a](t); return; }
   if (a === 'pickEvent') { switchEvent(t.value); return; }
+  if (t.hasAttribute('data-pp')) {
+    var pp = t.getAttribute('data-pp').split('|'), pv = t.value.trim(), po = byId(S.D.posp, pp[0]), pd = { id: pp[0] }, pmsg = '已更新';
+    if (!po) return;
+    if (pp[1] === 'price') { if (!/^\d+$/.test(pv)) { toast('售價請填 0 以上的整數', true); t.value = po.price; return; } if (+pv === po.price) return; pd.price = +pv; pmsg = '已更新售價：' + po.name + ' ' + money(pd.price); }
+    else if (pp[1] === 'start_stock') { if (pv !== '' && !/^\d+$/.test(pv)) { toast('起始庫存請填 0 以上的整數，或留空', true); t.value = po.start_stock == null ? '' : po.start_stock; return; } pd.start_stock = pv === '' ? null : +pv; if (pd.start_stock === po.start_stock) return; pmsg = '已更新庫存：' + po.name + ' ' + (pv === '' ? '不計' : pv); }
+    else if (pp[1] === 'category') { pd.category = t.value || null; pmsg = '已更新分類'; }
+    else { if (!pv) { toast('商品名稱不能空白', true); t.value = po.name; return; } if (pv === po.name) return; pd.name = pv; pmsg = '已更新商品名稱'; }
+    call('evt_pos_product_save', { p: pd }, ['posp'], pmsg).then(function (r) { if (!r.ok) renderNow(); });
+    return;
+  }
+  if (t.hasAttribute('data-pn')) {
+    var pk = t.getAttribute('data-pn'); S.ui.posNew = S.ui.posNew || { src: 'item' }; S.ui.posNew[pk] = t.value;
+    if (pk === 'src') { S.ui.posNew.ref = ''; renderNow(); }
+    return;
+  }
+  if (t.hasAttribute('data-poscfg')) {
+    var cp = S.ui.posCfg, pn = t.getAttribute('data-poscfg');
+    cp.pays = PAYMENTS.filter(function (x) { return x === pn ? t.checked : cp.pays.indexOf(x) >= 0; });
+    return;
+  }
+  if (t.hasAttribute('data-poscat')) {
+    var dc = posDev(), cn = t.getAttribute('data-poscat');
+    dc.cats = dc.cats.filter(function (x) { return x !== cn; }); if (t.checked) dc.cats.push(cn);
+    posDevSave(dc); toast(dc.cats.length ? '出餐只顯示：' + dc.cats.join('、') : '出餐顯示全部分類'); return;
+  }
+  if (t.hasAttribute('data-posdev')) {
+    var dv = posDev(), dk = t.getAttribute('data-posdev');
+    if (dk === 'code') { if (!t.value) return; dv.code = t.value; posDevSave(dv); posBeat(); toast('這台裝置代號：' + dv.code); setTimeout(function () { reload(['posDev']); }, 800); renderNow(); return; }
+    if (dk === 'warn') { var wv = Math.round(num(t.value)); if (wv < 1) { toast('請填 1 以上的分鐘數', true); t.value = dv.warn; return; } dv.warn = wv; posDevSave(dv); toast('出餐逾時提醒：' + wv + ' 分鐘'); return; }
+  }
+  if (t.hasAttribute('data-pcat')) {
+    var oc = t.getAttribute('data-pcat'), nc = t.value.trim(), CC = posCats().slice(), ren = {};
+    if (!nc) { toast('分類名稱不能空白', true); t.value = oc; return; }
+    if (nc === oc) return;
+    if (CC.indexOf(nc) >= 0) { toast('已經有「' + nc + '」這個分類', true); t.value = oc; return; }
+    CC[CC.indexOf(oc)] = nc; ren[oc] = nc;
+    posSaveCats(CC, ren, '分類已改名：' + oc + ' → ' + nc); return;
+  }
   if (a === 'buyStatus') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { status: t.value } }, ['buys'], '已更新狀態'); return; }
   if (a === 'buyRec') { call('evt_purchase_update', { p_id: t.getAttribute('data-id'), p: { received_qty: t.value === '' ? null : t.value } }, ['buys'], '已更新實收數量'); return; }
   if (a === 'stDate') { call('evt_station_save', { p: { id: S.ui.st, check_date: t.value } }, ['stations'], '已更新對點日期'); return; }
@@ -4312,6 +5167,8 @@ document.addEventListener('input', function (ev) {
     if (cb && had !== !!t.value) cb.disabled = !t.value && !S.ui[IMP[ik].ui];
     return;
   }
+  if (t.hasAttribute('data-pos')) { posState()[t.getAttribute('data-pos')] = t.value; posRefresh(); return; }
+  if (t.hasAttribute('data-pn') && t.tagName === 'INPUT') { S.ui.posNew = S.ui.posNew || { src: 'item' }; S.ui.posNew[t.getAttribute('data-pn')] = t.value; return; }
   if (d && S.ui.draftId) {
     var pr = d.split('|'), v = t.value === '' ? null : Math.max(0, Math.round(num(t.value)));
     S.ui.dv[pr[0]] = S.ui.dv[pr[0]] || {};
