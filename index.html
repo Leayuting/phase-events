@@ -518,7 +518,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 69;
+var APP_VERSION = 70;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1431,7 +1431,7 @@ function posState() {
   if (posPays().indexOf(u.pay) < 0) u.pay = posPays()[0];
   return u;
 }
-function cartKey(id, parts, opt) { return id + (opt ? '|t:' + opt : '') + (parts && parts.length ? '|' + parts.map(function (x) { return x.id + ':' + x.qty; }).sort().join(',') : ''); }
+function cartKey(id, parts, opt) { return id + (opt ? '|t:' + opt : '') + (parts && parts.length ? '|' + parts.map(function (x) { return x.id + (x.opt ? '/' + x.opt : '') + ':' + x.qty; }).sort().join(',') : ''); }
 function posTemps(p) { return p && p.temps && p.temps.length ? p.temps : []; }
 function tempTag(o) { return o ? ' <span class="topt' + (o === '冰' ? ' ice' : ' hot') + '">' + o + '</span>' : ''; }
 function cartQty(id) { var n = 0; posState().cart.forEach(function (x) { if (x.id === id) n += x.qty; }); return n; }
@@ -1453,7 +1453,7 @@ function posShort(c, add) {
   return bad;
 }
 function posComboOpts(p) { return posProducts().filter(function (x) { return !x.combo_size && x.id !== p.id && (!p.combo_category || x.category === p.combo_category); }); }
-function partsText(parts) { return parts.map(function (x) { return x.name + '×' + x.qty; }).join('、'); }
+function partsText(parts) { return parts.map(function (x) { return x.name + (x.opt ? '（' + x.opt + '）' : '') + '×' + x.qty; }).join('、'); }
 function posCalc() {
   var u = posState(), sub = 0, n = 0, lines = [];
   u.cart = u.cart.filter(function (c) {
@@ -1462,7 +1462,7 @@ function posCalc() {
   });
   u.cart.forEach(function (c) {
     var p = byId(S.D.posp, c.id);
-    lines.push({ p: p, qty: c.qty, amt: p.price * c.qty, opt: c.opt || null, key: c.key || cartKey(c.id, c.parts, c.opt), parts: (c.parts || []).map(function (x) { var q = byId(S.D.posp, x.id); return { id: x.id, name: q.name, qty: x.qty }; }) });
+    lines.push({ p: p, qty: c.qty, amt: p.price * c.qty, opt: c.opt || null, key: c.key || cartKey(c.id, c.parts, c.opt), parts: (c.parts || []).map(function (x) { var q = byId(S.D.posp, x.id); return { id: x.id, name: q.name, qty: x.qty, opt: x.opt || null }; }) });
     sub += p.price * c.qty; n += c.qty;
   });
   var disc = u.disc === '' ? 0 : Math.round(num(u.disc)), tot = sub - disc;
@@ -1650,7 +1650,8 @@ function vPosSell() {
   h += '<button class="posdrawerbar' + (u.drawer ? ' hide' : '') + '" data-act="posDrawer"><span>本筆明細' + (c.n ? ' ' + c.n + ' 件' : '') + '</span><b>' + money(c.tot) + '</b><span class="go">' + (c.n ? '結帳 ›' : '展開 ›') + '</span></button>';
   return h;
 }
-/* 組合商品：選口味（可以重複），選滿才能加入明細 */
+/* 組合商品：選口味（可以重複），選滿才能加入明細；冰熱都可的飲品每杯各自選溫度 */
+function pickQty(sel, id) { var n = 0; Object.keys(sel).forEach(function (k) { if (k.split('|')[0] === id) n += sel[k]; }); return n; }
 function vPosPick() {
   var u = posState(), p = byId(S.D.posp, u.pick.id);
   if (!p || p.archived) { u.pick = null; return ''; }
@@ -1658,14 +1659,22 @@ function vPosPick() {
   Object.keys(sel).forEach(function (k) { n += sel[k]; });
   var h = '<div class="posmodal" role="dialog" aria-modal="true" aria-label="' + esc(p.name) + ' 選口味"><div class="pmbox">' +
     '<div class="row" style="justify-content:space-between;align-items:baseline"><h2 style="margin:0">' + esc(p.name) + '</h2><b class="pmcount' + (n === p.combo_size ? ' ok' : '') + '">已選 ' + n + ' / ' + p.combo_size + '</b></div>' +
-    '<p class="sub">選 ' + p.combo_size + ' 個口味，可以重複。組合價 ' + money(p.price) + '。</p>';
+    '<p class="sub">選 ' + p.combo_size + ' 個，可以重複' + (opts.some(function (o) { return posTemps(o).length === 2; }) ? '，飲品每杯選冰或熱' : '') + '。組合價 ' + money(p.price) + '。</p>';
   if (!opts.length) h += '<div class="empty">沒有可以選的口味。' + (isMgr() ? '請到「設定」確認這個組合的口味分類。' : '請管理員確認組合設定。') + '</div>';
   else h += '<div class="posgrid">' + opts.map(function (o) {
-    var k = sel[o.id] || 0, left = posLeft(o, SM), avail = left == null ? null : left - (CU[o.id] || 0) - k;
+    var k = pickQty(sel, o.id), left = posLeft(o, SM), avail = left == null ? null : left - (CU[o.id] || 0) - k, T2 = posTemps(o);
     var out = o.sold_out || (left != null && left - (CU[o.id] || 0) <= 0), dis = out || n >= p.combo_size || (avail != null && avail <= 0);
-    return '<div class="pmopt"><button class="posbtn' + (out ? ' out' : '') + '" data-act="posPickAdd" data-id="' + o.id + '" aria-pressed="' + (k > 0) + '"' + (dis ? ' disabled' : '') + ' aria-label="' + esc(o.name) + (out ? '，售完' : '') + (k ? '，已選 ' + k : '') + '">' +
-      '<span class="nm">' + esc(o.name) + '</span>' + (out ? '<span class="left low">售完</span>' : avail != null ? '<span class="left' + (avail <= 3 ? ' low' : '') + '">餘 ' + avail + '</span>' : '') + (k ? '<span class="q">' + k + '</span>' : '') + '</button>' +
-      (k ? '<button class="btn ghost sm" data-act="posPickSub" data-id="' + o.id + '" aria-label="' + esc(o.name) + ' 減一">− 減一</button>' : '') + '</div>';
+    var info = '<span class="nm">' + esc(o.name) + (T2.length === 1 ? tempTag(T2[0]) : '') + '</span>' + (out ? '<span class="left low">售完</span>' : avail != null ? '<span class="left' + (avail <= 3 ? ' low' : '') + '">餘 ' + avail + '</span>' : '') + (k ? '<span class="q">' + k + '</span>' : '');
+    if (T2.length === 2) {
+      return '<div class="pmopt"><div class="posbtn tempcard' + (out ? ' out' : '') + '" role="group" aria-label="' + esc(o.name) + (k ? '，已選 ' + k : '') + '">' + info + '<span class="temps">' + T2.map(function (t) {
+        return '<button class="tbtn' + (t === '冰' ? ' ice' : ' hot') + '" data-act="posPickAdd" data-id="' + o.id + '" data-opt="' + t + '"' + (dis ? ' disabled' : '') + ' aria-label="' + esc(o.name) + ' ' + t + '">' + t + (sel[o.id + '|' + t] ? ' ' + sel[o.id + '|' + t] : '') + '</button>';
+      }).join('') + '</span></div>' + T2.filter(function (t) { return sel[o.id + '|' + t]; }).map(function (t) {
+        return '<button class="btn ghost sm" data-act="posPickSub" data-k="' + o.id + '|' + t + '" aria-label="' + esc(o.name) + ' ' + t + ' 減一">− ' + t + '減一</button>';
+      }).join('') + '</div>';
+    }
+    var key = o.id + (T2.length === 1 ? '|' + T2[0] : '');
+    return '<div class="pmopt"><button class="posbtn' + (out ? ' out' : '') + '" data-act="posPickAdd" data-id="' + o.id + '" aria-pressed="' + (k > 0) + '"' + (dis ? ' disabled' : '') + ' aria-label="' + esc(o.name) + (out ? '，售完' : '') + (k ? '，已選 ' + k : '') + '">' + info + '</button>' +
+      (k ? '<button class="btn ghost sm" data-act="posPickSub" data-k="' + key + '" aria-label="' + esc(o.name) + ' 減一">− 減一</button>' : '') + '</div>';
   }).join('') + '</div>';
   return h + '<div class="foot"><button class="btn ghost" data-act="posPickCancel">取消</button><button class="btn ghost" data-act="posPickClear"' + (n ? '' : ' disabled') + '>重選</button>' +
     '<button class="btn" data-act="posPickOk"' + (n === p.combo_size ? '' : ' disabled') + ' style="margin-left:auto">加入明細（' + money(p.price) + '）</button></div></div></div>';
@@ -1744,8 +1753,8 @@ function posStats(list) {
     items.filter(function (p) { return posCatOf(p.category) === c; }).forEach(function (p) {
       var os = posTemps(p).slice();
       Object.keys(byO).forEach(function (k) { var o = k.split('|')[1]; if (k.split('|')[0] === p.id && o && os.indexOf(o) < 0) os.push(o); });
-      if (!os.length) { L.push({ name: p.name, qty: by[p.id] || 0, inc: cu[p.id] || 0, combo: !!p.combo_size, off: p.archived }); return; }
-      os.forEach(function (o, i) { L.push({ name: p.name + '（' + o + '）', qty: byO[p.id + '|' + o] || 0, inc: i ? 0 : cu[p.id] || 0, off: p.archived }); });
+      if (!os.length) { L.push({ name: p.name, qty: by[p.id] || 0, inc: cu[p.id] || 0, combo: !!p.combo_size, off: p.archived, del: !!p.deleted_at }); return; }
+      os.forEach(function (o, i) { L.push({ name: p.name + '（' + o + '）', qty: byO[p.id + '|' + o] || 0, inc: i ? 0 : cu[p.id] || 0, off: p.archived, del: !!p.deleted_at }); });
       if (byO[p.id + '|']) L.push({ name: p.name + '（未選溫度）', qty: byO[p.id + '|'], inc: 0, off: p.archived });
     });
     if (L.length) T.cats.push({ cat: c, items: L, qty: sum(L, function (x) { return x.qty; }), inc: sum(L, function (x) { return x.inc; }) });
@@ -1771,7 +1780,7 @@ function vPosLog() {
   var hc = T.hasCombo;
   h += '<div class="sect"><h3>品項數量</h3><div class="tw"><table><thead><tr><th>品項</th><th class="n">數量</th>' + (hc ? '<th class="n">組合內</th>' : '') + '</tr></thead><tbody>' + T.cats.map(function (c) {
     return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td>' + (hc ? '<td class="n">' + (c.inc || '') + '</td>' : '') + '</tr>' + c.items.map(function (x) {
-      return '<tr><td>' + esc(x.name) + (x.combo ? ' <span class="tag">組合</span>' : '') + (x.off ? ' <span class="tag">已停用</span>' : '') + '</td><td class="n' + (x.qty ? '' : ' mut') + '">' + x.qty + '</td>' + (hc ? '<td class="n">' + (x.inc || '') + '</td>' : '') + '</tr>';
+      return '<tr><td>' + esc(x.name) + (x.combo ? ' <span class="tag">組合</span>' : '') + (x.del ? ' <span class="tag">已刪除</span>' : x.off ? ' <span class="tag">已停用</span>' : '') + '</td><td class="n' + (x.qty ? '' : ' mut') + '">' + x.qty + '</td>' + (hc ? '<td class="n">' + (x.inc || '') + '</td>' : '') + '</tr>';
     }).join('');
   }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td>' + (hc ? '<td></td>' : '') + '</tr></tbody></table></div>' +
     (hc ? '<p class="hint" style="margin-top:8px">組合以「組」計入數量；「組合內」是組合裡用掉的口味個數，不重複計入合計。</p>' : '') + '</div>';
@@ -1838,10 +1847,10 @@ function vPosSet() {
 }
 function vPosStock() {
   var P = posProducts(), SM = posSoldMap(), can = canEditStations();
-  return '<section class="panel">' + pHead('售完與庫存', '任何人都可以標記售完，所有裝置會同步變灰。起始庫存由管理員在「商品與售價」設定，空白＝不計庫存。') +
+  return '<section class="panel">' + pHead('售完與庫存', '任何人都可以標記售完，所有裝置會同步變灰。起始庫存由管理員在「商品與售價」設定，空白＝不計庫存；出杯與特調為現點現做，不設庫存。') +
     (P.length ? '<div class="tw"><table><thead><tr><th>商品</th><th class="n">起始</th><th class="n">已賣</th><th class="n">剩餘</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p) {
       var left = posLeft(p, SM);
-      return '<tr><td>' + esc(p.name) + (p.sold_out ? ' <span class="tag warn">售完</span>' : '') + '</td><td class="n">' + (p.start_stock == null ? '<span class="mut">不計</span>' : p.start_stock) + '</td><td class="n">' + (SM[p.id] || 0) + '</td>' +
+      return '<tr><td>' + esc(p.name) + (p.sold_out ? ' <span class="tag warn">售完</span>' : '') + '</td><td class="n">' + (p.start_stock == null ? '<span class="mut">' + (posMadeToOrder(p) ? '現做' : '不計') + '</span>' : p.start_stock) + '</td><td class="n">' + (SM[p.id] || 0) + '</td>' +
         '<td class="n' + (left != null && left <= 3 ? ' lowtx' : '') + '">' + (left == null ? '—' : left) + '</td><td class="ops">' +
         (can ? '<button class="btn ' + (p.sold_out ? 'ghost' : 'warn') + ' sm" data-act="posSoldOut" data-id="' + p.id + '" data-v="' + (p.sold_out ? 0 : 1) + '">' + (p.sold_out ? '取消售完' : '標記售完') + '</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">還沒有商品。</div>') + '</section>';
@@ -1852,27 +1861,36 @@ function posSrcLabel(p) {
   var it = item(p.item_id);
   return it ? (it.kind === 'drip' ? '濾掛' : it.kind === 'giftbox' ? '禮盒' : '咖啡豆') : '品項';
 }
+/* 分類輸入：可以打字也可以從清單選；新的分類存檔時自動加進這場的分類 */
+function posCatInput(attrs, cur) {
+  return '<input type="text" list="poscatlist" maxlength="20" ' + attrs + ' value="' + esc(cur || '') + '" placeholder="' + POS_OTHER + '"><datalist id="poscatlist">' + posCats().map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>';
+}
+function posEnsureCat(cat) {
+  if (!cat || posCats().indexOf(cat) >= 0) return Promise.resolve({ ok: true });
+  return call('evt_pos_config_save', { p_event_id: S.ev, p: { categories: posCats().concat([cat]) } }, ['events'], '已新增分類「' + cat + '」');
+}
 function posCatSel(attrs, cur, empty) {
   var L = posCats().slice(); if (cur && L.indexOf(cur) < 0) L.push(cur);
   return '<select ' + attrs + '><option value="">' + (empty || POS_OTHER) + '</option>' + L.map(function (c) { return '<option' + (cur === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
 }
+function posMadeToOrder(p) { return p.source === 'drink' || p.category === POS_BAR_CAT; }
 function posTempSel(attrs, cur) { return '<select ' + attrs + '>' + POS_TEMPS.map(function (t) { return '<option value="' + t[0] + '"' + (cur === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>'; }
 function posTempDefault(n) { return n.src === 'drink' || n.cat === POS_BAR_CAT ? '冰熱' : ''; }
 function posTempArr(v) { return v === '冰熱' ? ['冰', '熱'] : v ? [v] : []; }
 function vPosProducts() {
-  var P = posProducts(), A = S.D.posp.filter(function (p) { return p.archived; }), n = S.ui.posNew || (S.ui.posNew = { src: 'item' });
+  var P = posProducts(), A = S.D.posp.filter(function (p) { return p.archived && !p.deleted_at; }), n = S.ui.posNew || (S.ui.posNew = { src: 'item' });
   var used = {}; P.forEach(function (p) { if (p.item_id) used[p.item_id] = 1; if (p.drink_id) used[p.drink_id] = 1; });
   var h = '<section class="panel">' + pHead('商品與售價', '只有管理員可以修改，改了所有裝置會即時更新。可從本場品項、特調飲品挑選，或自訂商品。改售價只影響之後的結帳，已結帳的金額不變；停用不會刪除，歷史紀錄照常顯示。');
   if (P.length) {
     h += '<div class="tw"><table><thead><tr><th>商品</th><th>分類</th><th class="n">售價（元）</th><th class="n">起始庫存</th><th>組合（入數／口味分類）</th><th>溫度</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p, i) {
       return '<tr><td><input type="text" data-pp="' + p.id + '|name" value="' + esc(p.name) + '" maxlength="60" aria-label="商品名稱" style="min-width:140px"><div class="hint">' + posSrcLabel(p) + '</div></td>' +
-        '<td>' + posCatSel('data-pp="' + p.id + '|category" aria-label="' + esc(p.name) + ' 分類" style="min-width:110px"', p.category || '') + '</td>' +
+        '<td>' + posCatInput('data-pp="' + p.id + '|category" aria-label="' + esc(p.name) + ' 分類" style="min-width:110px"', p.category || '') + '</td>' +
         '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|price" value="' + p.price + '" aria-label="' + esc(p.name) + ' 售價"></td>' +
-        '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|start_stock" value="' + (p.start_stock == null ? '' : p.start_stock) + '" placeholder="不計" aria-label="' + esc(p.name) + ' 起始庫存"></td>' +
+        '<td class="n">' + (posMadeToOrder(p) && p.start_stock == null ? '<span class="mut small">現做</span>' : '<input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|start_stock" value="' + (p.start_stock == null ? '' : p.start_stock) + '" placeholder="不計" aria-label="' + esc(p.name) + ' 起始庫存">') + '</td>' +
         '<td><span class="row" style="gap:6px;flex-wrap:nowrap"><input type="number" inputmode="numeric" min="2" max="20" step="1" data-pp="' + p.id + '|combo_size" value="' + (p.combo_size || '') + '" placeholder="—" aria-label="' + esc(p.name) + ' 組合入數">' +
         (p.combo_size ? posCatSel('data-pp="' + p.id + '|combo_category" aria-label="' + esc(p.name) + ' 口味分類" style="min-width:110px"', p.combo_category || '', '全部分類') : '') + '</span></td>' +
         '<td>' + posTempSel('data-pp="' + p.id + '|temps" aria-label="' + esc(p.name) + ' 溫度" style="min-width:120px"', posTemps(p).join('')) + '</td>' +
-        '<td class="ops"><button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="-1"' + (i ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 上移">↑</button> <button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="1"' + (i < P.length - 1 ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 下移">↓</button> <button class="btn warn sm" data-act="posArch" data-id="' + p.id + '">停用</button></td></tr>';
+        '<td class="ops"><button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="-1"' + (i ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 上移">↑</button> <button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="1"' + (i < P.length - 1 ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 下移">↓</button> <button class="btn ghost sm" data-act="posArch" data-id="' + p.id + '">停用</button> <button class="btn warn sm" data-act="posDel" data-id="' + p.id + '">刪除</button></td></tr>';
     }).join('') + '</tbody></table></div>';
   } else h += '<div class="empty">還沒有商品。可以在下方新增，或從其他活動複製。</div>';
   var items = S.D.items.filter(function (it) { return !it.archived && !used[it.id]; });
@@ -1889,9 +1907,9 @@ function vPosProducts() {
   if (n.src === 'item') h += '<div class="field"><label for="pn-ref">品項</label><select id="pn-ref" data-pn="ref"><option value="">請選擇</option>' + grp('bean', '咖啡豆') + grp('drip', '濾掛') + grp('giftbox', '禮盒') + '</select></div>';
   else if (n.src === 'drink') h += '<div class="field"><label for="pn-ref">飲品</label><select id="pn-ref" data-pn="ref"><option value="">請選擇</option>' + drinks.map(function (d) { return '<option value="' + d.id + '"' + (n.ref === d.id ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select></div>';
   else h += '<div class="field"><label for="pn-name">商品名稱</label><input type="text" id="pn-name" data-pn="name" maxlength="60" value="' + esc(n.name || '') + '" placeholder="例如：原味費南雪、冰拿鐵"></div>';
-  h += '<div class="field"><label for="pn-cat">分類</label>' + posCatSel('id="pn-cat" data-pn="cat"', n.cat || '') + '</div>' +
+  h += '<div class="field"><label for="pn-cat">分類（可以直接輸入新分類）</label>' + posCatInput('id="pn-cat" data-pn="cat"', n.cat || '') + '</div>' +
     '<div class="field"><label for="pn-price">售價（元）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-price" data-pn="price" value="' + esc(n.price || '') + '"></div>' +
-    '<div class="field"><label for="pn-stock">起始庫存（選填）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-stock" data-pn="stock" value="' + esc(n.stock || '') + '" placeholder="不計"></div>' +
+    (posMadeToOrder({ source: n.src, category: n.cat }) ? '' : '<div class="field"><label for="pn-stock">起始庫存（選填）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-stock" data-pn="stock" value="' + esc(n.stock || '') + '" placeholder="不計"></div>') +
     '<div class="field"><label for="pn-combo">組合入數（選填）</label><input type="number" inputmode="numeric" min="2" max="20" step="1" id="pn-combo" data-pn="combo" value="' + esc(n.combo || '') + '" placeholder="例如 3"></div>' +
     '<div class="field"><label for="pn-temp">溫度</label>' + posTempSel('id="pn-temp" data-pn="temp"', n.temp != null ? n.temp : posTempDefault(n)) + '</div>' +
     '<div class="field"><label for="pn-ccat">組合口味分類</label>' + posCatSel('id="pn-ccat" data-pn="ccat"', n.ccat || '', '全部分類') + '</div>' +
@@ -1902,7 +1920,7 @@ function vPosProducts() {
   var others = S.G.events.filter(function (e) { return e.id !== S.ev; });
   if (others.length) h += '<div class="sect"><h3>從其他活動複製商品</h3><div class="grid2 form"><div class="field" style="grid-column:span 2"><label for="pos-copy">活動</label><select id="pos-copy">' + others.map(function (e) { return '<option value="' + e.id + '">' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select></div><div class="field"><button class="btn ghost" data-act="posCopy">複製商品</button></div></div><p class="hint" style="margin-top:8px">名稱、分類、售價、起始庫存一起複製；本場已有同名商品的會略過。</p></div>';
   if (A.length) h += '<div class="sect"><h3>已停用的商品</h3>' + A.map(function (p) {
-    return '<div class="log"><span class="tx">' + esc(p.name) + ' <span class="mut small">' + money(p.price) + '</span></span><button class="btn ghost sm" data-act="posUnarch" data-id="' + p.id + '">恢復販售</button></div>';
+    return '<div class="log"><span class="tx">' + esc(p.name) + ' <span class="mut small">' + money(p.price) + '</span></span><span class="row btns"><button class="btn ghost sm" data-act="posUnarch" data-id="' + p.id + '">恢復販售</button><button class="btn warn sm" data-act="posDel" data-id="' + p.id + '">刪除</button></span></div>';
   }).join('') + '</div>';
   return h + '</section>';
 }
@@ -4631,11 +4649,14 @@ var A = {
     if (!p) return;
     Object.keys(u.pick.sel).forEach(function (k) { n += u.pick.sel[k]; });
     if (n >= p.combo_size) return;
-    var o = byId(S.D.posp, id), left = posLeft(o, posSoldMap()), used = (cartUse()[id] || 0) + (u.pick.sel[id] || 0);
+    var o = byId(S.D.posp, id), left = posLeft(o, posSoldMap()), used = (cartUse()[id] || 0) + pickQty(u.pick.sel, id), T2 = posTemps(o);
     if (o.sold_out || (left != null && used >= left)) { toast('「' + o.name + '」' + (o.sold_out ? '已售完' : '庫存不足'), true); return; }
-    u.pick.sel[id] = (u.pick.sel[id] || 0) + 1; renderNow();
+    var opt = e.getAttribute('data-opt') || (T2.length === 1 ? T2[0] : '');
+    if (T2.length === 2 && !opt) { toast('請選冰或熱', true); return; }
+    var k = id + (opt ? '|' + opt : '');
+    u.pick.sel[k] = (u.pick.sel[k] || 0) + 1; renderNow();
   },
-  posPickSub: function (e) { var s2 = posState().pick.sel, id = e.getAttribute('data-id'); if (s2[id]) { s2[id]--; if (!s2[id]) delete s2[id]; } renderNow(); },
+  posPickSub: function (e) { var s2 = posState().pick.sel, k = e.getAttribute('data-k'); if (s2[k]) { s2[k]--; if (!s2[k]) delete s2[k]; } renderNow(); },
   posPickClear: function () { posState().pick.sel = {}; renderNow(); },
   posPickCancel: function () { posState().pick = null; renderNow(); },
   posPickOk: function () {
@@ -4643,7 +4664,7 @@ var A = {
     Object.keys(sel).forEach(function (k) { n += sel[k]; });
     if (!p || n !== p.combo_size) { toast('請選滿 ' + (p ? p.combo_size : '') + ' 個口味', true); return; }
     var order = posProducts().map(function (x) { return x.id; });
-    var parts = Object.keys(sel).sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); }).map(function (k) { return { id: k, qty: sel[k] }; });
+    var parts = Object.keys(sel).sort(function (a, b) { return order.indexOf(a.split('|')[0]) - order.indexOf(b.split('|')[0]) || (a < b ? -1 : 1); }).map(function (k) { var kk = k.split('|'), y = { id: kk[0], qty: sel[k] }; if (kk[1]) y.opt = kk[1]; return y; });
     var key = cartKey(p.id, parts), c = find(u.cart, function (x) { return (x.key || cartKey(x.id, x.parts)) === key; }), bad = posShort({ id: p.id, parts: parts }, 1);
     if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足：剩 ' + bad.left + (bad.used ? '，明細已用 ' + bad.used : '')), true); return; }
     if (c) c.qty++; else u.cart.push({ id: p.id, qty: 1, parts: parts, key: key });
@@ -4670,12 +4691,12 @@ var A = {
     var seq = posNextSeq(d.code), label = d.code + seq, ts = new Date().toISOString();
     var p = {
       client_ref: newRef(), device: d.code, seq: seq, payment: pay, discount: c.disc, received: c.recv, note: u.note.trim() || null, client_ts: ts, strict: true,
-      lines: c.lines.map(function (l) { var o = { product_id: l.p.id, qty: l.qty, price: l.p.price }; if (l.opt) o.opt = l.opt; if (l.parts.length) o.parts = l.parts.map(function (x) { return { product_id: x.id, qty: x.qty }; }); return o; })
+      lines: c.lines.map(function (l) { var o = { product_id: l.p.id, qty: l.qty, price: l.p.price }; if (l.opt) o.opt = l.opt; if (l.parts.length) o.parts = l.parts.map(function (x) { var y = { product_id: x.id, qty: x.qty }; if (x.opt) y.opt = x.opt; return y; }); return o; })
     };
     var view = {
       pending: true, client_ref: p.client_ref, label: label, device: d.code, seq: seq, payment: pay, subtotal: c.sub, discount: c.disc, total: c.tot,
       received: c.recv, change_due: c.change, note: p.note, client_ts: ts, created_at: ts, created_by: S.me.id, biz_date: todayStr(),
-      lines: c.lines.map(function (l) { return { product_id: l.p.id, name: l.p.name, category: l.p.category, price: l.p.price, qty: l.qty, amount: l.amt, opt: l.opt, parts: l.parts.length ? l.parts.map(function (x) { return { product_id: x.id, name: x.name, qty: x.qty }; }) : null }; })
+      lines: c.lines.map(function (l) { return { product_id: l.p.id, name: l.p.name, category: l.p.category, price: l.p.price, qty: l.qty, amount: l.amt, opt: l.opt, parts: l.parts.length ? l.parts.map(function (x) { return { product_id: x.id, name: x.name, qty: x.qty, opt: x.opt || null }; }) : null }; })
     };
     var sub = money(c.tot) + '・' + pay + (c.change != null ? '・找零 ' + money(c.change) : '');
     function ok(offline) {
@@ -4733,22 +4754,34 @@ var A = {
     call('evt_pos_soldout_set', { p_product_id: p.id, p_sold_out: on }, ['posp'], on ? '已標記「' + p.name + '」售完' : '已取消「' + p.name + '」售完');
   },
   posAddProduct: function () {
-    var n = S.ui.posNew || {}, price = String(n.price || '').trim(), stock = String(n.stock || '').trim(), p = { event_id: S.ev, source: n.src, category: n.cat || null };
+    var n = S.ui.posNew || {}, price = String(n.price || '').trim(), stock = String(n.stock || '').trim(), cat = String(n.cat || '').trim(), p = { event_id: S.ev, source: n.src, category: cat || null };
+    if (cat.length > 20) { toast('分類名稱最多 20 字', true); return; }
     if (n.src === 'custom') { p.name = (n.name || '').trim(); if (!p.name) { toast('請輸入商品名稱', true); return; } }
     else { if (!n.ref) { toast(n.src === 'drink' ? '請選飲品' : '請選品項', true); return; } p[n.src === 'drink' ? 'drink_id' : 'item_id'] = n.ref; }
     if (!/^\d+$/.test(price)) { toast('售價請填 0 以上的整數', true); return; }
     if (stock && !/^\d+$/.test(stock)) { toast('起始庫存請填 0 以上的整數，或留空', true); return; }
     var combo = String(n.combo || '').trim();
     if (combo && (!/^\d+$/.test(combo) || +combo < 2 || +combo > 20)) { toast('組合入數請填 2 到 20，不是組合就留空', true); return; }
-    p.price = +price; p.start_stock = stock === '' ? null : +stock;
+    p.price = +price; p.start_stock = stock === '' || posMadeToOrder(p) ? null : +stock;
     if (combo) { p.combo_size = +combo; p.combo_category = n.ccat || null; }
     p.temps = posTempArr(n.temp != null ? n.temp : posTempDefault(n));
-    call('evt_pos_product_save', { p: p }, ['posp'], combo ? '已新增組合商品' : '已新增商品').then(function (r) { if (r.ok) { S.ui.posNew = { src: n.src, cat: n.cat, temp: n.temp }; renderNow(); } });
+    posEnsureCat(cat).then(function (r0) {
+      if (!r0.ok) return;
+      call('evt_pos_product_save', { p: p }, ['posp'], combo ? '已新增組合商品' : '已新增商品').then(function (r) { if (r.ok) { S.ui.posNew = { src: n.src, cat: cat, temp: n.temp }; renderNow(); } });
+    });
   },
   posArch: function (e) {
     var p = byId(S.D.posp, e.getAttribute('data-id'));
     if (!p || !confirm('停用商品「' + p.name + '」？\n收銀畫面不再顯示，已結帳的紀錄不受影響，之後可以恢復販售。')) return;
     call('evt_pos_product_save', { p: { id: p.id, archived: true } }, ['posp'], '已停用商品');
+  },
+  posDel: function (e) {
+    var p = byId(S.D.posp, e.getAttribute('data-id'));
+    if (!p) return;
+    var sold = S.D.posL.some(function (l) { return l.product_id === p.id || (l.parts || []).some(function (x) { return x.product_id === p.id; }); }) ||
+      posQOf().some(function (o) { return o.k === 'sale' && o.p.lines.some(function (l) { return l.product_id === p.id || (l.parts || []).some(function (x) { return x.product_id === p.id; }); }); });
+    if (!confirm('刪除商品「' + p.name + '」？\n' + (sold ? '這個商品已經賣過：會從商品清單移除、不能再恢復販售；過去的訂單與統計照樣保留。' : '這個商品還沒賣過，會直接刪除。'))) return;
+    call('evt_pos_product_delete', { p_id: p.id }, ['posp'], '已刪除「' + p.name + '」').then(function (r) { if (r.ok) renderNow(); });
   },
   posUnarch: function (e) { call('evt_pos_product_save', { p: { id: e.getAttribute('data-id'), archived: false } }, ['posp'], '已恢復販售'); },
   posMove: function (e) {
@@ -5178,7 +5211,13 @@ document.addEventListener('change', function (ev) {
     if (!po) return;
     if (pp[1] === 'price') { if (!/^\d+$/.test(pv)) { toast('售價請填 0 以上的整數', true); t.value = po.price; return; } if (+pv === po.price) return; pd.price = +pv; pmsg = '已更新售價：' + po.name + ' ' + money(pd.price); }
     else if (pp[1] === 'start_stock') { if (pv !== '' && !/^\d+$/.test(pv)) { toast('起始庫存請填 0 以上的整數，或留空', true); t.value = po.start_stock == null ? '' : po.start_stock; return; } pd.start_stock = pv === '' ? null : +pv; if (pd.start_stock === po.start_stock) return; pmsg = '已更新庫存：' + po.name + ' ' + (pv === '' ? '不計' : pv); }
-    else if (pp[1] === 'category') { pd.category = t.value || null; pmsg = '已更新分類'; }
+    else if (pp[1] === 'category') {
+      if (pv.length > 20) { toast('分類名稱最多 20 字', true); t.value = po.category || ''; return; }
+      if ((pv || null) === (po.category || null)) return;
+      pd.category = pv || null;
+      posEnsureCat(pv).then(function (r0) { if (!r0.ok) { renderNow(); return; } call('evt_pos_product_save', { p: pd }, ['posp'], '「' + po.name + '」分類：' + (pv || POS_OTHER)).then(function (r) { if (!r.ok) renderNow(); }); });
+      return;
+    }
     else if (pp[1] === 'combo_size') {
       if (pv !== '' && (!/^\d+$/.test(pv) || +pv < 2 || +pv > 20)) { toast('組合入數請填 2 到 20，不是組合就留空', true); t.value = po.combo_size || ''; return; }
       pd.combo_size = pv === '' ? null : +pv; if (pd.combo_size === po.combo_size) return;
@@ -5193,7 +5232,7 @@ document.addEventListener('change', function (ev) {
   if (t.hasAttribute('data-pn')) {
     var pk = t.getAttribute('data-pn'); S.ui.posNew = S.ui.posNew || { src: 'item' }; S.ui.posNew[pk] = t.value;
     if (pk === 'src') { S.ui.posNew.ref = ''; renderNow(); }
-    else if (pk === 'cat' && S.ui.posNew.temp == null) renderNow();
+    else if (pk === 'cat') renderNow();
     return;
   }
   if (t.hasAttribute('data-poscfg')) {
