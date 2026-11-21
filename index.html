@@ -109,6 +109,24 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .posflash span{font-size:14px;color:var(--mut)}
 .posflash b{font-size:72px;line-height:1;font-variant-numeric:tabular-nums}
 .posflash small{font-size:15px;color:var(--mut)}
+.posbtn.combo{border-style:dashed}
+.posbtn.tempcard{cursor:default}
+.posbtn .temps{display:flex;gap:6px;width:100%;margin-top:2px}
+.tbtn{flex:1;min-height:44px;border:1px solid var(--ghostline);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;font-size:16px;cursor:pointer;touch-action:manipulation}
+.tbtn.ice:hover,.tbtn.ice:active{background:#e8f0f3}
+.tbtn.hot:hover,.tbtn.hot:active{background:#f6e9e3}
+.tbtn[disabled]{opacity:.4;cursor:not-allowed}
+.topt{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;font-size:13px;font-weight:700;line-height:1.6;vertical-align:1px}
+.topt.ice{background:#e3edf1;color:#184652}
+.topt.hot{background:#f4e3dc;color:#AD3C23}
+.poscard li small{display:block;font-size:14px;font-weight:500;color:var(--mut)}
+.poscard li.kbar small{color:var(--fg)}
+.posmodal{position:fixed;inset:0;z-index:250;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(20,20,20,.45)}
+.pmbox{width:100%;max-width:720px;max-height:calc(100vh - 32px);overflow:auto;background:var(--surface);border-radius:8px;padding:24px}
+.pmcount{font-size:18px;font-variant-numeric:tabular-nums}
+.pmcount.ok{color:var(--ok)}
+.pmopt{display:flex;flex-direction:column;gap:6px}
+.pmopt .btn{width:100%}
 .posdrawerbar{display:none}
 .btn.posclose{display:none}
 @media (min-width:900px){
@@ -500,7 +518,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 67;
+var APP_VERSION = 69;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1311,6 +1329,7 @@ function vBody() {
 var PAYMENTS = ['現金', 'LINE Pay', '全支付', '信用卡'];
 var POS_BAR_CAT = '出杯';
 var POS_OTHER = '其他';
+var POS_TEMPS = [['', '不用選'], ['冰熱', '冰／熱都可'], ['冰', '只有冰'], ['熱', '只有熱']];
 var POS_CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 var POS_ROLES = ['兩者', '收銀', '出餐'];
 var POS_LIVE_MS = 120000;
@@ -1389,7 +1408,13 @@ function posDoneOf(s, M) { return M['ref:' + s.client_ref] || (s.id && M[s.id]) 
 /* 庫存：起始庫存 − 所有裝置未作廢訂單（含本機待同步） */
 function posSoldMap() {
   var V = posVoided(), m = {};
-  posSales().forEach(function (s) { if (posIsVoid(s, V)) return; posLines(s).forEach(function (l) { m[l.product_id] = (m[l.product_id] || 0) + l.qty; }); });
+  posSales().forEach(function (s) {
+    if (posIsVoid(s, V)) return;
+    posLines(s).forEach(function (l) {
+      m[l.product_id] = (m[l.product_id] || 0) + l.qty;
+      (l.parts || []).forEach(function (x) { m[x.product_id] = (m[x.product_id] || 0) + x.qty * l.qty; });
+    });
+  });
   return m;
 }
 function posLeft(p, SM) { return p.start_stock == null ? null : p.start_stock - (SM[p.id] || 0); }
@@ -1406,11 +1431,40 @@ function posState() {
   if (posPays().indexOf(u.pay) < 0) u.pay = posPays()[0];
   return u;
 }
-function cartQty(id) { var c = find(posState().cart, function (x) { return x.id === id; }); return c ? c.qty : 0; }
+function cartKey(id, parts, opt) { return id + (opt ? '|t:' + opt : '') + (parts && parts.length ? '|' + parts.map(function (x) { return x.id + ':' + x.qty; }).sort().join(',') : ''); }
+function posTemps(p) { return p && p.temps && p.temps.length ? p.temps : []; }
+function tempTag(o) { return o ? ' <span class="topt' + (o === '冰' ? ' ice' : ' hot') + '">' + o + '</span>' : ''; }
+function cartQty(id) { var n = 0; posState().cart.forEach(function (x) { if (x.id === id) n += x.qty; }); return n; }
+/* 明細用掉的數量，含組合內的口味 */
+function cartUse() {
+  var m = {};
+  posState().cart.forEach(function (c) { m[c.id] = (m[c.id] || 0) + c.qty; (c.parts || []).forEach(function (x) { m[x.id] = (m[x.id] || 0) + x.qty * c.qty; }); });
+  return m;
+}
+/* 再加 add 組 c 之後，各商品會不會超過庫存或已售完；回傳第一個不夠的商品 */
+function posShort(c, add) {
+  var SM = posSoldMap(), CU = cartUse(), need = {};
+  need[c.id] = add; (c.parts || []).forEach(function (x) { need[x.id] = (need[x.id] || 0) + x.qty * add; });
+  var bad = null;
+  Object.keys(need).forEach(function (id) {
+    var p = byId(S.D.posp, id), left = p ? posLeft(p, SM) : null;
+    if (!bad && p && (p.sold_out || (left != null && (CU[id] || 0) + need[id] > left))) bad = { p: p, left: Math.max(left || 0, 0), used: CU[id] || 0 };
+  });
+  return bad;
+}
+function posComboOpts(p) { return posProducts().filter(function (x) { return !x.combo_size && x.id !== p.id && (!p.combo_category || x.category === p.combo_category); }); }
+function partsText(parts) { return parts.map(function (x) { return x.name + '×' + x.qty; }).join('、'); }
 function posCalc() {
   var u = posState(), sub = 0, n = 0, lines = [];
-  u.cart = u.cart.filter(function (c) { var p = byId(S.D.posp, c.id); return p && !p.archived && c.qty > 0; });
-  u.cart.forEach(function (c) { var p = byId(S.D.posp, c.id); lines.push({ p: p, qty: c.qty, amt: p.price * c.qty }); sub += p.price * c.qty; n += c.qty; });
+  u.cart = u.cart.filter(function (c) {
+    var p = byId(S.D.posp, c.id);
+    return p && !p.archived && c.qty > 0 && (c.parts || []).every(function (x) { var q = byId(S.D.posp, x.id); return q && !q.archived; });
+  });
+  u.cart.forEach(function (c) {
+    var p = byId(S.D.posp, c.id);
+    lines.push({ p: p, qty: c.qty, amt: p.price * c.qty, opt: c.opt || null, key: c.key || cartKey(c.id, c.parts, c.opt), parts: (c.parts || []).map(function (x) { var q = byId(S.D.posp, x.id); return { id: x.id, name: q.name, qty: x.qty }; }) });
+    sub += p.price * c.qty; n += c.qty;
+  });
   var disc = u.disc === '' ? 0 : Math.round(num(u.disc)), tot = sub - disc;
   var recv = u.pay === '現金' && u.recv !== '' ? Math.round(num(u.recv)) : null;
   return { lines: lines, n: n, sub: sub, disc: disc, tot: tot, recv: recv, change: recv != null ? recv - tot : null };
@@ -1539,7 +1593,7 @@ function vPos() {
   return h;
 }
 function vPosSell() {
-  var u = posState(), d = posDev(), ev = curEvent(), m = isMgr(), P = posProducts(), c = posCalc(), SM = posSoldMap(), dup = posDupDevice(), h = '';
+  var u = posState(), d = posDev(), ev = curEvent(), m = isMgr(), P = posProducts(), c = posCalc(), SM = posSoldMap(), CU = cartUse(), dup = posDupDevice(), h = '';
   var block = ev.status === '已結束' ? '這場活動已結束，不能再結帳。' : !canEditStations() ? '你沒有被加入這場活動，不能結帳。' :
     dup ? '裝置代號 ' + d.code + ' 和 ' + pname(dup.person_id) + ' 的裝置重複，請到「設定」更換代號後才能結帳。' : '';
   if (dup) h += '<div class="banner warn">' + esc(block) + '</div>';
@@ -1550,11 +1604,19 @@ function vPosSell() {
       var L = P.filter(function (p) { return posCatOf(p.category) === cat || (cat === POS_OTHER && p.category && posCats().indexOf(p.category) < 0); });
       if (!L.length) return;
       h += '<h3 class="poscat">' + esc(cat) + '</h3><div class="posgrid">' + L.map(function (p) {
-        var q = cartQty(p.id), left = posLeft(p, SM), out = p.sold_out || (left != null && left <= 0);
-        var full = left != null && q >= left;
-        return '<button class="posbtn' + (out ? ' out' : '') + '" data-act="posAdd" data-id="' + p.id + '" aria-pressed="' + (q > 0) + '"' + (out || full ? ' disabled' : '') + ' aria-label="' + esc(p.name) + ' ' + money(p.price) + (out ? '，售完' : '') + (q ? '，已選 ' + q : '') + '">' +
-          '<span class="nm">' + esc(p.name) + '</span><span class="pr">' + money(p.price) + '</span>' +
-          (out ? '<span class="left low">售完</span>' : left != null ? '<span class="left' + (left - q <= 3 ? ' low' : '') + '">餘 ' + (left - q) + '</span>' : '') +
+        var q = cartQty(p.id), used = CU[p.id] || 0, left = posLeft(p, SM), out = p.sold_out || (left != null && left <= 0);
+        if (p.combo_size && !out) out = !posComboOpts(p).some(function (o) { var l = posLeft(o, SM); return !o.sold_out && (l == null || l - (CU[o.id] || 0) > 0); });
+        var full = left != null && used >= left, T2 = posTemps(p);
+        if (T2.length === 2) {
+          return '<div class="posbtn tempcard' + (out ? ' out' : '') + '" role="group" aria-label="' + esc(p.name) + ' ' + money(p.price) + (out ? '，售完' : '') + (q ? '，已選 ' + q : '') + '">' +
+            '<span class="nm">' + esc(p.name) + '</span><span class="pr">' + money(p.price) + '</span>' +
+            (out ? '<span class="left low">售完</span>' : left != null ? '<span class="left' + (left - used <= 3 ? ' low' : '') + '">餘 ' + (left - used) + '</span>' : '') +
+            (q ? '<span class="q">' + q + '</span>' : '') +
+            '<span class="temps">' + T2.map(function (t) { return '<button class="tbtn' + (t === '冰' ? ' ice' : ' hot') + '" data-act="posAdd" data-id="' + p.id + '" data-opt="' + t + '"' + (out || full ? ' disabled' : '') + ' aria-label="' + esc(p.name) + ' ' + t + '">' + t + '</button>'; }).join('') + '</span></div>';
+        }
+        return '<button class="posbtn' + (out ? ' out' : '') + (p.combo_size ? ' combo' : '') + '" data-act="posAdd" data-id="' + p.id + '" aria-pressed="' + (q > 0) + '"' + (out || full ? ' disabled' : '') + ' aria-label="' + esc(p.name) + ' ' + money(p.price) + (p.combo_size ? '，選 ' + p.combo_size + ' 個口味' : '') + (out ? '，售完' : '') + (q ? '，已選 ' + q : '') + '">' +
+          '<span class="nm">' + esc(p.name) + (T2.length === 1 ? tempTag(T2[0]) : '') + '</span><span class="pr">' + money(p.price) + '</span>' +
+          (out ? '<span class="left low">售完</span>' : left != null ? '<span class="left' + (left - used <= 3 ? ' low' : '') + '">餘 ' + (left - used) + '</span>' : p.combo_size ? '<span class="left">選 ' + p.combo_size + ' 個口味</span>' : '') +
           (q ? '<span class="q">' + q + '</span>' : '') + '</button>';
       }).join('') + '</div>';
     });
@@ -1564,9 +1626,10 @@ function vPosSell() {
   if (!c.lines.length) h += '<div class="hint" style="padding:16px 0">點商品加入，點一下加一份。</div>';
   else {
     h += '<div class="poslines">' + c.lines.map(function (l) {
-      return '<div class="posline"><div class="nm">' + esc(l.p.name) + '<span class="mut small"> ' + money(l.p.price) + '</span></div>' +
-        '<span class="qty"><button class="btn ghost sm" data-act="posQty" data-id="' + l.p.id + '" data-v="-1" aria-label="' + esc(l.p.name) + ' 減一">−</button><b>' + l.qty + '</b><button class="btn ghost sm" data-act="posQty" data-id="' + l.p.id + '" data-v="1" aria-label="' + esc(l.p.name) + ' 加一">＋</button></span>' +
-        '<b class="amt">' + money(l.amt) + '</b><button class="btn ghost sm" data-act="posRm" data-id="' + l.p.id + '" aria-label="移除 ' + esc(l.p.name) + '">×</button></div>';
+      var k = esc(l.key);
+      return '<div class="posline"><div class="nm">' + esc(l.p.name) + tempTag(l.opt) + '<span class="mut small"> ' + money(l.p.price) + '</span>' + (l.parts.length ? '<div class="hint">' + esc(partsText(l.parts)) + '</div>' : '') + '</div>' +
+        '<span class="qty"><button class="btn ghost sm" data-act="posQty" data-key="' + k + '" data-v="-1" aria-label="' + esc(l.p.name) + ' 減一">−</button><b>' + l.qty + '</b><button class="btn ghost sm" data-act="posQty" data-key="' + k + '" data-v="1" aria-label="' + esc(l.p.name) + ' 加一">＋</button></span>' +
+        '<b class="amt">' + money(l.amt) + '</b><button class="btn ghost sm" data-act="posRm" data-key="' + k + '" aria-label="移除 ' + esc(l.p.name) + '">×</button></div>';
     }).join('') + '</div>';
   }
   h += '<div class="field" style="margin-top:16px"><label for="pos-note">備註（出餐看得到）</label><input type="text" id="pos-note" data-pos="note" maxlength="200" value="' + esc(u.note) + '" placeholder="例如：少冰、去糖"></div>';
@@ -1583,8 +1646,29 @@ function vPosSell() {
   else if (!posNetOk()) h += '<p class="hint" style="margin-top:12px">目前離線：結帳會先存在這台裝置，恢復連線後自動補傳。</p>';
   h += '<div class="foot"><button class="btn posgo" data-act="posGo"' + (c.lines.length && !block ? '' : ' disabled') + '>結帳 <span id="pos-go-amt">' + money(c.tot) + '</span>（' + esc(u.pay) + '）</button></div>';
   h += '</section></div>';
+  if (u.pick) h += vPosPick();
   h += '<button class="posdrawerbar' + (u.drawer ? ' hide' : '') + '" data-act="posDrawer"><span>本筆明細' + (c.n ? ' ' + c.n + ' 件' : '') + '</span><b>' + money(c.tot) + '</b><span class="go">' + (c.n ? '結帳 ›' : '展開 ›') + '</span></button>';
   return h;
+}
+/* 組合商品：選口味（可以重複），選滿才能加入明細 */
+function vPosPick() {
+  var u = posState(), p = byId(S.D.posp, u.pick.id);
+  if (!p || p.archived) { u.pick = null; return ''; }
+  var sel = u.pick.sel, n = 0, SM = posSoldMap(), CU = cartUse(), opts = posComboOpts(p);
+  Object.keys(sel).forEach(function (k) { n += sel[k]; });
+  var h = '<div class="posmodal" role="dialog" aria-modal="true" aria-label="' + esc(p.name) + ' 選口味"><div class="pmbox">' +
+    '<div class="row" style="justify-content:space-between;align-items:baseline"><h2 style="margin:0">' + esc(p.name) + '</h2><b class="pmcount' + (n === p.combo_size ? ' ok' : '') + '">已選 ' + n + ' / ' + p.combo_size + '</b></div>' +
+    '<p class="sub">選 ' + p.combo_size + ' 個口味，可以重複。組合價 ' + money(p.price) + '。</p>';
+  if (!opts.length) h += '<div class="empty">沒有可以選的口味。' + (isMgr() ? '請到「設定」確認這個組合的口味分類。' : '請管理員確認組合設定。') + '</div>';
+  else h += '<div class="posgrid">' + opts.map(function (o) {
+    var k = sel[o.id] || 0, left = posLeft(o, SM), avail = left == null ? null : left - (CU[o.id] || 0) - k;
+    var out = o.sold_out || (left != null && left - (CU[o.id] || 0) <= 0), dis = out || n >= p.combo_size || (avail != null && avail <= 0);
+    return '<div class="pmopt"><button class="posbtn' + (out ? ' out' : '') + '" data-act="posPickAdd" data-id="' + o.id + '" aria-pressed="' + (k > 0) + '"' + (dis ? ' disabled' : '') + ' aria-label="' + esc(o.name) + (out ? '，售完' : '') + (k ? '，已選 ' + k : '') + '">' +
+      '<span class="nm">' + esc(o.name) + '</span>' + (out ? '<span class="left low">售完</span>' : avail != null ? '<span class="left' + (avail <= 3 ? ' low' : '') + '">餘 ' + avail + '</span>' : '') + (k ? '<span class="q">' + k + '</span>' : '') + '</button>' +
+      (k ? '<button class="btn ghost sm" data-act="posPickSub" data-id="' + o.id + '" aria-label="' + esc(o.name) + ' 減一">− 減一</button>' : '') + '</div>';
+  }).join('') + '</div>';
+  return h + '<div class="foot"><button class="btn ghost" data-act="posPickCancel">取消</button><button class="btn ghost" data-act="posPickClear"' + (n ? '' : ' disabled') + '>重選</button>' +
+    '<button class="btn" data-act="posPickOk"' + (n === p.combo_size ? '' : ' disabled') + ' style="margin-left:auto">加入明細（' + money(p.price) + '）</button></div></div></div>';
 }
 function posQuickHtml(c) {
   var quick = [];
@@ -1621,13 +1705,13 @@ function vPosKitchen(KO) {
   else h += '<div class="poskq">' + KO.pending.map(function (o) {
     var s = o.s, mins = Math.max(0, Math.floor((now - new Date(posTime(s)).getTime()) / 60000));
     return '<div class="poscard' + (mins >= d.warn ? ' late' : '') + '"><div class="row" style="justify-content:space-between"><b class="lbl">' + esc(s.label || '') + '</b><span class="mut small">' + hhmm(posTime(s)) + '・等 ' + mins + ' 分</span></div>' +
-      '<ul>' + o.L.map(function (l) { return '<li class="' + (posCatOf(l.category) === POS_BAR_CAT ? 'kbar' : 'klite') + '"><span>' + esc(l.name) + '</span><b>× ' + l.qty + '</b></li>'; }).join('') + '</ul>' +
+      '<ul>' + o.L.map(function (l) { return '<li class="' + (posCatOf(l.category) === POS_BAR_CAT ? 'kbar' : 'klite') + '"><span>' + esc(l.name) + tempTag(l.opt) + (l.parts && l.parts.length ? '<small>' + esc(partsText(l.parts)) + '</small>' : '') + '</span><b>× ' + l.qty + '</b></li>'; }).join('') + '</ul>' +
       (s.note ? '<div class="pnote">' + esc(s.note) + '</div>' : '') + (s.pending ? '<span class="tag hold">待同步</span>' : '') +
       '<button class="btn" data-act="posDone" data-ref="' + esc(s.client_ref) + '" data-v="1">完成</button></div>';
   }).join('') + '</div>';
   h += '</section><section class="panel">' + pHead('已完成（最近 30 筆）', '按錯了可以「還原」，訂單會回到待出餐。');
   h += KO.done.length ? KO.done.map(function (o) {
-    return '<div class="log"><span class="tm">' + hhmm(posTime(o.s)) + '</span><span class="tx"><b>' + esc(o.s.label || '') + '</b> ' + esc(o.L.map(function (l) { return l.name + '×' + l.qty; }).join('、')) + '</span><button class="btn ghost sm" data-act="posDone" data-ref="' + esc(o.s.client_ref) + '" data-v="0">還原</button></div>';
+    return '<div class="log"><span class="tm">' + hhmm(posTime(o.s)) + '</span><span class="tx"><b>' + esc(o.s.label || '') + '</b> ' + esc(o.L.map(posLineText).join('、')) + '</span><button class="btn ghost sm" data-act="posDone" data-ref="' + esc(o.s.client_ref) + '" data-v="0">還原</button></div>';
   }).join('') : '<div class="empty">還沒有完成的訂單。</div>';
   return h + '</section>';
 }
@@ -1637,27 +1721,40 @@ function posFiltered() {
   return posSales().filter(function (s) { return (!day || s.biz_date === day) && (!u.fDev || s.device === u.fDev) && (!u.fPay || s.payment === u.fPay); });
 }
 function posStats(list) {
-  var V = posVoided(), T = { n: 0, qty: 0, total: 0, disc: 0, nVoid: 0, voidAmt: 0, pay: {}, cats: [] }, by = {};
+  var V = posVoided(), T = { n: 0, qty: 0, total: 0, disc: 0, nVoid: 0, voidAmt: 0, pay: {}, cats: [], hasCombo: false }, by = {}, cu = {}, byO = {};
   list.forEach(function (s) {
     if (posIsVoid(s, V)) { T.nVoid++; T.voidAmt += s.total; return; }
     T.n++; T.total += s.total; T.disc += s.discount;
     (T.pay[s.payment] = T.pay[s.payment] || { n: 0, amt: 0 }).n++; T.pay[s.payment].amt += s.total;
-    posLines(s).forEach(function (l) { by[l.product_id] = (by[l.product_id] || 0) + l.qty; T.qty += l.qty; });
+    posLines(s).forEach(function (l) {
+      by[l.product_id] = (by[l.product_id] || 0) + l.qty; T.qty += l.qty;
+      var ok2 = l.product_id + '|' + (l.opt || ''); byO[ok2] = (byO[ok2] || 0) + l.qty;
+      (l.parts || []).forEach(function (x) { cu[x.product_id] = (cu[x.product_id] || 0) + x.qty * l.qty; T.hasCombo = true; });
+    });
   });
   T.pays = posPays().slice();
   Object.keys(T.pay).forEach(function (k) { if (T.pays.indexOf(k) < 0) T.pays.push(k); });
   /* 品項完整列出：未停用的商品數量 0 也列；停用的有賣才列 */
-  var items = S.D.posp.slice().sort(function (a, b) { return a.sort - b.sort; }).filter(function (p) { return !p.archived || by[p.id]; });
+  var items = S.D.posp.slice().sort(function (a, b) { return a.sort - b.sort; }).filter(function (p) { return !p.archived || by[p.id] || cu[p.id]; });
+  if (!T.hasCombo) T.hasCombo = items.some(function (p) { return p.combo_size; });
   var cats = posCats().slice();
   items.forEach(function (p) { var c = posCatOf(p.category); if (cats.indexOf(c) < 0) cats.push(c); });
   cats.forEach(function (c) {
-    var L = items.filter(function (p) { return posCatOf(p.category) === c; }).map(function (p) { return { name: p.name, qty: by[p.id] || 0, off: p.archived }; });
-    if (L.length) T.cats.push({ cat: c, items: L, qty: sum(L, function (x) { return x.qty; }) });
+    var L = [];
+    items.filter(function (p) { return posCatOf(p.category) === c; }).forEach(function (p) {
+      var os = posTemps(p).slice();
+      Object.keys(byO).forEach(function (k) { var o = k.split('|')[1]; if (k.split('|')[0] === p.id && o && os.indexOf(o) < 0) os.push(o); });
+      if (!os.length) { L.push({ name: p.name, qty: by[p.id] || 0, inc: cu[p.id] || 0, combo: !!p.combo_size, off: p.archived }); return; }
+      os.forEach(function (o, i) { L.push({ name: p.name + '（' + o + '）', qty: byO[p.id + '|' + o] || 0, inc: i ? 0 : cu[p.id] || 0, off: p.archived }); });
+      if (byO[p.id + '|']) L.push({ name: p.name + '（未選溫度）', qty: byO[p.id + '|'], inc: 0, off: p.archived });
+    });
+    if (L.length) T.cats.push({ cat: c, items: L, qty: sum(L, function (x) { return x.qty; }), inc: sum(L, function (x) { return x.inc; }) });
   });
   return T;
 }
+function posLineText(l) { return l.name + (l.opt ? '（' + l.opt + '）' : '') + (l.parts && l.parts.length ? '（' + partsText(l.parts) + '）' : '') + '×' + l.qty; }
 function posSaleText(s) {
-  var L = posLines(s).map(function (l) { return l.name + '×' + l.qty; }).join('、');
+  var L = posLines(s).map(posLineText).join('、');
   return '<b>' + money(s.total) + '</b> ' + esc(s.payment) + ' ・ ' + esc(L) + (s.discount ? '（折 ' + money(s.discount) + '）' : '') +
     (s.received != null ? ' ・ 收 ' + money(s.received) + ' 找 ' + money(s.change_due) : '') + (s.note ? ' ・ ' + esc(s.note) : '');
 }
@@ -1671,11 +1768,13 @@ function vPosLog() {
     '<div class="chips" role="group" aria-label="付款方式" style="margin-bottom:16px">' + chip('posFPay', '', u.fPay, '全部付款') + T.pays.map(function (x) { return chip('posFPay', x, u.fPay, x); }).join('') + '</div>' +
     '<div class="posnums"><div><span>總數量</span><b>' + T.qty + '</b></div><div><span>筆數</span><b>' + T.n + '</b></div></div>' +
     (T.nVoid ? '<p class="hint" style="margin-top:8px">另有 ' + T.nVoid + ' 筆作廢，不計入。</p>' : '');
-  h += '<div class="sect"><h3>品項數量</h3><div class="tw"><table><thead><tr><th>品項</th><th class="n">數量</th></tr></thead><tbody>' + T.cats.map(function (c) {
-    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td></tr>' + c.items.map(function (x) {
-      return '<tr><td>' + esc(x.name) + (x.off ? ' <span class="tag">已停用</span>' : '') + '</td><td class="n' + (x.qty ? '' : ' mut') + '">' + x.qty + '</td></tr>';
+  var hc = T.hasCombo;
+  h += '<div class="sect"><h3>品項數量</h3><div class="tw"><table><thead><tr><th>品項</th><th class="n">數量</th>' + (hc ? '<th class="n">組合內</th>' : '') + '</tr></thead><tbody>' + T.cats.map(function (c) {
+    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td>' + (hc ? '<td class="n">' + (c.inc || '') + '</td>' : '') + '</tr>' + c.items.map(function (x) {
+      return '<tr><td>' + esc(x.name) + (x.combo ? ' <span class="tag">組合</span>' : '') + (x.off ? ' <span class="tag">已停用</span>' : '') + '</td><td class="n' + (x.qty ? '' : ' mut') + '">' + x.qty + '</td>' + (hc ? '<td class="n">' + (x.inc || '') + '</td>' : '') + '</tr>';
     }).join('');
-  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td></tr></tbody></table></div></div>';
+  }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td>' + (hc ? '<td></td>' : '') + '</tr></tbody></table></div>' +
+    (hc ? '<p class="hint" style="margin-top:8px">組合以「組」計入數量；「組合內」是組合裡用掉的口味個數，不重複計入合計。</p>' : '') + '</div>';
   h += '<div class="sect"><h3>對帳</h3><div class="tw"><table><thead><tr><th>付款方式</th><th class="n">筆數</th><th class="n">金額</th></tr></thead><tbody>' + T.pays.map(function (p) {
     var x = T.pay[p] || { n: 0, amt: 0 };
     return '<tr><td>' + esc(p) + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>';
@@ -1753,20 +1852,26 @@ function posSrcLabel(p) {
   var it = item(p.item_id);
   return it ? (it.kind === 'drip' ? '濾掛' : it.kind === 'giftbox' ? '禮盒' : '咖啡豆') : '品項';
 }
-function posCatSel(attrs, cur) {
+function posCatSel(attrs, cur, empty) {
   var L = posCats().slice(); if (cur && L.indexOf(cur) < 0) L.push(cur);
-  return '<select ' + attrs + '><option value="">' + POS_OTHER + '</option>' + L.map(function (c) { return '<option' + (cur === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+  return '<select ' + attrs + '><option value="">' + (empty || POS_OTHER) + '</option>' + L.map(function (c) { return '<option' + (cur === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
 }
+function posTempSel(attrs, cur) { return '<select ' + attrs + '>' + POS_TEMPS.map(function (t) { return '<option value="' + t[0] + '"' + (cur === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>'; }
+function posTempDefault(n) { return n.src === 'drink' || n.cat === POS_BAR_CAT ? '冰熱' : ''; }
+function posTempArr(v) { return v === '冰熱' ? ['冰', '熱'] : v ? [v] : []; }
 function vPosProducts() {
   var P = posProducts(), A = S.D.posp.filter(function (p) { return p.archived; }), n = S.ui.posNew || (S.ui.posNew = { src: 'item' });
   var used = {}; P.forEach(function (p) { if (p.item_id) used[p.item_id] = 1; if (p.drink_id) used[p.drink_id] = 1; });
   var h = '<section class="panel">' + pHead('商品與售價', '只有管理員可以修改，改了所有裝置會即時更新。可從本場品項、特調飲品挑選，或自訂商品。改售價只影響之後的結帳，已結帳的金額不變；停用不會刪除，歷史紀錄照常顯示。');
   if (P.length) {
-    h += '<div class="tw"><table><thead><tr><th>商品</th><th>分類</th><th class="n">售價（元）</th><th class="n">起始庫存</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p, i) {
+    h += '<div class="tw"><table><thead><tr><th>商品</th><th>分類</th><th class="n">售價（元）</th><th class="n">起始庫存</th><th>組合（入數／口味分類）</th><th>溫度</th><th class="ops"></th></tr></thead><tbody>' + P.map(function (p, i) {
       return '<tr><td><input type="text" data-pp="' + p.id + '|name" value="' + esc(p.name) + '" maxlength="60" aria-label="商品名稱" style="min-width:140px"><div class="hint">' + posSrcLabel(p) + '</div></td>' +
         '<td>' + posCatSel('data-pp="' + p.id + '|category" aria-label="' + esc(p.name) + ' 分類" style="min-width:110px"', p.category || '') + '</td>' +
         '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|price" value="' + p.price + '" aria-label="' + esc(p.name) + ' 售價"></td>' +
         '<td class="n"><input type="number" inputmode="numeric" min="0" step="1" data-pp="' + p.id + '|start_stock" value="' + (p.start_stock == null ? '' : p.start_stock) + '" placeholder="不計" aria-label="' + esc(p.name) + ' 起始庫存"></td>' +
+        '<td><span class="row" style="gap:6px;flex-wrap:nowrap"><input type="number" inputmode="numeric" min="2" max="20" step="1" data-pp="' + p.id + '|combo_size" value="' + (p.combo_size || '') + '" placeholder="—" aria-label="' + esc(p.name) + ' 組合入數">' +
+        (p.combo_size ? posCatSel('data-pp="' + p.id + '|combo_category" aria-label="' + esc(p.name) + ' 口味分類" style="min-width:110px"', p.combo_category || '', '全部分類') : '') + '</span></td>' +
+        '<td>' + posTempSel('data-pp="' + p.id + '|temps" aria-label="' + esc(p.name) + ' 溫度" style="min-width:120px"', posTemps(p).join('')) + '</td>' +
         '<td class="ops"><button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="-1"' + (i ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 上移">↑</button> <button class="btn ghost sm" data-act="posMove" data-id="' + p.id + '" data-v="1"' + (i < P.length - 1 ? '' : ' disabled') + ' aria-label="' + esc(p.name) + ' 下移">↓</button> <button class="btn warn sm" data-act="posArch" data-id="' + p.id + '">停用</button></td></tr>';
     }).join('') + '</tbody></table></div>';
   } else h += '<div class="empty">還沒有商品。可以在下方新增，或從其他活動複製。</div>';
@@ -1787,9 +1892,13 @@ function vPosProducts() {
   h += '<div class="field"><label for="pn-cat">分類</label>' + posCatSel('id="pn-cat" data-pn="cat"', n.cat || '') + '</div>' +
     '<div class="field"><label for="pn-price">售價（元）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-price" data-pn="price" value="' + esc(n.price || '') + '"></div>' +
     '<div class="field"><label for="pn-stock">起始庫存（選填）</label><input type="number" inputmode="numeric" min="0" step="1" id="pn-stock" data-pn="stock" value="' + esc(n.stock || '') + '" placeholder="不計"></div>' +
+    '<div class="field"><label for="pn-combo">組合入數（選填）</label><input type="number" inputmode="numeric" min="2" max="20" step="1" id="pn-combo" data-pn="combo" value="' + esc(n.combo || '') + '" placeholder="例如 3"></div>' +
+    '<div class="field"><label for="pn-temp">溫度</label>' + posTempSel('id="pn-temp" data-pn="temp"', n.temp != null ? n.temp : posTempDefault(n)) + '</div>' +
+    '<div class="field"><label for="pn-ccat">組合口味分類</label>' + posCatSel('id="pn-ccat" data-pn="ccat"', n.ccat || '', '全部分類') + '</div>' +
     '<div class="field"><button class="btn" data-act="posAddProduct">新增商品</button></div></div>' +
     (n.src === 'item' && !items.length ? '<p class="hint" style="margin-top:8px">本場品項都已加入。</p>' : '') +
-    (n.src === 'drink' && !drinks.length ? '<p class="hint" style="margin-top:8px">特調飲品都已加入，或還沒有飲品。</p>' : '') + '</div>';
+    (n.src === 'drink' && !drinks.length ? '<p class="hint" style="margin-top:8px">特調飲品都已加入，或還沒有飲品。</p>' : '') +
+    '<p class="hint" style="margin-top:8px">組合商品（例如費南雪三入組）：來源選「自訂商品」，售價填組合價，填入數與口味分類；結帳時會請收銀選口味，扣的是各口味的庫存。</p></div>';
   var others = S.G.events.filter(function (e) { return e.id !== S.ev; });
   if (others.length) h += '<div class="sect"><h3>從其他活動複製商品</h3><div class="grid2 form"><div class="field" style="grid-column:span 2"><label for="pos-copy">活動</label><select id="pos-copy">' + others.map(function (e) { return '<option value="' + e.id + '">' + esc(e.name) + '（' + md(e.start_date) + '）</option>'; }).join('') + '</select></div><div class="field"><button class="btn ghost" data-act="posCopy">複製商品</button></div></div><p class="hint" style="margin-top:8px">名稱、分類、售價、起始庫存一起複製；本場已有同名商品的會略過。</p></div>';
   if (A.length) h += '<div class="sect"><h3>已停用的商品</h3>' + A.map(function (p) {
@@ -1829,12 +1938,15 @@ function posCsv(kind, all) {
     var r = [['單號', '時間', '營業日', '裝置', '分類', '品項', '單價', '數量', '小計', '付款方式', '整筆折扣', '備註', '結帳人', '狀態']];
     list.slice().sort(function (a, b) { return posTime(a) < posTime(b) ? -1 : 1; }).forEach(function (s) {
       if (posIsVoid(s, V)) return;
-      posLines(s).forEach(function (l) { r.push([s.label, tm(posTime(s)), s.biz_date, s.device, posCatOf(l.category), l.name, l.price, l.qty, l.amount, s.payment, s.discount, s.note, pname(s.created_by), s.pending ? '待同步' : s.offline ? '離線補傳' : '']); });
+      posLines(s).forEach(function (l) { r.push([s.label, tm(posTime(s)), s.biz_date, s.device, posCatOf(l.category), l.name + (l.opt ? '（' + l.opt + '）' : '') + (l.parts && l.parts.length ? '（' + partsText(l.parts) + '）' : ''), l.price, l.qty, l.amount, s.payment, s.discount, s.note, pname(s.created_by), s.pending ? '待同步' : s.offline ? '離線補傳' : '']); });
     });
     csvDownload(base + '明細_' + tag + '.csv', r);
   } else {
-    var T = posStats(list), r2 = [['分類', '品項', '數量']];
-    T.cats.forEach(function (c) { c.items.forEach(function (x) { r2.push([c.cat, x.name, x.qty]); }); r2.push([c.cat, '小計', c.qty]); });
+    var T = posStats(list), hc = T.hasCombo, r2 = [['分類', '品項', '數量'].concat(hc ? ['組合內'] : [])];
+    T.cats.forEach(function (c) {
+      c.items.forEach(function (x) { r2.push([c.cat, x.name, x.qty].concat(hc ? [x.inc] : [])); });
+      r2.push([c.cat, '小計', c.qty].concat(hc ? [c.inc] : []));
+    });
     r2.push(['', '總數量', T.qty]);
     csvDownload(base + '品項彙總_' + tag + '.csv', r2);
   }
@@ -1844,8 +1956,8 @@ function posText(kind) {
   var head = ev.name + '（' + md(ev.start_date) + '–' + md(ev.end_date) + (ev.venue ? '・' + ev.venue : '') + '）POS 彙總・' + posFilterLabel();
   var stamp = '複製時間 ' + tm(new Date().toISOString());
   if (kind === 'tsv') {
-    L.push(head, stamp, '', ['分類', '品項', '數量'].join('\t'));
-    T.cats.forEach(function (c) { c.items.forEach(function (x) { L.push([c.cat, String(x.name).replace(/[\t\n]/g, ' '), x.qty].join('\t')); }); L.push([c.cat, '小計', c.qty].join('\t')); });
+    L.push(head, stamp, '', ['分類', '品項', '數量'].concat(T.hasCombo ? ['組合內'] : []).join('\t'));
+    T.cats.forEach(function (c) { c.items.forEach(function (x) { L.push([c.cat, String(x.name).replace(/[\t\n]/g, ' '), x.qty].concat(T.hasCombo ? [x.inc] : []).join('\t')); }); L.push([c.cat, '小計', c.qty].concat(T.hasCombo ? [c.inc] : []).join('\t')); });
     L.push(['', '總數量', T.qty].join('\t'), '', ['付款方式', '筆數', '金額'].join('\t'));
     T.pays.forEach(function (p) { var x = T.pay[p] || { n: 0, amt: 0 }; L.push([p, x.n, x.amt].join('\t')); });
     return L.join('\n');
@@ -1853,7 +1965,7 @@ function posText(kind) {
   L.push('【' + head + '】', stamp, '', '總數量 ' + T.qty + '｜' + T.n + ' 筆' + (T.nVoid ? '｜作廢 ' + T.nVoid + ' 筆不計' : ''));
   T.cats.forEach(function (c) {
     L.push('', '■ ' + c.cat + ' ' + c.qty);
-    c.items.forEach(function (x) { L.push('・' + x.name + ' ' + x.qty); });
+    c.items.forEach(function (x) { L.push('・' + x.name + ' ' + x.qty + (x.inc ? '（組合內 ' + x.inc + '）' : '')); });
   });
   return L.join('\n');
 }
@@ -1861,7 +1973,7 @@ function posPrintHtml() {
   var T = posStats(posFiltered());
   var h = printHead('POS 彙總', esc(posFilterLabel()));
   h += '<div class="sec"><h2>品項數量<small>總數量 ' + T.qty + '・' + T.n + ' 筆</small></h2><table><thead><tr><th>品項</th><th class="n">數量</th></tr></thead><tbody>' + T.cats.map(function (c) {
-    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td></tr>' + c.items.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="n">' + x.qty + '</td></tr>'; }).join('');
+    return '<tr class="grp"><td>' + esc(c.cat) + '</td><td class="n">' + c.qty + '</td></tr>' + c.items.map(function (x) { return '<tr><td>' + esc(x.name) + (x.inc ? '（組合內 ' + x.inc + '）' : '') + '</td><td class="n">' + x.qty + '</td></tr>'; }).join('');
   }).join('') + '<tr class="tot"><td>合計</td><td class="n">' + T.qty + '</td></tr></tbody></table></div>';
   h += '<div class="sec"><h2>對帳</h2><table><thead><tr><th>付款方式</th><th class="n">筆數</th><th class="n">金額</th></tr></thead><tbody>' + T.pays.map(function (p) {
     var x = T.pay[p] || { n: 0, amt: 0 }; return '<tr><td>' + esc(p) + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>';
@@ -4494,20 +4606,49 @@ var A = {
   /* POS */
   posView: function (e) { S.ui.pv = e.getAttribute('data-v'); posState().drawer = false; renderNow(); window.scrollTo(0, 0); },
   posAdd: function (e) {
-    var u = posState(), id = e.getAttribute('data-id'), c = find(u.cart, function (x) { return x.id === id; });
-    if (c) c.qty++; else u.cart.push({ id: id, qty: 1 });
+    var u = posState(), id = e.getAttribute('data-id'), p = byId(S.D.posp, id);
+    if (!p) return;
+    if (p.combo_size) { u.pick = { id: id, sel: {} }; renderNow(); return; }
+    var T2 = posTemps(p), opt = e.getAttribute('data-opt') || (T2.length === 1 ? T2[0] : null);
+    if (T2.length === 2 && !opt) { toast('請選冰或熱', true); return; }
+    var key = cartKey(id, null, opt), c = find(u.cart, function (x) { return (x.key || cartKey(x.id, x.parts, x.opt)) === key; }), bad = posShort({ id: id }, 1);
+    if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足：剩 ' + bad.left + (bad.used ? '，明細已用 ' + bad.used : '')), true); return; }
+    if (c) c.qty++; else u.cart.push({ id: id, qty: 1, key: key, opt: opt });
     renderNow();
   },
   posQty: function (e) {
-    var u = posState(), id = e.getAttribute('data-id'), c = find(u.cart, function (x) { return x.id === id; }), p = byId(S.D.posp, id);
+    var u = posState(), key = e.getAttribute('data-key'), c = find(u.cart, function (x) { return (x.key || cartKey(x.id, x.parts, x.opt)) === key; });
     if (!c) return;
-    var add = +e.getAttribute('data-v'), left = p ? posLeft(p, posSoldMap()) : null;
-    if (add > 0 && left != null && c.qty + add > left) { toast('「' + p.name + '」只剩 ' + Math.max(left, 0), true); return; }
+    var add = +e.getAttribute('data-v');
+    if (add > 0) { var bad = posShort(c, add); if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足：剩 ' + bad.left + (bad.used ? '，明細已用 ' + bad.used : '')), true); return; } }
     c.qty += add;
     if (c.qty <= 0) u.cart = u.cart.filter(function (x) { return x !== c; });
     renderNow();
   },
-  posRm: function (e) { var u = posState(), id = e.getAttribute('data-id'); u.cart = u.cart.filter(function (x) { return x.id !== id; }); renderNow(); },
+  posRm: function (e) { var u = posState(), key = e.getAttribute('data-key'); u.cart = u.cart.filter(function (x) { return (x.key || cartKey(x.id, x.parts, x.opt)) !== key; }); renderNow(); },
+  posPickAdd: function (e) {
+    var u = posState(), p = u.pick && byId(S.D.posp, u.pick.id), id = e.getAttribute('data-id'), n = 0;
+    if (!p) return;
+    Object.keys(u.pick.sel).forEach(function (k) { n += u.pick.sel[k]; });
+    if (n >= p.combo_size) return;
+    var o = byId(S.D.posp, id), left = posLeft(o, posSoldMap()), used = (cartUse()[id] || 0) + (u.pick.sel[id] || 0);
+    if (o.sold_out || (left != null && used >= left)) { toast('「' + o.name + '」' + (o.sold_out ? '已售完' : '庫存不足'), true); return; }
+    u.pick.sel[id] = (u.pick.sel[id] || 0) + 1; renderNow();
+  },
+  posPickSub: function (e) { var s2 = posState().pick.sel, id = e.getAttribute('data-id'); if (s2[id]) { s2[id]--; if (!s2[id]) delete s2[id]; } renderNow(); },
+  posPickClear: function () { posState().pick.sel = {}; renderNow(); },
+  posPickCancel: function () { posState().pick = null; renderNow(); },
+  posPickOk: function () {
+    var u = posState(), p = byId(S.D.posp, u.pick.id), sel = u.pick.sel, n = 0;
+    Object.keys(sel).forEach(function (k) { n += sel[k]; });
+    if (!p || n !== p.combo_size) { toast('請選滿 ' + (p ? p.combo_size : '') + ' 個口味', true); return; }
+    var order = posProducts().map(function (x) { return x.id; });
+    var parts = Object.keys(sel).sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); }).map(function (k) { return { id: k, qty: sel[k] }; });
+    var key = cartKey(p.id, parts), c = find(u.cart, function (x) { return (x.key || cartKey(x.id, x.parts)) === key; }), bad = posShort({ id: p.id, parts: parts }, 1);
+    if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足：剩 ' + bad.left + (bad.used ? '，明細已用 ' + bad.used : '')), true); return; }
+    if (c) c.qty++; else u.cart.push({ id: p.id, qty: 1, parts: parts, key: key });
+    u.pick = null; renderNow();
+  },
   posClear: function () { var u = posState(); u.cart = []; u.disc = ''; u.recv = ''; u.note = ''; renderNow(); },
   posDrawer: function () { var u = posState(); u.drawer = !u.drawer; renderNow(); },
   posPay: function (e) { posState().pay = e.getAttribute('data-v'); renderNow(); },
@@ -4523,17 +4664,18 @@ var A = {
     if (!c.lines.length) { toast('請先選商品', true); return; }
     if (u.disc !== '' && (!/^\d+$/.test(String(u.disc).trim()) || c.disc > c.sub)) { toast('折扣請填 0 到 ' + c.sub + ' 的整數', true); return; }
     if (c.recv != null && (!/^\d+$/.test(String(u.recv).trim()) || c.recv < c.tot)) { toast('收款金額不足（應收 ' + money(c.tot) + '）', true); return; }
-    var SM = posSoldMap(), bad = find(c.lines, function (l) { var left = posLeft(l.p, SM); return l.p.sold_out || (left != null && l.qty > left); });
-    if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足（剩 ' + Math.max(posLeft(bad.p, SM), 0) + '）'), true); return; }
+    var SM = posSoldMap(), CU = cartUse(), bad = null;
+    Object.keys(CU).forEach(function (id) { var bp = byId(S.D.posp, id), left = bp ? posLeft(bp, SM) : null; if (!bad && bp && (bp.sold_out || (left != null && CU[id] > left))) bad = { p: bp, left: Math.max(left || 0, 0) }; });
+    if (bad) { toast('「' + bad.p.name + '」' + (bad.p.sold_out ? '已售完' : '庫存不足（剩 ' + bad.left + '）'), true); return; }
     var seq = posNextSeq(d.code), label = d.code + seq, ts = new Date().toISOString();
     var p = {
       client_ref: newRef(), device: d.code, seq: seq, payment: pay, discount: c.disc, received: c.recv, note: u.note.trim() || null, client_ts: ts, strict: true,
-      lines: c.lines.map(function (l) { return { product_id: l.p.id, qty: l.qty, price: l.p.price }; })
+      lines: c.lines.map(function (l) { var o = { product_id: l.p.id, qty: l.qty, price: l.p.price }; if (l.opt) o.opt = l.opt; if (l.parts.length) o.parts = l.parts.map(function (x) { return { product_id: x.id, qty: x.qty }; }); return o; })
     };
     var view = {
       pending: true, client_ref: p.client_ref, label: label, device: d.code, seq: seq, payment: pay, subtotal: c.sub, discount: c.disc, total: c.tot,
       received: c.recv, change_due: c.change, note: p.note, client_ts: ts, created_at: ts, created_by: S.me.id, biz_date: todayStr(),
-      lines: c.lines.map(function (l) { return { product_id: l.p.id, name: l.p.name, category: l.p.category, price: l.p.price, qty: l.qty, amount: l.amt }; })
+      lines: c.lines.map(function (l) { return { product_id: l.p.id, name: l.p.name, category: l.p.category, price: l.p.price, qty: l.qty, amount: l.amt, opt: l.opt, parts: l.parts.length ? l.parts.map(function (x) { return { product_id: x.id, name: x.name, qty: x.qty }; }) : null }; })
     };
     var sub = money(c.tot) + '・' + pay + (c.change != null ? '・找零 ' + money(c.change) : '');
     function ok(offline) {
@@ -4596,8 +4738,12 @@ var A = {
     else { if (!n.ref) { toast(n.src === 'drink' ? '請選飲品' : '請選品項', true); return; } p[n.src === 'drink' ? 'drink_id' : 'item_id'] = n.ref; }
     if (!/^\d+$/.test(price)) { toast('售價請填 0 以上的整數', true); return; }
     if (stock && !/^\d+$/.test(stock)) { toast('起始庫存請填 0 以上的整數，或留空', true); return; }
+    var combo = String(n.combo || '').trim();
+    if (combo && (!/^\d+$/.test(combo) || +combo < 2 || +combo > 20)) { toast('組合入數請填 2 到 20，不是組合就留空', true); return; }
     p.price = +price; p.start_stock = stock === '' ? null : +stock;
-    call('evt_pos_product_save', { p: p }, ['posp'], '已新增商品').then(function (r) { if (r.ok) { S.ui.posNew = { src: n.src, cat: n.cat }; renderNow(); } });
+    if (combo) { p.combo_size = +combo; p.combo_category = n.ccat || null; }
+    p.temps = posTempArr(n.temp != null ? n.temp : posTempDefault(n));
+    call('evt_pos_product_save', { p: p }, ['posp'], combo ? '已新增組合商品' : '已新增商品').then(function (r) { if (r.ok) { S.ui.posNew = { src: n.src, cat: n.cat, temp: n.temp }; renderNow(); } });
   },
   posArch: function (e) {
     var p = byId(S.D.posp, e.getAttribute('data-id'));
@@ -5033,6 +5179,13 @@ document.addEventListener('change', function (ev) {
     if (pp[1] === 'price') { if (!/^\d+$/.test(pv)) { toast('售價請填 0 以上的整數', true); t.value = po.price; return; } if (+pv === po.price) return; pd.price = +pv; pmsg = '已更新售價：' + po.name + ' ' + money(pd.price); }
     else if (pp[1] === 'start_stock') { if (pv !== '' && !/^\d+$/.test(pv)) { toast('起始庫存請填 0 以上的整數，或留空', true); t.value = po.start_stock == null ? '' : po.start_stock; return; } pd.start_stock = pv === '' ? null : +pv; if (pd.start_stock === po.start_stock) return; pmsg = '已更新庫存：' + po.name + ' ' + (pv === '' ? '不計' : pv); }
     else if (pp[1] === 'category') { pd.category = t.value || null; pmsg = '已更新分類'; }
+    else if (pp[1] === 'combo_size') {
+      if (pv !== '' && (!/^\d+$/.test(pv) || +pv < 2 || +pv > 20)) { toast('組合入數請填 2 到 20，不是組合就留空', true); t.value = po.combo_size || ''; return; }
+      pd.combo_size = pv === '' ? null : +pv; if (pd.combo_size === po.combo_size) return;
+      pmsg = pv === '' ? '「' + po.name + '」改為一般商品' : '「' + po.name + '」改為 ' + pv + ' 入組合';
+    }
+    else if (pp[1] === 'combo_category') { pd.combo_category = t.value || null; pmsg = '已更新組合口味分類'; }
+    else if (pp[1] === 'temps') { pd.temps = posTempArr(t.value); pmsg = '「' + po.name + '」溫度：' + find(POS_TEMPS, function (x) { return x[0] === t.value; })[1]; }
     else { if (!pv) { toast('商品名稱不能空白', true); t.value = po.name; return; } if (pv === po.name) return; pd.name = pv; pmsg = '已更新商品名稱'; }
     call('evt_pos_product_save', { p: pd }, ['posp'], pmsg).then(function (r) { if (!r.ok) renderNow(); });
     return;
@@ -5040,6 +5193,7 @@ document.addEventListener('change', function (ev) {
   if (t.hasAttribute('data-pn')) {
     var pk = t.getAttribute('data-pn'); S.ui.posNew = S.ui.posNew || { src: 'item' }; S.ui.posNew[pk] = t.value;
     if (pk === 'src') { S.ui.posNew.ref = ''; renderNow(); }
+    else if (pk === 'cat' && S.ui.posNew.temp == null) renderNow();
     return;
   }
   if (t.hasAttribute('data-poscfg')) {
