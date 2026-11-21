@@ -111,7 +111,8 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .posflash small{font-size:15px;color:var(--mut)}
 .posbtn.combo{border-style:dashed}
 .pgift{font-size:12px;color:var(--warn);font-weight:600;margin-top:2px}
-.poscard li small.kgift{color:var(--warn);font-weight:700}
+.poscard .kgifts{padding:8px 12px;border:2px solid var(--warn);border-radius:6px;color:var(--warn);font-size:17px;font-weight:700}
+.poscard .kgifts b{font-size:20px}
 .pck.sm{min-height:0;font-size:12px;gap:4px}
 .pck.sm input{width:14px;height:14px}
 .posbtn.tempcard{cursor:default}
@@ -522,7 +523,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 71;
+var APP_VERSION = 72;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1719,6 +1720,12 @@ function posKitchen() {
   done.sort(function (a, b) { return a.st.t < b.st.t ? 1 : -1; });
   return { pending: pend, done: done.slice(0, 30) };
 }
+/* 出餐卡片：這張單要送的贈品，依名稱合計 */
+function posGiftRow(L) {
+  var m = {}, order = [];
+  L.forEach(function (l) { if (!l.gift) return; if (!m[l.gift.name]) { m[l.gift.name] = 0; order.push(l.gift.name); } m[l.gift.name] += l.gift.qty; });
+  return order.length ? '<div class="kgifts">贈送：' + order.map(function (n) { return esc(n) + ' <b>× ' + m[n] + '</b>'; }).join('、') + '</div>' : '';
+}
 function vPosKitchen(KO) {
   var d = posDev(), now = Date.now(), h = '';
   if (!posNetOk()) h += '<div class="banner warn">離線，資料可能過期。恢復連線後會自動更新。</div>';
@@ -1728,7 +1735,7 @@ function vPosKitchen(KO) {
   else h += '<div class="poskq">' + KO.pending.map(function (o) {
     var s = o.s, mins = Math.max(0, Math.floor((now - new Date(posTime(s)).getTime()) / 60000));
     return '<div class="poscard' + (mins >= d.warn ? ' late' : '') + '"><div class="row" style="justify-content:space-between"><b class="lbl">' + esc(s.label || '') + '</b><span class="mut small">' + hhmm(posTime(s)) + '・等 ' + mins + ' 分</span></div>' +
-      '<ul>' + o.L.map(function (l) { return '<li class="' + (posCatOf(l.category) === POS_BAR_CAT ? 'kbar' : 'klite') + '"><span>' + esc(l.name) + tempTag(l.opt) + (l.parts && l.parts.length ? '<small>' + esc(partsText(l.parts)) + '</small>' : '') + (l.gift ? '<small class="kgift">' + esc(giftText(l.gift)) + '</small>' : '') + '</span><b>× ' + l.qty + '</b></li>'; }).join('') + '</ul>' +
+      '<ul>' + o.L.map(function (l) { return '<li class="' + (posCatOf(l.category) === POS_BAR_CAT ? 'kbar' : 'klite') + '"><span>' + esc(l.name) + tempTag(l.opt) + (l.parts && l.parts.length ? '<small>' + esc(partsText(l.parts)) + '</small>' : '') + '</span><b>× ' + l.qty + '</b></li>'; }).join('') + '</ul>' + posGiftRow(o.L) +
       (s.note ? '<div class="pnote">' + esc(s.note) + '</div>' : '') + (s.pending ? '<span class="tag hold">待同步</span>' : '') +
       '<button class="btn" data-act="posDone" data-ref="' + esc(s.client_ref) + '" data-v="1">完成</button></div>';
   }).join('') + '</div>';
