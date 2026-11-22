@@ -133,13 +133,25 @@ header.top{padding:calc(24px + env(safe-area-inset-top, 0px)) 0 0}
 .pmopt{display:flex;flex-direction:column;gap:6px}
 .pmopt .btn{width:100%}
 .posdrawerbar{display:none}
+body.posmode{padding-bottom:24px}
+body.posmode .wrap{max-width:1440px}
+.postop{position:sticky;top:0;z-index:120;background:var(--bg);margin:0 calc(-1 * var(--gutter));padding:calc(8px + env(safe-area-inset-top, 0px)) var(--gutter) 8px;border-bottom:1px solid var(--line)}
+.postop .ptrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.postop .ptev{flex:1 1 160px;min-width:0;font-weight:600;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.postop .ptev small{font-weight:400;color:var(--mut);font-size:12px;margin-left:6px}
+.postop .posbar{margin-top:8px}
+.postop .banner{margin:8px 0 0}
+body.posmode main#view>.panels{padding-top:16px}
+.poscart{display:flex;flex-direction:column;padding-bottom:0}
+.poscart .poscroll{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;margin:0 -24px;padding:0 24px 16px}
+.poscart .foot{flex:none;margin-top:0;padding:12px 0 calc(16px + env(safe-area-inset-bottom, 0px))}
 .btn.posclose{display:none}
 @media (min-width:900px){
   .possell{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
-  .poscart{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+  .poscart{position:sticky;top:calc(var(--pth, 0px) + 16px);max-height:calc(100vh - var(--pth, 0px) - 32px);overflow:hidden}
 }
 @media (max-width:899px){
-  .possell .poscart{position:fixed;left:0;right:0;bottom:0;z-index:200;margin:0;max-height:88vh;overflow:auto;border-radius:12px 12px 0 0;transform:translateY(105%);transition:transform .2s;box-shadow:0 -8px 24px rgba(0,0,0,.15)}
+  .possell .poscart{position:fixed;left:0;right:0;bottom:0;z-index:200;margin:0;max-height:88vh;overflow:hidden;border-radius:12px 12px 0 0;transform:translateY(105%);transition:transform .2s;box-shadow:0 -8px 24px rgba(0,0,0,.15)}
   .possell .poscart.open{transform:none}
   .btn.posclose{display:inline-flex}
   .posdrawerbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:150;align-items:center;gap:12px;min-height:60px;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border:0;background:var(--ink);color:var(--onink);font:inherit;font-size:16px;cursor:pointer}
@@ -523,7 +535,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 72;
+var APP_VERSION = 73;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -1174,7 +1186,10 @@ function renderNow() {
     return;
   }
   var y = window.scrollY;
-  app.innerHTML = (S.ui.picker || (S.loaded && !curEvent()) ? vListPage() : vHeader() + '<main id="view">' + vBody() + '</main>') + (S.ui.newEv && isMgr() ? vNewEvent() : '');
+  var pm = !S.ui.picker && S.loaded && !!curEvent() && S.ui.tab === 'pos' && posOn();
+  document.body.classList.toggle('posmode', pm);
+  app.innerHTML = (S.ui.picker || (S.loaded && !curEvent()) ? vListPage() : (pm ? vPosTop() : vHeader()) + '<main id="view">' + vBody() + '</main>') + (S.ui.newEv && isMgr() ? vNewEvent() : '');
+  posTopH();
   window.scrollTo(0, y);
   applyFolds();
   if (S.ui.tab === 'count' && S.ui.signing) initPad();
@@ -1581,7 +1596,20 @@ function posSyncPill() {
   if (er) return '<span class="tag warn">' + er + ' 筆補傳失敗</span>';
   return '<span class="tag ok">已同步</span>';
 }
-function vPos() {
+/* POS 獨立頁面：不顯示活動系統的頁首與分頁，只留返回鍵、活動名稱與 POS 功能列（固定在畫面頂端） */
+function vPosTop() {
+  var ev = curEvent();
+  var h = '<header class="postop"><div class="ptrow"><button class="btn ghost sm" data-act="posExit">‹ 回活動系統</button>' +
+    '<div class="ptev">' + esc(ev.name) + '<small>POS 收銀</small></div></div>' + vPosBar();
+  if (S.offline) h += offlineBanner();
+  return h + '</header>';
+}
+function posTopH() {
+  var t = $('.postop');
+  document.documentElement.style.setProperty('--pth', (t ? t.offsetHeight : 0) + 'px');
+}
+window.addEventListener('resize', posTopH);
+function vPosBar() {
   var d = posDev(), ev = curEvent(), h = '';
   var views = [['sell', '收銀'], ['kitchen', '出餐'], ['log', '紀錄'], ['set', '設定']].filter(function (v) {
     return !(v[0] === 'sell' && d.role === '出餐') && !(v[0] === 'kitchen' && d.role === '收銀');
@@ -1593,6 +1621,10 @@ function vPos() {
   h += '<div class="posbar"><div class="seg" role="group" aria-label="POS 功能">' + views.map(function (v) {
     return '<button data-act="posView" data-v="' + v[0] + '" aria-pressed="' + (S.ui.pv === v[0]) + '"' + (!d.code && v[0] !== 'set' ? ' disabled' : '') + '>' + v[1] + (v[0] === 'kitchen' && nP ? '（' + nP + '）' : '') + '</button>';
   }).join('') + '</div><span class="row" style="gap:8px">' + posSyncPill() + (d.code ? '<span class="tag">裝置 ' + d.code + '・' + d.role + '</span>' : '') + '</span></div>';
+  return h;
+}
+function vPos() {
+  var h = '', KO = posKitchen();
   if (S.ui.pv === 'sell') h += vPosSell();
   else if (S.ui.pv === 'kitchen') h += vPosKitchen(KO);
   else if (S.ui.pv === 'log') h += vPosLog();
@@ -1631,7 +1663,7 @@ function vPosSell() {
     });
   }
   h += '</section><section class="panel poscart nofold' + (u.drawer ? ' open' : '') + '" aria-label="本筆明細">';
-  h += '<div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">本筆明細' + (c.n ? '（' + c.n + ' 件）' : '') + '</h2><span class="row btns">' + (c.lines.length ? '<button class="btn ghost sm" data-act="posClear">清除全部</button>' : '') + '<button class="btn ghost sm posclose" data-act="posDrawer">收合</button></span></div>';
+  h += '<div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">本筆明細' + (c.n ? '（' + c.n + ' 件）' : '') + '</h2><span class="row btns">' + (c.lines.length ? '<button class="btn ghost sm" data-act="posClear">清除全部</button>' : '') + '<button class="btn ghost sm posclose" data-act="posDrawer">收合</button></span></div><div class="poscroll">';
   if (!c.lines.length) h += '<div class="hint" style="padding:16px 0">點商品加入，點一下加一份。</div>';
   else {
     var gSM = posSoldMap(), gUse = {};
@@ -1659,7 +1691,7 @@ function vPosSell() {
     '<div class="big"><span>應收</span><b id="pos-tot">' + money(c.tot) + '</b></div></div>';
   if (block) h += '<p class="hint" style="color:var(--warn);margin-top:12px">' + esc(block) + '</p>';
   else if (!posNetOk()) h += '<p class="hint" style="margin-top:12px">目前離線：結帳會先存在這台裝置，恢復連線後自動補傳。</p>';
-  h += '<div class="foot"><button class="btn posgo" data-act="posGo"' + (c.lines.length && !block ? '' : ' disabled') + '>結帳 <span id="pos-go-amt">' + money(c.tot) + '</span>（' + esc(u.pay) + '）</button></div>';
+  h += '</div><div class="foot"><button class="btn posgo" data-act="posGo"' + (c.lines.length && !block ? '' : ' disabled') + '>結帳 <span id="pos-go-amt">' + money(c.tot) + '</span>（' + esc(u.pay) + '）</button></div>';
   h += '</section></div>';
   if (u.pick) h += vPosPick();
   h += '<button class="posdrawerbar' + (u.drawer ? ' hide' : '') + '" data-act="posDrawer"><span>本筆明細' + (c.n ? ' ' + c.n + ' 件' : '') + '</span><b>' + money(c.tot) + '</b><span class="go">' + (c.n ? '結帳 ›' : '展開 ›') + '</span></button>';
@@ -4248,7 +4280,8 @@ var A = {
     /* supabase-js 的呼叫要接上 then 才會真正送出 */
     sb.rpc('evt_logout', { p_token: tok }).then(function () {}, function () {});
   },
-  tab: function (e) { S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; S.ui.itemEdit = null; S.ui.secEdit = {}; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
+  posExit: function () { S.ui.tab = S.ui.prevTab && S.ui.prevTab !== 'pos' ? S.ui.prevTab : 'count'; renderNow(); window.scrollTo(0, 0); },
+  tab: function (e) { if (S.ui.tab !== 'pos') S.ui.prevTab = S.ui.tab; S.ui.tab = e.getAttribute('data-v'); S.ui.editId = null; S.ui.buyEdit = null; S.ui.itemEdit = null; S.ui.secEdit = {}; if (S.ui.tab === 'event') S.pinStatus = null; renderNow(); window.scrollTo(0, 0); },
   go: function (e) { S.ui.tab = e.getAttribute('data-v'); renderNow(); window.scrollTo(0, 0); },
 
   /* 盤點單 */
