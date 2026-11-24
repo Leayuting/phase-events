@@ -276,6 +276,15 @@ details[open]>summary::before{transform:rotate(90deg)}
 .foldbtn{min-width:64px}
 .grid2 .wide2{grid-column:span 2}
 @media (max-width:560px){.grid2 .wide2{grid-column:auto}}
+.prows{display:flex;flex-direction:column;gap:8px}
+.prow{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.8fr) minmax(0,1.1fr) 160px 110px 44px;gap:8px;align-items:center}
+.prow.hd{font-size:12px;color:var(--mut)}
+.prow input,.prow select{width:100%}
+@media (max-width:760px){
+  .prow{grid-template-columns:1fr 1fr;padding:12px 0;border-bottom:1px solid var(--line)}
+  .prow .pc{grid-column:1 / -1}
+  .prow.hd{display:none}
+}
 .panel tbody tr:last-child td{border-bottom:0}
 .phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px}
 .phead .ptitle{flex:1 1 320px;min-width:0}
@@ -535,7 +544,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 74;
+var APP_VERSION = 75;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -2907,10 +2916,34 @@ function vNewStation() {
     }).join('') + '</div></div>' +
     '<div class="foot"><button class="btn" data-act="addStationCk">新增崗位</button></div></section>';
 }
+/* 手動輸入：一列一項（崗位、內容、負責人、對點日期、階段），預覽時轉成「前置作業／職責分配」表格，沿用同一套解析與匯入 */
+function prepRows() { if (!S.ui.prepRows || !S.ui.prepRows.length) S.ui.prepRows = [{ ph: '事前' }]; return S.ui.prepRows; }
+function prepRowsFilled() { return prepRows().filter(function (r) { return (r.st || '').trim() || (r.ct || '').trim(); }); }
+function prepManualText() {
+  var clean = function (v) { return String(v || '').replace(/[\t\r\n]+/g, ' ').trim(); };
+  return '崗位\t內容\t負責人\t對點日期\t階段\n' + prepRowsFilled().map(function (r) {
+    var d = r.dt ? +r.dt.slice(5, 7) + '/' + +r.dt.slice(8, 10) : '';
+    return [clean(r.st), clean(r.ct), clean(r.ow), d, r.ph || '事前'].join('\t');
+  }).join('\n');
+}
+function vPrepManual() {
+  var R = prepRows(), live = S.D.stations.filter(function (x) { return !x.archived; });
+  return '<div class="field" style="margin-top:16px"><label>或手動輸入<span class="hint" style="margin-left:8px">一列一項；同一個崗位有多項就填多列，負責人多位用「、」分開</span></label>' +
+    '<datalist id="prep-sts">' + live.map(function (x) { return '<option value="' + esc(x.name) + '"></option>'; }).join('') + '</datalist>' + namesDatalist() +
+    '<div class="prows"><div class="prow hd" aria-hidden="true"><span>崗位</span><span>內容</span><span>負責人</span><span>對點日期</span><span>階段</span><span></span></div>' +
+    R.map(function (r, i) {
+      return '<div class="prow"><input type="text" class="pc" list="prep-sts" data-prow="' + i + '|st" value="' + esc(r.st || '') + '" placeholder="崗位，例如：櫃檯區" aria-label="第 ' + (i + 1) + ' 列 崗位">' +
+        '<input type="text" class="pc" data-prow="' + i + '|ct" value="' + esc(r.ct || '') + '" placeholder="內容，例如：櫃檯區所需物品攜帶" aria-label="第 ' + (i + 1) + ' 列 內容">' +
+        '<input type="text" list="names" data-prow="' + i + '|ow" value="' + esc(r.ow || '') + '" placeholder="負責人" aria-label="第 ' + (i + 1) + ' 列 負責人">' +
+        '<input type="date" data-prow="' + i + '|dt" value="' + esc(r.dt || '') + '" aria-label="第 ' + (i + 1) + ' 列 對點日期">' +
+        '<select data-prow="' + i + '|ph" aria-label="第 ' + (i + 1) + ' 列 階段">' + selOpts(PHASES.map(function (p) { return [p, p]; }), r.ph || '事前') + '</select>' +
+        '<button class="btn ghost sm" data-act="prowDel" data-v="' + i + '" aria-label="刪除第 ' + (i + 1) + ' 列"' + (R.length < 2 && !r.st && !r.ct ? ' disabled' : '') + '>×</button></div>';
+    }).join('') + '</div><div class="row btns" style="margin-top:8px"><button class="btn ghost sm" data-act="prowAdd">＋ 新增一列</button></div></div>';
+}
 function vPrepImport() {
   var P = S.ui.prep, h = '<section class="panel">' + pHead('匯入崗位與清單', '支援兩種表：「前置作業／職責分配」（崗位、內容、負責人、對點日期）與「各崗位清單」（每區一組 品項、用途、數量、確認、備註，標題寫「櫃檯區（怡蓁）」）。兩張可以分開匯入，名稱相近的崗位會自動合併。可以上傳 CSV 或 Excel 檔，或從 Google 試算表、Excel 複製整張表貼上；合併儲存格沒關係。', '<button class="btn ghost sm" data-act="prepTemplate" data-v="xlsx">下載範本（Excel）</button><button class="btn ghost sm" data-act="prepTemplate" data-v="csv">下載範本（CSV）</button>') +
     '<div class="field"><label for="prep-file">上傳 CSV 或 Excel</label><input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" id="prep-file" style="max-width:320px"></div>' + xlsSheetSel('prep') +
-    '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)">' + esc(impText('prep')) + '</textarea></div>';
+    '<div class="field" style="margin-top:16px"><label for="prep-text">或貼上表格</label><textarea id="prep-text" rows="6" placeholder="崗位&#9;內容&#9;負責人&#9;對點日期&#10;櫃檯（不封箱）&#9;櫃檯區所需物品攜帶&#9;怡蓁&#9;10/28(三)">' + esc(impText('prep')) + '</textarea></div>' + vPrepManual();
   if (P && P.error) h += '<div class="banner warn">' + esc(P.error) + '</div>';
   if (P && P.stations) {
     var nItems = 0;
@@ -4004,8 +4037,8 @@ function newBoothFromSelect(t, prev) {
 /* 匯入暫存：貼上的內容與預覽，按「清除」一起清掉 */
 var IMP = { prep: { ui: 'prep', text: 'prep-text', file: 'prep-file', parse: function (t) { return prepParse(t); } }, tl: { ui: 'tlimp', text: 'tl-text', file: 'tl-file', parse: function (t) { return tlParse(t); } }, csv: { ui: 'csv', text: 'csvtext', file: 'csvfile', parse: function (t) { return csvToItems(t); } } };
 function impText(k) { return (S.ui.impText && S.ui.impText[k]) || ''; }
-function impClearBtn(k) { return '<button class="btn ghost" data-act="impClear" data-v="' + k + '"' + (impText(k) || S.ui[IMP[k].ui] ? '' : ' disabled') + '>清除</button>'; }
-function impReset(k) { S.ui[IMP[k].ui] = null; if (S.ui.impText) S.ui.impText[k] = ''; if (S.ui.xls) S.ui.xls[k] = null; }
+function impClearBtn(k) { return '<button class="btn ghost" data-act="impClear" data-v="' + k + '"' + (impText(k) || S.ui[IMP[k].ui] || (k === 'prep' && prepRowsFilled().length) ? '' : ' disabled') + '>清除</button>'; }
+function impReset(k) { if (k === 'prep') S.ui.prepRows = null; S.ui[IMP[k].ui] = null; if (S.ui.impText) S.ui.impText[k] = ''; if (S.ui.xls) S.ui.xls[k] = null; }
 /* 上傳檔案：CSV 直接讀文字；Excel 用 SheetJS（第一次用到才載入）轉成 Tab 分隔文字，再交給原本的 CSV／貼上解析 */
 var XLSX_SRC = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', xlsxLoading = null;
 function loadXlsx() {
@@ -4632,10 +4665,18 @@ var A = {
   prepPreview: function () {
     var f = $('#prep-file'), t = val('#prep-text'), K = 'prep';
     function go(text) { if (S.ui.xls) S.ui.xls[K] = null; S.ui.prep = prepParse(text); renderNow(); }
+    var man = prepRowsFilled().length;
+    if ((f && f.files && f.files[0] ? 1 : 0) + (t.trim() ? 1 : 0) + (man ? 1 : 0) > 1) { toast('上傳檔案、貼上表格、手動輸入請只用一種；不用的請先清除', true); return; }
     if (f && f.files && f.files[0]) readImportFile(K, f.files[0]);
     else if (t.trim()) go(t);
-    else toast('請選擇檔案或貼上表格', true);
+    else if (man) {
+      if (prepRowsFilled().some(function (r) { return !(r.st || '').trim() || !(r.ct || '').trim(); })) { toast('手動輸入的每一列都要填崗位和內容', true); return; }
+      go(prepManualText());
+    }
+    else toast('請選擇檔案、貼上表格或手動輸入', true);
   },
+  prowAdd: function () { var R = prepRows(), last = R[R.length - 1] || {}; R.push({ st: last.st || '', ow: last.ow || '', dt: last.dt || '', ph: last.ph || '事前' }); renderNow(); var x = document.querySelectorAll('[data-prow$="|ct"]'); if (x.length) x[x.length - 1].focus(); },
+  prowDel: function (e) { var R = prepRows(); R.splice(+e.getAttribute('data-v'), 1); S.ui.prep = null; renderNow(); },
   impClear: function (e) {
     var k = e.getAttribute('data-v'), f = $('#' + IMP[k].file);
     impReset(k);
@@ -5490,6 +5531,12 @@ document.addEventListener('input', function (ev) {
     S.ui.impText = S.ui.impText || {}; S.ui.impText[ik] = t.value;
     var cb = document.querySelector('[data-act=impClear][data-v=' + ik + ']');
     if (cb && had !== !!t.value) cb.disabled = !t.value && !S.ui[IMP[ik].ui];
+    return;
+  }
+  if (t.hasAttribute('data-prow')) {
+    var pr = t.getAttribute('data-prow').split('|'), PR = prepRows();
+    if (PR[+pr[0]]) PR[+pr[0]][pr[1]] = t.value;
+    var cb2 = document.querySelector('[data-act=impClear][data-v=prep]'); if (cb2) cb2.disabled = !impText('prep') && !S.ui.prep && !prepRowsFilled().length;
     return;
   }
   if (t.hasAttribute('data-pos')) { posState()[t.getAttribute('data-pos')] = t.value; posRefresh(); return; }
