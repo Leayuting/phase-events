@@ -535,7 +535,7 @@ var DATA = {
 /* ============================================================================
    設定
    ============================================================================ */
-var APP_VERSION = 73;
+var APP_VERSION = 74;
 var SB_URL = 'https://uzvlyxpgbxwkndnfvgup.supabase.co';
 var SB_KEY = 'sb_publishable_FUgZ8gWPqeJL9AlaKMVotA_SAfxzu8R';
 </script>
@@ -681,7 +681,7 @@ var S = {
   }
 };
 function emptyD() {
-  return { stations: [], owners: [], items: [], plan: [], sheets: [], lines: [], moves: [], ck: [], cklog: [], buys: [], tl: [], audit: [], drinks: [], dplan: [], ding: [], dlog: [], posp: [], posS: [], posL: [], posD: [], posDev: [] };
+  return { stations: [], owners: [], items: [], plan: [], sheets: [], lines: [], moves: [], ck: [], cklog: [], buys: [], tl: [], audit: [], drinks: [], dplan: [], ding: [], dlog: [], posp: [], posS: [], posL: [], posD: [], posDev: [], mytodo: [] };
 }
 var URL_KEYS = { tab: 'tab', ev: 'ev', st: 'st', ph: 'ph', bt: 'bt', lk: 'lk', li: 'li', lw: 'lw', ld: 'ld', newEv: 'new', picker: 'list', pv: 'pv' };
 function readUrl() {
@@ -798,6 +798,14 @@ var LOAD = {
   posS: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_sales').select('*').eq('event_id', ev).order('created_at').order('id').range(a, b); }); },
   posL: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_sale_lines').select('*').eq('event_id', ev).order('sale_id').order('line_no').range(a, b); }); },
   posD: function (ev) { return pageAll(function (a, b) { return sb.from('evt_pos_done').select('*').eq('event_id', ev).order('sale_id').range(a, b); }); },
+  /* 個人待辦：只有本人看得到，經伺服器函式讀取；資料庫還沒執行 v3z 時視為沒有這個功能 */
+  mytodo: function (ev) {
+    if (!S.token) return Promise.resolve([]);
+    return sb.rpc('evt_my_todo_list', { p_token: S.token, p_event_id: ev }).then(function (r) {
+      if (r.error) { if (isNetErr(r.error)) throw r.error; S.myTodoOff = true; return []; }
+      S.myTodoOff = false; return r.data || [];
+    });
+  },
   posDev: function (ev) { return sb.from('evt_pos_devices').select('*').eq('event_id', ev).order('code').range(0, 199).then(function (r) { if (r.error) throw r.error; return r.data || []; }); },
   audit: function (ev) {
     /* 這場活動的修改＋全系統設定（人員、PIN、共用密碼）的修改 */
@@ -806,7 +814,7 @@ var LOAD = {
   }
 };
 var GLOBAL_KEYS = ['people', 'events', 'members', 'templates', 'tplItems'];
-var EVENT_KEYS = ['stations', 'owners', 'items', 'plan', 'sheets', 'lines', 'moves', 'ck', 'cklog', 'buys', 'tl', 'drinks', 'ding', 'dlog', 'posp', 'posS', 'posL', 'posD', 'posDev', 'audit'];
+var EVENT_KEYS = ['stations', 'owners', 'items', 'plan', 'sheets', 'lines', 'moves', 'ck', 'cklog', 'buys', 'tl', 'drinks', 'ding', 'dlog', 'posp', 'posS', 'posL', 'posD', 'posDev', 'mytodo', 'audit'];
 var TABLE_KEY = {
   evt_people: 'people', evt_events: 'events', evt_event_members: 'members', evt_checklist_templates: 'templates', evt_checklist_template_items: 'tplItems',
   evt_stations: 'stations', evt_station_owners: 'owners', evt_items: 'items', evt_plan: 'plan',
@@ -2601,7 +2609,29 @@ function vSettle() {
    --------------------------------------------------------------------------- */
 function assignees(c) { if (c.assignee_id) return [c.assignee_id]; return ownersOf(c.station_id); }
 /* 我的待辦：只看崗位的負責人欄位（多位負責人時，包含我就算） */
-function isMine(c) { return !!S.me && ownersOf(c.station_id).indexOf(S.me.id) >= 0; }
+function isMine(c) { return !!S.me && (ownersOf(c.station_id).indexOf(S.me.id) >= 0 || c.assignee_id === S.me.id); }
+/* 勾選：崗位負責人、管理員，以及這一項「指派給」的人（活動未結束、崗位未刪除） */
+function canTick(c) {
+  if (canEditSt(c.station_id)) return true;
+  var ev = curEvent(), s = station(c.station_id);
+  return !!(S.me && c.assignee_id === S.me.id && s && !s.archived && ev && ev.status !== '已結束');
+}
+/* 我的待辦：手動新增的個人待辦（只有本人看得到） */
+function canMyTodo() { var ev = curEvent(); return !S.myTodoOff && !!ev && (isMgr() || (ev.status !== '已結束' && membersOf(S.ev).indexOf(S.me.id) >= 0)); }
+function myRow(t) {
+  var can = canMyTodo(), done = !!t.done_at;
+  if (S.ui.myEdit === t.id && can) {
+    return '<div class="ck"><span></span><div><div class="grid2">' +
+      '<div class="field"><label for="me-title">待辦</label><input type="text" id="me-title" maxlength="200" value="' + esc(t.title) + '"></div>' +
+      '<div class="field"><label for="me-note">備註</label><input type="text" id="me-note" maxlength="500" value="' + esc(t.note || '') + '"></div>' +
+      '<div class="field"><label for="me-phase">階段</label><select id="me-phase">' + selOpts(PHASES.map(function (p) { return [p, p]; }), t.phase) + '</select></div></div>' +
+      '<div class="row btns" style="margin-top:8px"><button class="btn sm" data-act="mySave" data-id="' + t.id + '">儲存</button><button class="btn ghost sm" data-act="myCancel">取消</button></div></div><span></span></div>';
+  }
+  return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="myTick" data-id="' + t.id + '"' + (done ? ' checked' : '') + (can ? '' : ' disabled') + ' aria-label="' + esc(t.title) + '"><div>' +
+    '<span class="t">' + esc(t.title) + '</span> ' + (done ? '<span class="ckdate">' + tm(t.done_at) + '</span> ' : '') + '<span class="tag">' + esc(t.phase) + '</span> <span class="tag ok">個人</span>' +
+    (t.note ? '<div class="small mut">' + esc(t.note) + '</div>' : '') + '</div><div class="act">' +
+    (can ? '<button class="btn ghost sm" data-act="myEdit" data-id="' + t.id + '">編輯</button><button class="btn ghost sm" data-act="myDel" data-id="' + t.id + '">刪除</button>' : '') + '</div></div>';
+}
 function selOpts(arr, cur) { return arr.map(function (a) { return '<option value="' + esc(a[0]) + '"' + (a[0] === cur ? ' selected' : '') + '>' + esc(a[1]) + '</option>'; }).join(''); }
 function whoOpts(cur) {
   var mem = membersOf(S.ev);
@@ -2625,7 +2655,7 @@ function ckRow(c, showSt) {
   }
   var q = c.qty ? (/^\d+$/.test(c.qty) ? '× ' + esc(c.qty) : esc(c.qty)) : '';
   var as = assignees(c);
-  return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="tick" data-id="' + c.id + '"' + (done ? ' checked' : '') + (can ? '' : ' disabled title="只有這個崗位的負責人或管理員可以勾選"') + ' aria-label="' + esc(c.title) + '"><div>' +
+  return '<div class="ck' + (done ? ' done' : '') + '"><input type="checkbox" data-act="tick" data-id="' + c.id + '"' + (done ? ' checked' : '') + (canTick(c) ? '' : ' disabled title="只有這個崗位的負責人、被指派的人或管理員可以勾選"') + ' aria-label="' + esc(c.title) + '"><div>' +
     '<span class="t">' + esc(c.title) + '</span> ' + (done ? '<span class="ckdate" title="' + esc(pname(done.by)) + ' 確認">' + tm(done.at) + '</span> ' : '') + (q ? '<span class="tag">' + q + '</span> ' : '') + '<span class="tag">' + esc(c.phase) + '</span>' +
     (showSt && st ? ' <span class="tag">' + esc(st.name) + '</span>' : '') +
     (c.assignee_id ? ' <span class="tag ok">' + esc(pname(c.assignee_id)) + '</span>' : (as.length ? '' : ' <span class="tag warn">未分配</span>')) +
@@ -2650,6 +2680,8 @@ function vCheck() {
   var inPh = function (c) { return S.ui.ph === '全部' || c.phase === S.ui.ph; }, list = pool.filter(inPh);
   list.sort(function (a, b) { return a.sort - b.sort; });
   var open = list.filter(function (c) { return !R.ck[c.id]; }), dn = list.filter(function (c) { return R.ck[c.id]; });
+  var my = (S.D.mytodo || []).filter(inPh), myOpen = my.filter(function (t) { return !t.done_at; }), myDone = my.filter(function (t) { return t.done_at; });
+  if (v !== 'me') { myOpen = []; myDone = []; }
   var pct = R.ckLive ? Math.round(R.ckDone / R.ckLive * 100) : 0;
 
   var h = '<section class="panel">' + pHead('全場進度', '已完成 <b>' + R.ckDone + '</b> / ' + R.ckLive + ' 項（' + pct + '%）。選擇崗位與階段，下方只顯示符合的項目。') +
@@ -2658,7 +2690,7 @@ function vCheck() {
     var a = live.filter(function (c) { return c.station_id === s.id; }), d = a.filter(function (c) { return R.ck[c.id]; }).length;
     return '<button class="chip" data-act="station" data-v="' + s.id + '" aria-pressed="' + (v === s.id) + '">' + esc(s.name) + ' <span style="opacity:.7">' + d + '/' + a.length + '</span></button>';
   }).join('') +
-    '<button class="chip" data-act="station" data-v="me" aria-pressed="' + (v === 'me') + '">我的待辦 <span style="opacity:.7">' + mine.filter(function (c) { return !R.ck[c.id] && inPh(c); }).length + '</span></button>' +
+    '<button class="chip" data-act="station" data-v="me" aria-pressed="' + (v === 'me') + '">我的待辦 <span style="opacity:.7">' + (mine.filter(function (c) { return !R.ck[c.id] && inPh(c); }).length + (S.D.mytodo || []).filter(function (t) { return !t.done_at && inPh(t); }).length) + '</span></button>' +
     '<button class="chip" data-act="station" data-v="none" aria-pressed="' + (v === 'none') + '">未分配 <span style="opacity:.7">' + none.length + '</span></button></div>';
   h += '<span class="lbl">階段</span><div class="chips" role="group" aria-label="階段">' + ['全部'].concat(PHASES).map(function (p) {
     return '<button class="chip" data-act="phase" data-v="' + p + '" aria-pressed="' + (S.ui.ph === p) + '">' + p + '</button>';
@@ -2678,15 +2710,23 @@ function vCheck() {
       }).join('') + '</div><div class="field" style="margin-top:16px;max-width:240px"><label for="st-date">與負責人對點日期</label><input type="date" id="st-date" data-act="stDate" value="' + esc(st.check_date || '') + '"></div></div></details>';
     }
   } else {
-    h += '<section class="panel">' + pHead(v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配', v === 'me' ? '我是負責人的崗位中，還沒完成的項目' + (S.ui.ph === '全部' ? '' : '（目前只顯示「' + esc(S.ui.ph) + '」階段）') + '。勾選完成後就會從這裡移除。' : '沒有指派人，而且崗位也沒有負責人的項目。');
+    h += '<section class="panel">' + pHead(v === 'me' ? '我的待辦（' + esc(S.me.name) + '）' : '未分配', v === 'me' ? '我負責的崗位、指派給我的項目，以及我自己新增的個人待辦' + (S.ui.ph === '全部' ? '' : '（目前只顯示「' + esc(S.ui.ph) + '」階段）') + '。個人待辦只有自己看得到。' : '沒有指派人，而且崗位也沒有負責人的項目。');
   }
-  h += '<h3>待完成（' + open.length + '）</h3>';
-  if (!open.length) h += '<div class="empty">' + (v === 'me' ? (mine.length ? '你負責的崗位' + (S.ui.ph === '全部' ? '' : '在這個階段') + '都完成了。' : '你目前不是任何崗位的負責人。') : list.length ? '這一組都完成了。' : (can ? '這個崗位在這個階段還沒有項目，可以在下方新增或套用範本。' : '沒有符合的項目。')) + '</div>';
+  h += '<h3>待完成（' + (open.length + myOpen.length) + '）</h3>';
+  if (!open.length && !myOpen.length) h += '<div class="empty">' + (v === 'me' ? (mine.length || my.length ? '你的待辦' + (S.ui.ph === '全部' ? '' : '在這個階段') + '都完成了。' : '目前沒有待辦。你不是任何崗位的負責人，也沒有被指派的項目' + (canMyTodo() ? '，可以在下方自己新增。' : '。')) : list.length ? '這一組都完成了。' : (can ? '這個崗位在這個階段還沒有項目，可以在下方新增或套用範本。' : '沒有符合的項目。')) + '</div>';
   open.forEach(function (c) { h += ckRow(c, !real); });
-  if (dn.length) {
-    h += '<div class="sect"><div class="row" style="justify-content:space-between"><h3 style="margin:0">已完成（' + dn.length + '）</h3><button class="btn ghost sm" data-act="toggleDone">' + (S.ui.showDone ? '收起' : '展開') + '</button></div>';
-    if (S.ui.showDone) dn.forEach(function (c) { h += ckRow(c, !real); });
+  myOpen.forEach(function (t) { h += myRow(t); });
+  if (dn.length || myDone.length) {
+    h += '<div class="sect"><div class="row" style="justify-content:space-between"><h3 style="margin:0">已完成（' + (dn.length + myDone.length) + '）</h3><button class="btn ghost sm" data-act="toggleDone">' + (S.ui.showDone ? '收起' : '展開') + '</button></div>';
+    if (S.ui.showDone) { dn.forEach(function (c) { h += ckRow(c, !real); }); myDone.forEach(function (t) { h += myRow(t); }); }
     h += '</div>';
+  }
+  if (v === 'me' && canMyTodo()) {
+    h += '<div class="sect"><h3>新增個人待辦</h3><div class="grid2 form">' +
+      '<div class="field"><label for="my-title">待辦</label><input type="text" id="my-title" maxlength="200" placeholder="例如：帶延長線、確認停車證"></div>' +
+      '<div class="field"><label for="my-note">備註（選填）</label><input type="text" id="my-note" maxlength="500"></div>' +
+      '<div class="field"><label for="my-phase">階段</label><select id="my-phase">' + selOpts(PHASES.map(function (p) { return [p, p]; }), S.ui.ph === '全部' ? '事前' : S.ui.ph) + '</select></div></div>' +
+      '<div class="row btns" style="margin-top:16px"><button class="btn" data-act="myAdd">新增</button><span class="hint">只有你自己看得到，不算進全場進度。</span></div></div>';
   }
   h += '</section>';
   if (can) {
@@ -4371,6 +4411,24 @@ var A = {
     if (!p.title.trim()) { toast('請輸入品項', true); return; }
     call('evt_checklist_save', { p: p }, ['ck'], '已儲存').then(function (r) { if (r.ok) { S.ui.editId = null; renderNow(); } });
   },
+  myAdd: function () {
+    var p = { event_id: S.ev, title: val('#my-title'), note: val('#my-note'), phase: val('#my-phase') };
+    if (!p.title.trim()) { toast('請輸入待辦內容', true); return; }
+    call('evt_my_todo_save', { p: p }, ['mytodo'], '已新增：' + p.title.trim());
+  },
+  myTick: function (e) { call('evt_my_todo_done', { p_id: e.getAttribute('data-id'), p_done: e.checked }, ['mytodo']).then(function (r) { if (!r.ok) renderNow(); }); },
+  myEdit: function (e) { S.ui.myEdit = e.getAttribute('data-id'); renderNow(); },
+  myCancel: function () { S.ui.myEdit = null; renderNow(); },
+  mySave: function (e) {
+    var p = { id: e.getAttribute('data-id'), title: val('#me-title'), note: val('#me-note'), phase: val('#me-phase') };
+    if (!p.title.trim()) { toast('請輸入待辦內容', true); return; }
+    call('evt_my_todo_save', { p: p }, ['mytodo'], '已儲存').then(function (r) { if (r.ok) { S.ui.myEdit = null; renderNow(); } });
+  },
+  myDel: function (e) {
+    var t = byId(S.D.mytodo, e.getAttribute('data-id'));
+    if (!t || !confirm('刪除個人待辦「' + t.title + '」？')) return;
+    call('evt_my_todo_delete', { p_id: t.id }, ['mytodo'], '已刪除');
+  },
   archCk: function (e) {
     var c = byId(S.D.ck, e.getAttribute('data-id'));
     if (!c || !confirm('刪除「' + c.title + '」？\n項目會從清單隱藏，勾選紀錄保留，管理員可以還原。')) return;
@@ -5189,7 +5247,7 @@ var A = {
   }
 };
 /* 這些動作由 change 事件觸發，不由 click 觸發 */
-var CHANGE_ACTS = ['tick', 'showCalc', 'pMgr', 'pOwner', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
+var CHANGE_ACTS = ['tick', 'myTick', 'showCalc', 'pMgr', 'pOwner', 'pActive', 'pickEvent', 'buyStatus', 'buyRec', 'stDate', 'mSupport', 'prepInc', 'tlReplace'];
 
 document.addEventListener('keydown', function (ev) {
   if ((ev.key === 'Escape' || ev.key === 'Esc') && S.ui.newEv) { A.closeNewEv(); }
@@ -5275,7 +5333,7 @@ document.addEventListener('change', function (ev) {
     return;
   }
   if (t.type === 'file') { Object.keys(IMP).forEach(function (k) { if (IMP[k].file === t.id) { var cb = document.querySelector('[data-act=impClear][data-v=' + k + ']'); if (cb) cb.disabled = false; } }); }
-  if (a === 'tick' || a === 'showCalc' || a === 'pMgr' || a === 'pOwner' || a === 'pActive') { A[a](t); return; }
+  if (a === 'tick' || a === 'myTick' || a === 'showCalc' || a === 'pMgr' || a === 'pOwner' || a === 'pActive') { A[a](t); return; }
   if (a === 'pickEvent') { switchEvent(t.value); return; }
   if (t.hasAttribute('data-pp')) {
     var pp = t.getAttribute('data-pp').split('|'), pv = t.value.trim(), po = byId(S.D.posp, pp[0]), pd = { id: pp[0] }, pmsg = '已更新';
